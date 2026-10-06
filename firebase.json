@@ -1,0 +1,16 @@
+{
+  "firestore": [
+    {
+      "database": "ai-studio-android-growthdi-0b40ddf8-1b62-4ba8-827a-1a526890ad8a",
+      "rules": "firestore.rules"
+    }
+  ],
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "firestore": {
+      "port": 8085
+    }
+  }
+}

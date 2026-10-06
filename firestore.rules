@@ -1,0 +1,93 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // User profile validation
+    function isValidUserProfile(data) {
+      return data.userId is string &&
+             data.name is string &&
+             data.email is string &&
+             data.gender is string &&
+             data.age is number &&
+             data.weightKg is number &&
+             data.heightCm is number &&
+             data.biotype is string &&
+             data.trainingDaysPerWeek is number &&
+             data.goal is string &&
+             data.targetCalories is number;
+    }
+
+    // Meal plan validation
+    function isValidMealPlan(data) {
+      return data.userId is string &&
+             data.name is string &&
+             data.mealType is string &&
+             data.portionGrams is number &&
+             data.calories is number &&
+             data.protein is number &&
+             data.carbs is number &&
+             data.fat is number;
+    }
+
+    // Shopping item validation
+    function isValidShoppingItem(data) {
+      return data.userId is string &&
+             data.name is string &&
+             data.category is string &&
+             data.totalQuantityGrams is number &&
+             data.unit is string &&
+             data.estimatedPrice is number &&
+             data.isBought is bool;
+    }
+
+    // Progress log validation
+    function isValidProgressLog(data) {
+      return data.userId is string &&
+             data.dateMillis is number &&
+             data.weightKg is number;
+    }
+
+    // User Profile document
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isValidUserProfile(request.resource.data);
+      allow delete: if isOwner(userId);
+
+      // Subcollections
+      match /mealPlans/{mealPlanId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidMealPlan(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /shoppingItems/{itemId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidShoppingItem(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /progressLogs/{logId} {
+        allow read: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidProgressLog(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
+
+      match /receipts/{receiptId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /workoutLogs/{workoutLogId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+  }
+}
