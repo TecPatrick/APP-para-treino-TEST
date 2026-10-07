@@ -177,6 +177,10 @@ object ExerciseGifMapper {
         )
     )
 
+    fun getAllAvailableExercises(): List<ExerciseVisualGuide> {
+        return guidesMap.values.distinctBy { it.exerciseName }
+    }
+
     fun getGuideForExercise(exerciseName: String): ExerciseVisualGuide {
         // Direct exact match
         guidesMap[exerciseName]?.let { return it }

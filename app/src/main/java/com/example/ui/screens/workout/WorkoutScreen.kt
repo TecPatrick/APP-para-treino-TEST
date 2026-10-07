@@ -17,9 +17,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -36,6 +40,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
@@ -122,6 +127,8 @@ fun WorkoutScreen(viewModel: GrowthViewModel) {
 
     var showAddExerciseDialog by remember { mutableStateOf(false) }
     var showAddRoutineDialog by remember { mutableStateOf(false) }
+    var routineToEdit by remember { mutableStateOf<WorkoutRoutine?>(null) }
+    var routineToDelete by remember { mutableStateOf<WorkoutRoutine?>(null) }
     var exerciseToEdit by remember { mutableStateOf<WorkoutExercise?>(null) }
     var selectedExerciseGuide by remember { mutableStateOf<WorkoutExercise?>(null) }
     var showFinishWorkoutDialog by remember { mutableStateOf(false) }
@@ -138,7 +145,10 @@ fun WorkoutScreen(viewModel: GrowthViewModel) {
                 badgeText = "FICHA DE TREINO",
                 trailingContent = {
                     IconButton(
-                        onClick = { showAddRoutineDialog = true },
+                        onClick = {
+                            routineToEdit = null
+                            showAddRoutineDialog = true
+                        },
                         modifier = Modifier.testTag("add_routine_btn")
                     ) {
                         Icon(Icons.Default.Add, contentDescription = "Criar Treino", tint = GrowthOrange)
@@ -230,7 +240,10 @@ fun WorkoutScreen(viewModel: GrowthViewModel) {
                 item {
                     FilterChip(
                         selected = false,
-                        onClick = { showAddRoutineDialog = true },
+                        onClick = {
+                            routineToEdit = null
+                            showAddRoutineDialog = true
+                        },
                         label = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp), tint = GrowthOrange)
@@ -295,13 +308,26 @@ fun WorkoutScreen(viewModel: GrowthViewModel) {
                                         )
                                     }
 
-                                    if (currentRoutine.splitType == WorkoutSplitType.CUSTOM) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
                                         IconButton(
-                                            onClick = { viewModel.deleteWorkoutRoutine(currentRoutine.id) }
+                                            onClick = {
+                                                routineToEdit = currentRoutine
+                                                showAddRoutineDialog = true
+                                            }
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Edit,
+                                                contentDescription = "Editar Ficha de Treino",
+                                                tint = GrowthOrange,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = { routineToDelete = currentRoutine }
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Delete,
-                                                contentDescription = "Excluir Ficha Customizada",
+                                                contentDescription = "Excluir Ficha de Treino",
                                                 tint = GrowthRed,
                                                 modifier = Modifier.size(20.dp)
                                             )
@@ -339,54 +365,72 @@ fun WorkoutScreen(viewModel: GrowthViewModel) {
                         }
                     }
 
-                    // Exercise List with Biomechanics Guide & GIF animation button
+                    // Exercise List with Growth Official Layout & Biomechanics Guide
                     items(exercisesForCurrentRoutine) { exercise ->
                         val isSessionActive = activeWorkout.isRunning && activeWorkout.routine?.id == currentRoutine.id
                         val loggedSetsForThisEx = activeWorkout.loggedExerciseSets[exercise.id] ?: emptyList()
+                        val exerciseIndex = (exercisesForCurrentRoutine.indexOf(exercise) + 1).let { if (it < 10) "0$it" else "$it" }
 
                         Card(
                             colors = CardDefaults.cardColors(containerColor = CarbonCard),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(14.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp)
+                                .padding(vertical = 5.dp)
                                 .testTag("exercise_card_${exercise.id}")
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    // Growth Index Badge (01, 02...)
+                                    Surface(
+                                        color = GrowthOrange,
+                                        shape = RoundedCornerShape(6.dp),
+                                        modifier = Modifier.size(30.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(exerciseIndex, fontSize = 12.sp, fontWeight = FontWeight.Black, color = Color.White)
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.width(10.dp))
+
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = exercise.exerciseName,
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.ExtraBold,
                                             color = MaterialTheme.colorScheme.onBackground
                                         )
-                                        Text(
-                                            text = "Grupamento: ${exercise.muscleGroup}",
-                                            fontSize = 11.sp,
-                                            color = GrowthOrangeLight
-                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = exercise.muscleGroup,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = GrowthOrangeLight
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Surface(
+                                                color = GrowthCyan.copy(alpha = 0.15f),
+                                                shape = RoundedCornerShape(4.dp),
+                                                modifier = Modifier.clickable { selectedExerciseGuide = exercise }
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Info, contentDescription = null, tint = GrowthCyan, modifier = Modifier.size(11.dp))
+                                                    Spacer(modifier = Modifier.width(3.dp))
+                                                    Text("🎬 Animação 3D", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GrowthCyan)
+                                                }
+                                            }
+                                        }
                                     }
 
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        // Biomechanics & GIF guide button
-                                        IconButton(
-                                            onClick = { selectedExerciseGuide = exercise },
-                                            modifier = Modifier.size(28.dp).testTag("guide_btn_${exercise.id}")
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Info,
-                                                contentDescription = "Guia Biomecânico",
-                                                tint = GrowthCyan,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
-
                                         IconButton(
                                             onClick = { exerciseToEdit = exercise },
                                             modifier = Modifier.size(28.dp)
@@ -412,48 +456,88 @@ fun WorkoutScreen(viewModel: GrowthViewModel) {
                                     }
                                 }
 
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(10.dp))
 
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                // Growth Load & Progression Controls Bar
+                                Surface(
+                                    color = CarbonCardElevated,
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Surface(
-                                        color = CarbonCardElevated,
-                                        shape = RoundedCornerShape(6.dp)
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = "${exercise.sets} séries x ${exercise.repsMin}-${exercise.repsMax} reps",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = GrowthCyan,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                        )
-                                    }
-
-                                    Surface(
-                                        color = CarbonCardElevated,
-                                        shape = RoundedCornerShape(6.dp)
-                                    ) {
-                                        Text(
-                                            text = "Carga: ${exercise.currentWeightKg.toInt()} kg",
+                                            text = "📊 ${exercise.sets} séries × ${exercise.repsMin}-${exercise.repsMax} reps",
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = GrowthGreen,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            color = GrowthCyan
                                         )
-                                    }
 
-                                    Surface(
-                                        color = CarbonCardElevated,
-                                        shape = RoundedCornerShape(6.dp)
-                                    ) {
+                                        // Instant Weight Progression Adjuster
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Surface(
+                                                color = CarbonDark,
+                                                shape = RoundedCornerShape(4.dp),
+                                                modifier = Modifier
+                                                    .size(24.dp)
+                                                    .clickable {
+                                                        viewModel.updateExerciseWeightAndReps(
+                                                            exercise,
+                                                            (exercise.currentWeightKg - 2.5f).coerceAtLeast(0f),
+                                                            exercise.sets
+                                                        )
+                                                    }
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(Icons.Default.Remove, contentDescription = "-2.5kg", tint = GrowthOrange, modifier = Modifier.size(12.dp))
+                                                }
+                                            }
+
+                                            Spacer(modifier = Modifier.width(4.dp))
+
+                                            Surface(
+                                                color = GrowthGreen.copy(alpha = 0.2f),
+                                                shape = RoundedCornerShape(4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "${if (exercise.currentWeightKg % 1f == 0f) exercise.currentWeightKg.toInt().toString() else exercise.currentWeightKg.toString()} kg",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Black,
+                                                    color = GrowthGreen,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+
+                                            Spacer(modifier = Modifier.width(4.dp))
+
+                                            Surface(
+                                                color = CarbonDark,
+                                                shape = RoundedCornerShape(4.dp),
+                                                modifier = Modifier
+                                                    .size(24.dp)
+                                                    .clickable {
+                                                        viewModel.updateExerciseWeightAndReps(
+                                                            exercise,
+                                                            exercise.currentWeightKg + 2.5f,
+                                                            exercise.sets
+                                                        )
+                                                    }
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center) {
+                                                    Icon(Icons.Default.Add, contentDescription = "+2.5kg", tint = GrowthOrange, modifier = Modifier.size(12.dp))
+                                                }
+                                            }
+                                        }
+
                                         Text(
-                                            text = "Descanso: ${exercise.restSeconds}s",
+                                            text = "⏱️ ${exercise.restSeconds}s",
                                             fontSize = 11.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
@@ -613,12 +697,33 @@ fun WorkoutScreen(viewModel: GrowthViewModel) {
     }
 
     if (showAddRoutineDialog) {
-        AddRoutineDialog(
+        WorkoutRoutineFormDialog(
+            routineToEdit = routineToEdit,
             initialSplit = selectedSplitType,
-            onDismiss = { showAddRoutineDialog = false },
-            onConfirm = { split, letter, title, day, muscles, duration ->
-                viewModel.addWorkoutRoutineWithSplit(split, letter, title, day, muscles, duration)
+            existingExercises = if (routineToEdit != null) allExercises.filter { it.routineId == routineToEdit!!.id } else emptyList(),
+            onDismiss = {
                 showAddRoutineDialog = false
+                routineToEdit = null
+            },
+            onSave = { routine, exercises ->
+                selectedSplitType = routine.splitType
+                viewModel.saveWorkoutRoutineWithExercises(routine, exercises)
+                showAddRoutineDialog = false
+                routineToEdit = null
+            }
+        )
+    }
+
+    if (routineToDelete != null) {
+        ConfirmDeleteRoutineDialog(
+            routine = routineToDelete!!,
+            onDismiss = { routineToDelete = null },
+            onConfirm = {
+                val targetId = routineToDelete!!.id
+                viewModel.deleteWorkoutRoutine(targetId)
+                val remaining = filteredRoutines.filter { it.id != targetId }
+                selectedRoutineId = remaining.firstOrNull()?.id ?: 0L
+                routineToDelete = null
             }
         )
     }
@@ -1004,88 +1109,285 @@ fun AddExerciseDialog(
 }
 
 @Composable
-fun AddRoutineDialog(
+fun WorkoutRoutineFormDialog(
+    routineToEdit: WorkoutRoutine?,
     initialSplit: WorkoutSplitType = WorkoutSplitType.CUSTOM,
+    existingExercises: List<WorkoutExercise> = emptyList(),
     onDismiss: () -> Unit,
-    onConfirm: (WorkoutSplitType, String, String, String, String, Int) -> Unit
+    onSave: (WorkoutRoutine, List<WorkoutExercise>) -> Unit
 ) {
-    var splitType by remember { mutableStateOf(initialSplit) }
-    var letter by remember { mutableStateOf("F") }
-    var title by remember { mutableStateOf("") }
-    var dayOfWeek by remember { mutableStateOf("Sábado") }
-    var muscles by remember { mutableStateOf("Braços & Core") }
-    var durationText by remember { mutableStateOf("60") }
+    var splitType by remember { mutableStateOf(routineToEdit?.splitType ?: initialSplit) }
+    var letter by remember { mutableStateOf(routineToEdit?.letter ?: "A") }
+    var title by remember { mutableStateOf(routineToEdit?.title ?: "") }
+    var dayOfWeek by remember { mutableStateOf(routineToEdit?.dayOfWeekLabel ?: "Segunda-feira") }
+    var muscles by remember { mutableStateOf(routineToEdit?.targetMuscleGroups ?: "Peitoral & Tríceps") }
+    var durationText by remember { mutableStateOf((routineToEdit?.estimatedDurationMinutes ?: 60).toString()) }
+
+    var draftExercises by remember {
+        mutableStateOf<List<WorkoutExercise>>(
+            if (routineToEdit != null) existingExercises.map { it.copy() }
+            else emptyList()
+        )
+    }
+
+    var showExercisePicker by remember { mutableStateOf(false) }
+    var showCustomExerciseDialog by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = CarbonCard,
         title = {
-            Text("Criar Nova Ficha de Treino", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+            Text(
+                if (routineToEdit != null) "Editar Ficha de Treino" else "Criar Nova Ficha de Treino",
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground
+            )
         },
         text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        value = letter,
-                        onValueChange = { letter = it.take(2) },
-                        label = { Text("Letra (A, B, C...)") },
-                        modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GrowthOrange,
-                            unfocusedBorderColor = CarbonBorder
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 480.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                item {
+                    Text("Divisão do Treino:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = GrowthCyan)
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp)
+                    ) {
+                        items(WorkoutSplitType.values()) { st ->
+                            FilterChip(
+                                selected = (splitType == st),
+                                onClick = { splitType = st },
+                                label = {
+                                    Text(
+                                        text = when (st) {
+                                            WorkoutSplitType.AB -> "Divisão AB"
+                                            WorkoutSplitType.ABC -> "Divisão ABC"
+                                            WorkoutSplitType.ABCDE -> "ABCDE"
+                                            WorkoutSplitType.CUSTOM -> "Personalizado"
+                                        },
+                                        fontSize = 10.sp
+                                    )
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = GrowthOrange,
+                                    selectedLabelColor = Color.White
+                                )
+                            )
+                        }
+                    }
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = letter,
+                            onValueChange = { letter = it.take(4) },
+                            label = { Text("Letra/Sigla (ex: A, ABC)") },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("routine_letter_input"),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = GrowthOrange,
+                                unfocusedBorderColor = CarbonBorder
+                            )
                         )
-                    )
+                        OutlinedTextField(
+                            value = durationText,
+                            onValueChange = { durationText = it },
+                            label = { Text("Duração (min)") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = GrowthOrange,
+                                unfocusedBorderColor = CarbonBorder
+                            )
+                        )
+                    }
+                }
+
+                item {
                     OutlinedTextField(
-                        value = durationText,
-                        onValueChange = { durationText = it },
-                        label = { Text("Duração (min)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f),
+                        value = title,
+                        onValueChange = { title = it },
+                        label = { Text("Título da Ficha (Ex: ABC, Peito & Tríceps)") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("routine_title_input"),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = GrowthOrange,
                             unfocusedBorderColor = CarbonBorder
                         )
                     )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
 
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Título (Ex: Bíceps & Tríceps)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GrowthOrange,
-                        unfocusedBorderColor = CarbonBorder
+                item {
+                    OutlinedTextField(
+                        value = dayOfWeek,
+                        onValueChange = { dayOfWeek = it },
+                        label = { Text("Dia / Frequência (Ex: Segunda-feira)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GrowthOrange,
+                            unfocusedBorderColor = CarbonBorder
+                        )
                     )
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+                }
 
-                OutlinedTextField(
-                    value = dayOfWeek,
-                    onValueChange = { dayOfWeek = it },
-                    label = { Text("Dia da Semana") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GrowthOrange,
-                        unfocusedBorderColor = CarbonBorder
+                item {
+                    OutlinedTextField(
+                        value = muscles,
+                        onValueChange = { muscles = it },
+                        label = { Text("Músculos Alvo") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GrowthOrange,
+                            unfocusedBorderColor = CarbonBorder
+                        )
                     )
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+                }
 
-                OutlinedTextField(
-                    value = muscles,
-                    onValueChange = { muscles = it },
-                    label = { Text("Músculos Alvo") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GrowthOrange,
-                        unfocusedBorderColor = CarbonBorder
-                    )
-                )
+                item {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "Exercícios (${draftExercises.size})",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = GrowthOrange
+                        )
+                        Row {
+                            TextButton(onClick = { showExercisePicker = true }) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp), tint = GrowthCyan)
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Text("Biblioteca", fontSize = 11.sp, color = GrowthCyan)
+                            }
+                            TextButton(onClick = { showCustomExerciseDialog = true }) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp), tint = GrowthOrange)
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Text("Manual", fontSize = 11.sp, color = GrowthOrange)
+                            }
+                        }
+                    }
+                }
+
+                if (draftExercises.isEmpty()) {
+                    item {
+                        Surface(
+                            color = CarbonCardElevated,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Text(
+                                "Nenhum exercício selecionado. Clique em 'Biblioteca' para escolher do banco de dados ou 'Manual' para criar.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
+                } else {
+                    itemsIndexed(draftExercises) { index, ex ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = CarbonCardElevated),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            "${index + 1}. ${ex.exerciseName}",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                        Text(
+                                            ex.muscleGroup,
+                                            fontSize = 10.sp,
+                                            color = GrowthOrangeLight
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            draftExercises = draftExercises.filterIndexed { i, _ -> i != index }
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(Icons.Default.Close, contentDescription = "Remover", tint = GrowthRed, modifier = Modifier.size(14.dp))
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 6.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    OutlinedTextField(
+                                        value = ex.sets.toString(),
+                                        onValueChange = { newVal ->
+                                            val s = newVal.toIntOrNull() ?: ex.sets
+                                            val updated = draftExercises.toMutableList()
+                                            updated[index] = updated[index].copy(sets = s)
+                                            draftExercises = updated
+                                        },
+                                        label = { Text("Séries", fontSize = 9.sp) },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        modifier = Modifier.weight(1f),
+                                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = GrowthOrange)
+                                    )
+                                    OutlinedTextField(
+                                        value = "${ex.repsMin}-${ex.repsMax}",
+                                        onValueChange = { newVal ->
+                                            val parts = newVal.split("-")
+                                            val rMin = parts.getOrNull(0)?.trim()?.toIntOrNull() ?: ex.repsMin
+                                            val rMax = parts.getOrNull(1)?.trim()?.toIntOrNull() ?: ex.repsMax
+                                            val updated = draftExercises.toMutableList()
+                                            updated[index] = updated[index].copy(repsMin = rMin, repsMax = rMax)
+                                            draftExercises = updated
+                                        },
+                                        label = { Text("Reps", fontSize = 9.sp) },
+                                        modifier = Modifier.weight(1f),
+                                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = GrowthOrange)
+                                    )
+                                    OutlinedTextField(
+                                        value = if (ex.currentWeightKg % 1f == 0f) ex.currentWeightKg.toInt().toString() else ex.currentWeightKg.toString(),
+                                        onValueChange = { newVal ->
+                                            val w = newVal.toFloatOrNull() ?: ex.currentWeightKg
+                                            val updated = draftExercises.toMutableList()
+                                            updated[index] = updated[index].copy(currentWeightKg = w)
+                                            draftExercises = updated
+                                        },
+                                        label = { Text("Carga (kg)", fontSize = 9.sp) },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                        modifier = Modifier.weight(1f),
+                                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = GrowthOrange)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
@@ -1093,12 +1395,317 @@ fun AddRoutineDialog(
                 onClick = {
                     if (title.isNotBlank()) {
                         val dur = durationText.toIntOrNull() ?: 60
-                        onConfirm(splitType, letter, title, dayOfWeek, muscles, dur)
+                        val routine = (routineToEdit ?: WorkoutRoutine(
+                            id = 0L,
+                            splitType = splitType,
+                            letter = letter.uppercase().take(4),
+                            title = title,
+                            dayOfWeekLabel = dayOfWeek,
+                            targetMuscleGroups = muscles,
+                            estimatedDurationMinutes = dur
+                        )).copy(
+                            splitType = splitType,
+                            letter = letter.uppercase().take(4),
+                            title = title,
+                            dayOfWeekLabel = dayOfWeek,
+                            targetMuscleGroups = muscles,
+                            estimatedDurationMinutes = dur
+                        )
+                        onSave(routine, draftExercises)
                     }
                 },
+                enabled = title.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
+                modifier = Modifier.testTag("confirm_add_routine_btn")
+            ) {
+                Text(if (routineToEdit != null) "Salvar Alterações" else "Criar Ficha", color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    )
+
+    if (showExercisePicker) {
+        ExercisePickerDialog(
+            onDismiss = { showExercisePicker = false },
+            onExercisesSelected = { selectedGuides ->
+                val newExercises = selectedGuides.mapIndexed { idx, guide ->
+                    WorkoutExercise(
+                        routineId = routineToEdit?.id ?: 0L,
+                        exerciseName = guide.exerciseName,
+                        muscleGroup = guide.muscleGroup,
+                        sets = 4,
+                        repsMin = 8,
+                        repsMax = 12,
+                        currentWeightKg = 30f,
+                        restSeconds = 60,
+                        orderIndex = draftExercises.size + idx,
+                        biomechanicsGuide = guide.concentricPhase
+                    )
+                }
+                draftExercises = draftExercises + newExercises
+                showExercisePicker = false
+            }
+        )
+    }
+
+    if (showCustomExerciseDialog) {
+        AddCustomExerciseInlineDialog(
+            onDismiss = { showCustomExerciseDialog = false },
+            onAdd = { name, group, sets, rMin, rMax, weight, rest ->
+                val newEx = WorkoutExercise(
+                    routineId = routineToEdit?.id ?: 0L,
+                    exerciseName = name,
+                    muscleGroup = group,
+                    sets = sets,
+                    repsMin = rMin,
+                    repsMax = rMax,
+                    currentWeightKg = weight,
+                    restSeconds = rest,
+                    orderIndex = draftExercises.size,
+                    biomechanicsGuide = "Execução personalizada."
+                )
+                draftExercises = draftExercises + newEx
+                showCustomExerciseDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun ExercisePickerDialog(
+    onDismiss: () -> Unit,
+    onExercisesSelected: (List<com.example.util.ExerciseVisualGuide>) -> Unit
+) {
+    val allGuides = remember { ExerciseGifMapper.getAllAvailableExercises() }
+    var searchQuery by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf("Todos") }
+    var checkedGuides by remember { mutableStateOf(setOf<String>()) }
+
+    val categories = remember {
+        listOf("Todos", "Peitoral", "Costas", "Deltoide", "Quadríceps", "Isquiotibiais", "Bíceps", "Tríceps", "Panturrilha")
+    }
+
+    val filtered = allGuides.filter { guide ->
+        val matchesSearch = guide.exerciseName.contains(searchQuery, ignoreCase = true) ||
+                guide.muscleGroup.contains(searchQuery, ignoreCase = true)
+        val matchesCat = if (selectedCategory == "Todos") true else guide.muscleGroup.contains(selectedCategory, ignoreCase = true)
+        matchesSearch && matchesCat
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = CarbonCard,
+        title = {
+            Text("Selecionar do Banco de Dados", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    label = { Text("Buscar exercício (ex: Supino, Agachamento)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = GrowthOrange)
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(categories) { cat ->
+                        FilterChip(
+                            selected = (selectedCategory == cat),
+                            onClick = { selectedCategory = cat },
+                            label = { Text(cat, fontSize = 10.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = GrowthOrange,
+                                selectedLabelColor = Color.White
+                            )
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 280.dp)
+                ) {
+                    items(filtered) { guide ->
+                        val isChecked = checkedGuides.contains(guide.exerciseName)
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isChecked) GrowthOrange.copy(alpha = 0.25f) else CarbonCardElevated
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp)
+                                .clickable {
+                                    checkedGuides = if (isChecked) {
+                                        checkedGuides - guide.exerciseName
+                                    } else {
+                                        checkedGuides + guide.exerciseName
+                                    }
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = isChecked,
+                                    onCheckedChange = {
+                                        checkedGuides = if (isChecked) {
+                                            checkedGuides - guide.exerciseName
+                                        } else {
+                                            checkedGuides + guide.exerciseName
+                                        }
+                                    },
+                                    colors = CheckboxDefaults.colors(checkedColor = GrowthOrange)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(guide.exerciseName, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text(guide.muscleGroup, fontSize = 10.sp, color = GrowthCyan)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val selectedList = allGuides.filter { checkedGuides.contains(it.exerciseName) }
+                    onExercisesSelected(selectedList)
+                },
+                enabled = checkedGuides.isNotEmpty(),
+                colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
+                modifier = Modifier.testTag("confirm_select_exercises_btn")
+            ) {
+                Text("Adicionar (${checkedGuides.size})", color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    )
+}
+
+@Composable
+fun AddCustomExerciseInlineDialog(
+    onDismiss: () -> Unit,
+    onAdd: (String, String, Int, Int, Int, Float, Int) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var group by remember { mutableStateOf("Geral") }
+    var setsText by remember { mutableStateOf("4") }
+    var repsMinText by remember { mutableStateOf("8") }
+    var repsMaxText by remember { mutableStateOf("12") }
+    var weightText by remember { mutableStateOf("30") }
+    var restText by remember { mutableStateOf("60") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = CarbonCard,
+        title = { Text("Adicionar Exercício Manual", fontWeight = FontWeight.Bold, color = Color.White) },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Nome do Exercício") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = GrowthOrange)
+                )
+                OutlinedTextField(
+                    value = group,
+                    onValueChange = { group = it },
+                    label = { Text("Grupamento Muscular") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = GrowthOrange)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedTextField(
+                        value = setsText,
+                        onValueChange = { setsText = it },
+                        label = { Text("Séries") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = weightText,
+                        onValueChange = { weightText = it },
+                        label = { Text("Carga (kg)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (name.isNotBlank()) {
+                        val s = setsText.toIntOrNull() ?: 4
+                        val rMin = repsMinText.toIntOrNull() ?: 8
+                        val rMax = repsMaxText.toIntOrNull() ?: 12
+                        val w = weightText.toFloatOrNull() ?: 30f
+                        val rest = restText.toIntOrNull() ?: 60
+                        onAdd(name, group, s, rMin, rMax, w, rest)
+                    }
+                },
+                enabled = name.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange)
             ) {
-                Text("Criar Treino", color = Color.White)
+                Text("Adicionar", color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    )
+}
+
+@Composable
+fun ConfirmDeleteRoutineDialog(
+    routine: WorkoutRoutine,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = CarbonCard,
+        title = {
+            Text("Excluir Ficha de Treino", fontWeight = FontWeight.Bold, color = GrowthRed)
+        },
+        text = {
+            Text(
+                "Tem certeza que deseja excluir a ficha '${routine.letter}: ${routine.title}'? Esta ação removerá a ficha e todos os exercícios associados.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = GrowthRed),
+                modifier = Modifier.testTag("confirm_delete_routine_btn")
+            ) {
+                Text("Excluir Ficha", color = Color.White, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {

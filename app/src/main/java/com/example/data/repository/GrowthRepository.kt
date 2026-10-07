@@ -361,6 +361,8 @@ class GrowthRepository(private val dao: GrowthDao) {
 
     suspend fun deleteWorkoutExercise(id: Long) = dao.deleteExercise(id)
 
+    suspend fun deleteExercisesForRoutine(routineId: Long) = dao.deleteExercisesForRoutine(routineId)
+
     suspend fun deleteWorkoutRoutine(id: Long) {
         dao.deleteExercisesForRoutine(id)
         dao.deleteRoutine(id)

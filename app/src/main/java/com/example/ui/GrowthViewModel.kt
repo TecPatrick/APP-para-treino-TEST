@@ -740,6 +740,31 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun saveWorkoutRoutineWithExercises(
+        routine: WorkoutRoutine,
+        exercises: List<WorkoutExercise>
+    ) {
+        viewModelScope.launch {
+            val routineId = if (routine.id == 0L) {
+                repository.addWorkoutRoutine(routine)
+            } else {
+                repository.addWorkoutRoutine(routine)
+                routine.id
+            }
+            repository.deleteExercisesForRoutine(routineId)
+            exercises.forEachIndexed { index, ex ->
+                repository.addWorkoutExercise(
+                    ex.copy(
+                        id = 0L,
+                        routineId = routineId,
+                        orderIndex = index
+                    )
+                )
+            }
+            _toastMessage.value = if (routine.id == 0L) "Treino salvo com sucesso!" else "Treino atualizado com sucesso!"
+        }
+    }
+
     fun createTemplateCustomRoutine(templateType: String) {
         viewModelScope.launch {
             val letter = when (templateType) {
@@ -791,6 +816,60 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
             _toastMessage.value = "Ficha personalizada criada com sucesso!"
+        }
+    }
+
+    fun saveFullRoutineWithExercises(
+        existingRoutineId: Long?,
+        splitType: WorkoutSplitType,
+        letter: String,
+        title: String,
+        dayOfWeekLabel: String,
+        targetMuscleGroups: String,
+        estimatedDurationMinutes: Int,
+        exercises: List<WorkoutExercise>
+    ) {
+        viewModelScope.launch {
+            val targetLetter = letter.ifBlank { "A" }.uppercase().take(2)
+            val routineId = if (existingRoutineId != null && existingRoutineId > 0L) {
+                val updatedRoutine = WorkoutRoutine(
+                    id = existingRoutineId,
+                    splitType = splitType,
+                    letter = targetLetter,
+                    title = title,
+                    dayOfWeekLabel = dayOfWeekLabel,
+                    targetMuscleGroups = targetMuscleGroups,
+                    estimatedDurationMinutes = estimatedDurationMinutes
+                )
+                repository.addWorkoutRoutine(updatedRoutine)
+                repository.deleteExercisesForRoutine(existingRoutineId)
+                existingRoutineId
+            } else {
+                val newRoutine = WorkoutRoutine(
+                    splitType = splitType,
+                    letter = targetLetter,
+                    title = title,
+                    dayOfWeekLabel = dayOfWeekLabel,
+                    targetMuscleGroups = targetMuscleGroups,
+                    estimatedDurationMinutes = estimatedDurationMinutes
+                )
+                repository.addWorkoutRoutine(newRoutine)
+            }
+
+            exercises.forEachIndexed { index, ex ->
+                val guide = com.example.util.ExerciseGifMapper.getGuideForExercise(ex.exerciseName)
+                repository.addWorkoutExercise(
+                    ex.copy(
+                        id = 0L,
+                        routineId = routineId,
+                        orderIndex = index,
+                        biomechanicsGuide = ex.biomechanicsGuide.ifBlank { guide.postureTip },
+                        gifDemonstrationUrl = ex.gifDemonstrationUrl.ifBlank { guide.gifUrl }
+                    )
+                )
+            }
+
+            _toastMessage.value = "Ficha '$title' salva com sucesso!"
         }
     }
 
