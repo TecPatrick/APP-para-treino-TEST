@@ -54,6 +54,26 @@ class GrowthRepository(private val dao: AppDao) {
         dao.insertOrUpdateProfile(profile)
     }
 
+    suspend fun updateDietaryGoals(calories: Int, protein: Int, carbs: Int, fat: Int, water: Int) {
+        dao.updateDietaryGoals(calories, protein, carbs, fat, water)
+    }
+
+    suspend fun updateWaterGoal(newTargetWater: Int) {
+        dao.updateWaterGoal(newTargetWater)
+    }
+
+    suspend fun updateWeight(newWeight: Float) {
+        dao.updateWeight(newWeight)
+    }
+
+    suspend fun switchActiveDietPlan(planId: Long) {
+        dao.switchActiveDietPlan(planId)
+    }
+
+    suspend fun updateDietPlanGoals(planId: Long, calories: Int, protein: Int, carbs: Int, fat: Int, water: Int) {
+        dao.updateDietPlanGoals(planId, calories, protein, carbs, fat, water)
+    }
+
     suspend fun addDietPlan(plan: DietPlan): Long = dao.insertDietPlan(plan)
 
     suspend fun updateDietPlan(plan: DietPlan) = dao.updateDietPlan(plan)
@@ -186,16 +206,16 @@ class GrowthRepository(private val dao: AppDao) {
 
         val rawString = json.toString()
         val base64 = Base64.encodeToString(rawString.toByteArray(StandardCharsets.UTF_8), Base64.NO_WRAP)
-        return "GROWTH-SHARE:$base64"
+        return "FIT-SHARE:$base64"
     }
 
     suspend fun importAndMergePartnerShoppingList(shareCode: String, partnerName: String): Boolean {
         try {
             val cleanCode = shareCode.trim()
-            val base64Content = if (cleanCode.startsWith("GROWTH-SHARE:")) {
-                cleanCode.substringAfter("GROWTH-SHARE:")
-            } else {
-                cleanCode
+            val base64Content = when {
+                cleanCode.startsWith("FIT-SHARE:") -> cleanCode.substringAfter("FIT-SHARE:")
+                cleanCode.startsWith("GROWTH-SHARE:") -> cleanCode.substringAfter("GROWTH-SHARE:")
+                else -> cleanCode
             }
 
             val decodedBytes = Base64.decode(base64Content, Base64.DEFAULT)
@@ -402,6 +422,15 @@ class GrowthRepository(private val dao: AppDao) {
     }
 
     suspend fun deleteWorkoutLog(id: Long) = dao.deleteWorkoutLog(id)
+
+    fun getWorkoutLogsForRoutine(routineId: Long): Flow<List<WorkoutLog>> =
+        dao.getWorkoutLogsForRoutine(routineId)
+
+    fun getRecentWorkoutLogs(limit: Int = 10): Flow<List<WorkoutLog>> =
+        dao.getRecentWorkoutLogs(limit)
+
+    val totalWorkoutVolume: Flow<Float?> = dao.getTotalWorkoutVolume()
+    val totalWorkoutCount: Flow<Int> = dao.getTotalWorkoutCount()
 
     // --- Progress & Analytics ---
     suspend fun addProgressLog(log: ProgressLog): Long = dao.insertProgressLog(log)

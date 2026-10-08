@@ -6,7 +6,7 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "purchase_receipts")
 data class PurchaseReceipt(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val storeName: String = "Supermercado / Growth Suplementos",
+    val storeName: String = "Supermercado / Loja de Suplementos",
     val receiptNumber: String = "", // Chave de acesso / Número da NF-e
     val dateMillis: Long = System.currentTimeMillis(),
     val dateDisplay: String = "",

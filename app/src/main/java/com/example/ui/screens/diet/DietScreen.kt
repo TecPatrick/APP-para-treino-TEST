@@ -1,5 +1,7 @@
 package com.example.ui.screens.diet
 
+import android.content.Intent
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -30,6 +32,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocalMall
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -97,6 +100,7 @@ fun DietScreen(
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
     val mealPlans by viewModel.mealPlanItems.collectAsStateWithLifecycle()
     val allFoods by viewModel.allFoods.collectAsStateWithLifecycle()
+    val context = LocalContext.current
 
     var showAddFoodDialog by remember { mutableStateOf(false) }
     var selectedMealTypeForAdd by remember { mutableStateOf(MealType.BREAKFAST) }
@@ -117,20 +121,41 @@ fun DietScreen(
             GrowthHeader(
                 title = "Dieta & Nutrição",
                 subtitle = "Planejamento alimentar e distribuição de macros",
-                badgeText = "CARDÁPIO GROWTH",
+                badgeText = "CARDÁPIO DIÁRIO",
                 trailingContent = {
-                    IconButton(
-                        onClick = {
-                            viewModel.generateShoppingList(30)
-                            onNavigateToShopping()
-                        },
-                        modifier = Modifier.testTag("diet_to_shopping_btn")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ShoppingCart,
-                            contentDescription = "Lista de Compras",
-                            tint = GrowthGreen
-                        )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = {
+                                val text = viewModel.formatDietPlanForSharing()
+                                val sendIntent = Intent().apply {
+                                    action = Intent.ACTION_SEND
+                                    putExtra(Intent.EXTRA_TEXT, text)
+                                    type = "text/plain"
+                                }
+                                context.startActivity(Intent.createChooser(sendIntent, "Compartilhar Cardápio"))
+                            },
+                            modifier = Modifier.testTag("diet_share_btn")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Compartilhar Cardápio",
+                                tint = GrowthOrangeLight
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
+                                viewModel.generateShoppingList(30)
+                                onNavigateToShopping()
+                            },
+                            modifier = Modifier.testTag("diet_to_shopping_btn")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ShoppingCart,
+                                contentDescription = "Lista de Compras",
+                                tint = GrowthGreen
+                            )
+                        }
                     }
                 }
             )
@@ -725,29 +750,12 @@ fun AddFoodToMealDialog(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            if (food.isGrowthProduct) {
-                                                Surface(
-                                                    color = GrowthOrange,
-                                                    shape = RoundedCornerShape(4.dp),
-                                                    modifier = Modifier.padding(end = 6.dp)
-                                                ) {
-                                                    Text(
-                                                        "GROWTH",
-                                                        color = Color.White,
-                                                        fontSize = 8.sp,
-                                                        fontWeight = FontWeight.Black,
-                                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                                    )
-                                                }
-                                            }
-                                            Text(
-                                                text = food.name,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.onBackground
-                                            )
-                                        }
+                                        Text(
+                                            text = food.name,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onBackground
+                                        )
                                         Text(
                                             text = "${food.calories.toInt()} kcal | P: ${food.protein}g | C: ${food.carbs}g | G: ${food.fat}g (por ${food.baseServingAmount.toInt()}${food.servingUnit})",
                                             fontSize = 10.sp,

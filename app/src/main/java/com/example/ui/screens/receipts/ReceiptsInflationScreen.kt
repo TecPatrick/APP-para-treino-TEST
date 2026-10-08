@@ -460,7 +460,7 @@ fun AddReceiptDialog(
                     OutlinedTextField(
                         value = storeName,
                         onValueChange = { storeName = it },
-                        label = { Text("Estabelecimento (Mercado / Growth)") },
+                        label = { Text("Estabelecimento (Mercado / Loja de Suplementos)") },
                         modifier = Modifier.fillMaxWidth().testTag("receipt_store_input"),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = GrowthOrange,

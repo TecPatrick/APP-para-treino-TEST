@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import com.example.data.model.DailyIntakeHistory
 import com.example.data.model.DietPlan
@@ -32,6 +33,15 @@ interface AppDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdateProfile(profile: UserProfile)
 
+    @Query("UPDATE user_profile SET targetCalories = :calories, targetProteinGrams = :protein, targetCarbsGrams = :carbs, targetFatGrams = :fat, targetWaterMl = :water WHERE id = 1")
+    suspend fun updateDietaryGoals(calories: Int, protein: Int, carbs: Int, fat: Int, water: Int)
+
+    @Query("UPDATE user_profile SET targetWaterMl = :newTargetWater WHERE id = 1")
+    suspend fun updateWaterGoal(newTargetWater: Int)
+
+    @Query("UPDATE user_profile SET weightKg = :newWeight WHERE id = 1")
+    suspend fun updateWeight(newWeight: Float)
+
     // =========================================================================
     // 🥗 DietPlan DAO Operations
     // =========================================================================
@@ -55,6 +65,21 @@ interface AppDao {
 
     @Query("DELETE FROM diet_plans WHERE id = :id")
     suspend fun deleteDietPlan(id: Long)
+
+    @Query("UPDATE diet_plans SET isActive = 0")
+    suspend fun deactivateAllDietPlans()
+
+    @Query("UPDATE diet_plans SET isActive = 1 WHERE id = :planId")
+    suspend fun activateDietPlan(planId: Long)
+
+    @Transaction
+    suspend fun switchActiveDietPlan(planId: Long) {
+        deactivateAllDietPlans()
+        activateDietPlan(planId)
+    }
+
+    @Query("UPDATE diet_plans SET targetCalories = :calories, targetProteinGrams = :protein, targetCarbsGrams = :carbs, targetFatGrams = :fat, targetWaterMl = :water WHERE id = :planId")
+    suspend fun updateDietPlanGoals(planId: Long, calories: Int, protein: Int, carbs: Int, fat: Int, water: Int)
 
     // =========================================================================
     // 🏋️ WorkoutRoutine DAO Operations
@@ -203,11 +228,29 @@ interface AppDao {
     @Query("SELECT * FROM workout_logs ORDER BY dateMillis DESC")
     fun getAllWorkoutLogs(): Flow<List<WorkoutLog>>
 
+    @Query("SELECT * FROM workout_logs WHERE routineId = :routineId ORDER BY dateMillis DESC")
+    fun getWorkoutLogsForRoutine(routineId: Long): Flow<List<WorkoutLog>>
+
+    @Query("SELECT * FROM workout_logs ORDER BY dateMillis DESC LIMIT :limit")
+    fun getRecentWorkoutLogs(limit: Int = 10): Flow<List<WorkoutLog>>
+
+    @Query("SELECT * FROM workout_logs WHERE id = :id LIMIT 1")
+    fun getWorkoutLogById(id: Long): Flow<WorkoutLog?>
+
+    @Query("SELECT SUM(totalVolumeKg) FROM workout_logs")
+    fun getTotalWorkoutVolume(): Flow<Float?>
+
+    @Query("SELECT COUNT(*) FROM workout_logs")
+    fun getTotalWorkoutCount(): Flow<Int>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWorkoutLog(log: WorkoutLog): Long
 
     @Query("DELETE FROM workout_logs WHERE id = :id")
     suspend fun deleteWorkoutLog(id: Long)
+
+    @Query("DELETE FROM workout_logs WHERE routineId = :routineId")
+    suspend fun deleteWorkoutLogsForRoutine(routineId: Long)
 
     // =========================================================================
     // 📈 Progress & Daily Intake DAO Operations

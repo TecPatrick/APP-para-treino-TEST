@@ -19,12 +19,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.LocalFireDepartment
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.ShoppingCart
@@ -58,6 +60,7 @@ import com.example.ui.screens.auth.AuthAndOnboardingScreen
 import com.example.ui.screens.calculator.MacroCalculatorScreen
 import com.example.ui.screens.dashboard.DashboardScreen
 import com.example.ui.screens.diet.DietScreen
+import com.example.ui.screens.profile.UserProfileScreen
 import com.example.ui.screens.receipts.ReceiptsInflationScreen
 import com.example.ui.screens.shopping.ShoppingListScreen
 import com.example.ui.screens.workout.WorkoutScreen
@@ -80,6 +83,7 @@ enum class AppNavigationScreen(
     RECEIPTS("Preços/NF", Icons.Filled.ReceiptLong, Icons.Outlined.ReceiptLong, "nav_receipts"),
     ANALYTICS("Evolução", Icons.Filled.TrendingUp, Icons.Outlined.TrendingUp, "nav_analytics"),
     CALCULATOR("Macros", Icons.Filled.Calculate, Icons.Filled.Calculate, "nav_calculator"),
+    PROFILE("Perfil", Icons.Filled.Person, Icons.Outlined.Person, "nav_profile"),
     AUTH("Conta", Icons.Filled.LocalFireDepartment, Icons.Outlined.LocalFireDepartment, "nav_auth")
 }
 
@@ -133,7 +137,7 @@ fun MainAppScreen(viewModel: GrowthViewModel) {
         }
     }
 
-    val showBottomBar = currentScreen != AppNavigationScreen.CALCULATOR && currentScreen != AppNavigationScreen.AUTH
+    val showBottomBar = currentScreen != AppNavigationScreen.CALCULATOR && currentScreen != AppNavigationScreen.AUTH && currentScreen != AppNavigationScreen.PROFILE
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -204,7 +208,8 @@ fun MainAppScreen(viewModel: GrowthViewModel) {
                         onNavigateToWorkout = { currentScreen = AppNavigationScreen.WORKOUT },
                         onNavigateToShopping = { currentScreen = AppNavigationScreen.SHOPPING },
                         onNavigateToCalculator = { currentScreen = AppNavigationScreen.CALCULATOR },
-                        onNavigateToAnalytics = { currentScreen = AppNavigationScreen.ANALYTICS }
+                        onNavigateToAnalytics = { currentScreen = AppNavigationScreen.ANALYTICS },
+                        onNavigateToProfile = { currentScreen = AppNavigationScreen.PROFILE }
                     )
                     AppNavigationScreen.DIET -> DietScreen(
                         viewModel = viewModel,
@@ -223,6 +228,10 @@ fun MainAppScreen(viewModel: GrowthViewModel) {
                         viewModel = viewModel
                     )
                     AppNavigationScreen.CALCULATOR -> MacroCalculatorScreen(
+                        viewModel = viewModel,
+                        onNavigateBack = { currentScreen = AppNavigationScreen.DASHBOARD }
+                    )
+                    AppNavigationScreen.PROFILE -> UserProfileScreen(
                         viewModel = viewModel,
                         onNavigateBack = { currentScreen = AppNavigationScreen.DASHBOARD }
                     )

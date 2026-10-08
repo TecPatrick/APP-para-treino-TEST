@@ -1,5 +1,10 @@
 package com.example.util
 
+import android.content.Context
+import org.json.JSONArray
+import java.io.BufferedReader
+import java.io.InputStreamReader
+
 data class ExerciseVisualGuide(
     val exerciseName: String,
     val muscleGroup: String,
@@ -11,6 +16,73 @@ data class ExerciseVisualGuide(
 )
 
 object ExerciseGifMapper {
+
+    private var applicationContext: Context? = null
+    private var cachedFullLibrary: List<ExerciseVisualGuide>? = null
+    private var cachedLibraryByName: Map<String, ExerciseVisualGuide>? = null
+
+    fun init(context: Context) {
+        if (applicationContext == null) {
+            applicationContext = context.applicationContext
+            loadLibraryFromAssets()
+        }
+    }
+
+    private fun loadLibraryFromAssets(): List<ExerciseVisualGuide> {
+        cachedFullLibrary?.let { return it }
+        val ctx = applicationContext ?: return catalogGuides
+
+        try {
+            val inputStream = ctx.assets.open("fitnessprogramer_exercises.json")
+            val reader = BufferedReader(InputStreamReader(inputStream))
+            val jsonString = reader.use { it.readText() }
+            val jsonArray = JSONArray(jsonString)
+
+            val loadedList = mutableListOf<ExerciseVisualGuide>()
+            val loadedMap = mutableMapOf<String, ExerciseVisualGuide>()
+
+            // 1. Primeiro adicionamos os canônicos brasileiros já traduzidos e com dicas anatômicas
+            for (guide in catalogGuides) {
+                loadedList.add(guide)
+                loadedMap[guide.exerciseName.lowercase().trim()] = guide
+            }
+
+            // 2. Em seguida, adicionamos todos os 813 exercícios do fitnessprogramer.com
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.getJSONObject(i)
+                val enName = obj.optString("exerciseName", "").trim()
+                if (enName.isEmpty()) continue
+
+                val lowerEn = enName.lowercase()
+                // Se já existir no canônico, não duplica
+                if (loadedMap.containsKey(lowerEn)) continue
+
+                val muscleGroup = obj.optString("muscleGroup", "Geral")
+                val pageUrl = obj.optString("fitnessProgrammerUrl", "")
+                val gifUrl = obj.optString("gifUrl", "")
+
+                val guide = ExerciseVisualGuide(
+                    exerciseName = enName,
+                    muscleGroup = muscleGroup,
+                    fitnessProgrammerUrl = pageUrl,
+                    gifUrl = gifUrl,
+                    concentricPhase = "Fase Concêntrica: Realize a contração vencendo a resistência de forma controlada.",
+                    eccentricPhase = "Fase Excêntrica: Controle a volta do movimento (descida da carga) em 2 a 3 segundos.",
+                    postureTip = "Mantenha a postura alinhada, core ativado e amplitudes seguras para as articulações."
+                )
+
+                loadedList.add(guide)
+                loadedMap[lowerEn] = guide
+            }
+
+            cachedFullLibrary = loadedList
+            cachedLibraryByName = loadedMap
+            return loadedList
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return catalogGuides
+        }
+    }
 
     // Lista canônica de exercícios da biblioteca (exibida no catálogo e nos filtros)
     private val catalogGuides = listOf(
@@ -339,6 +411,120 @@ object ExerciseGifMapper {
             concentricPhase = "Suba na ponta dos pés o máximo possível contraindo a panturrilha.",
             eccentricPhase = "Desça os calcanhares abaixo da linha do degrau alongando a musculatura.",
             postureTip = "Mantenha os joelhos estendidos e corpo alinhado sem dobrar o quadril."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Agachamento Hack",
+            muscleGroup = "Quadríceps & Glúteos",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/sled-hack-squat/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Sled-Hack-Squat.gif",
+            concentricPhase = "Empurre a plataforma com os calcanhares estendendo os joelhos.",
+            eccentricPhase = "Desça controladamente até 90 graus com as costas apoiadas.",
+            postureTip = "Mantenha os pés alinhados com os ombros e lombar colada no encosto."
+        ),
+
+        // === ABDÔMEN & CORE ===
+        ExerciseVisualGuide(
+            exerciseName = "Abdominal Crunch no Solo",
+            muscleGroup = "Reto Abdominal",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/crunch/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2015/11/Crunch.gif",
+            concentricPhase = "Eleve o tórax em direção aos joelhos enrolando a coluna.",
+            eccentricPhase = "Desça controladamente sem relaxar a musculatura do abdômen.",
+            postureTip = "Não puxe a cabeça com as mãos para não forçar a cervical."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Abdominal Infra no Solo",
+            muscleGroup = "Abdômen Inferior & Flexores",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/lying-leg-raise/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Lying-Leg-Raise.gif",
+            concentricPhase = "Eleve as pernas retas até ficarem perpendiculares ao chão.",
+            eccentricPhase = "Desça as pernas devagar sem tocar os calcanhares no chão.",
+            postureTip = "Mantenha a região lombar colada no colchonete durante toda a execução."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Abdominal no Cross / Polia",
+            muscleGroup = "Reto Abdominal & Core",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/kneeling-cable-crunch/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Kneeling-Cable-Crunch.gif",
+            concentricPhase = "Ajoelhado, flexione o tronco levando os cotovelos aos joelhos.",
+            eccentricPhase = "Retorne estendendo a coluna sob tensão da polia.",
+            postureTip = "Concentre o movimento no abdômen, sem mexer o quadril."
+        ),
+
+        // === TRAPÉZIO & ANTEBRAÇO ===
+        ExerciseVisualGuide(
+            exerciseName = "Encolhimento com Barra (Trapézio)",
+            muscleGroup = "Trapézio Superior",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/barbell-shrug/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Barbell-Shrug.gif",
+            concentricPhase = "Eleve os ombros verticalmente em direção às orelhas e segure 1s.",
+            eccentricPhase = "Desça os ombros completamente para máximo alongamento do trapézio.",
+            postureTip = "Não gire os ombros; o movimento é puramente vertical para cima e para baixo."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Rosca Inversa com Barra",
+            muscleGroup = "Antebraço & Braquiorradial",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/barbell-reverse-curl/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Barbell-Reverse-Curl.gif",
+            concentricPhase = "Eleve a barra com a pegada pronada (palmas para baixo).",
+            eccentricPhase = "Desça controlando a carga com firmeza nos punhos.",
+            postureTip = "Fortalece os antebraços e protege os punhos contra lesões."
+        ),
+
+        // === VARIAÇÕES CLÁSSICAS ADICIONAIS ===
+        ExerciseVisualGuide(
+            exerciseName = "Levantamento Terra (Deadlift)",
+            muscleGroup = "Cadeia Posterior, Dorsal & Glúteos",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/barbell-deadlift/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Barbell-Deadlift.gif",
+            concentricPhase = "Puxe a barra do chão estendendo quadril e joelhos simultaneamente.",
+            eccentricPhase = "Desça a barra rente às canelas mantendo a coluna alinhada.",
+            postureTip = "Excelente exercício construtor de massa e força geral; trave o abdômen."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Supino Reto com Halteres",
+            muscleGroup = "Peitoral Maior",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/dumbbell-press/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Press.gif",
+            concentricPhase = "Empurre os halteres para cima aproximando-os no topo.",
+            eccentricPhase = "Desça os halteres alinhados ao esterno com amplitude completa.",
+            postureTip = "Permite maior amplitude e liberdade articular que a barra reta."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Flexão de Braços (Push-Up)",
+            muscleGroup = "Peitoral Maior, Tríceps & Core",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/push-up/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Push-Up.gif",
+            concentricPhase = "Empurre o chão estendendo os braços com corpo em linha reta.",
+            eccentricPhase = "Desça até o peito quase tocar o chão mantendo o core travado.",
+            postureTip = "Cotovelos a 45 graus em relação ao tronco."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Pullover com Halter",
+            muscleGroup = "Peitoral Maior, Serrátil & Dorsal",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/dumbbell-pullover/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Pullover.gif",
+            concentricPhase = "Puxe o halter de trás da cabeça até a linha do peito.",
+            eccentricPhase = "Desça o halter por trás da cabeça sentindo a caixa torácica expandir.",
+            postureTip = "Cotovelos levemente flexionados durante todo o movimento."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Elevação Frontal com Halteres",
+            muscleGroup = "Deltoide Anterior",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/dumbbell-front-raise/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Front-Raise.gif",
+            concentricPhase = "Eleve os halteres à frente até a altura dos olhos.",
+            eccentricPhase = "Desça devagar sem balançar o tronco.",
+            postureTip = "Tronco ereto e abdômen contraído para não roubar com a coluna."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Desenvolvimento com Barra",
+            muscleGroup = "Deltoides & Tríceps",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/barbell-shoulder-press/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Barbell-Shoulder-Press.gif",
+            concentricPhase = "Empurre a barra para cima em linha vertical acima da cabeça.",
+            eccentricPhase = "Desça a barra até a linha da clavícula sob controle.",
+            postureTip = "Glúteos e abdômen contraídos para proteger a lombar."
         )
     )
 
@@ -475,17 +661,21 @@ object ExerciseGifMapper {
     }
 
     fun getAllAvailableExercises(): List<ExerciseVisualGuide> {
-        return catalogGuides
+        val loaded = cachedFullLibrary ?: loadLibraryFromAssets()
+        return if (loaded.isNotEmpty()) loaded else catalogGuides
     }
 
     fun getGuideForExercise(exerciseName: String): ExerciseVisualGuide {
-        // 1. Busca exata ou por alias direto
+        // 1. Busca exata ou por alias direto no mapa canônico
         directMap[exerciseName]?.let { return it }
         directMap[exerciseName.lowercase()]?.let { return it }
 
         val clean = exerciseName.lowercase().trim()
 
-        // 2. Resolução inteligente específica para Tríceps
+        // 2. Busca exata na biblioteca completa carregada (FitnessProgramer)
+        cachedLibraryByName?.get(clean)?.let { return it }
+
+        // 3. Resolução inteligente específica para Tríceps
         val isTriceps = clean.contains("tríceps") || clean.contains("triceps") || clean.contains("tricep")
         if (isTriceps) {
             when {
@@ -559,8 +749,13 @@ object ExerciseGifMapper {
         if (clean.contains("afundo") || clean.contains("passada") || clean.contains("lunge")) return directMap["Afundo / Passada com Halteres"]!!
         if (clean.contains("panturrilha") || clean.contains("gemeos") || clean.contains("gêmeos")) return directMap["Panturrilha em Pé"]!!
 
-        // 4. Substring matching geral contra o catálogo
+        // 4. Substring matching geral contra o catálogo e biblioteca completa
         catalogGuides.firstOrNull { guide ->
+            val guideLower = guide.exerciseName.lowercase()
+            clean.contains(guideLower) || guideLower.contains(clean)
+        }?.let { return it }
+
+        getAllAvailableExercises().firstOrNull { guide ->
             val guideLower = guide.exerciseName.lowercase()
             clean.contains(guideLower) || guideLower.contains(clean)
         }?.let { return it }
@@ -584,5 +779,9 @@ object ExerciseGifMapper {
             eccentricPhase = "Fase Excêntrica: Controle a descida em 2 a 3 segundos para maximizar microlesões celulares.",
             postureTip = "Mantenha a postura anatômica correta, articulações protegidas e estabilização de core."
         )
+    }
+
+    fun getFavoriteAndTopExercises(): List<ExerciseVisualGuide> {
+        return catalogGuides
     }
 }

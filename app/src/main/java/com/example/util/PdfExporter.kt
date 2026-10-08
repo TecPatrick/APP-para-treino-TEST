@@ -60,7 +60,7 @@ object PdfExporter {
             }
 
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val pdfFile = File(reportsDir, "Relatorio_Growth_Dieta_Treino_$timestamp.pdf")
+            val pdfFile = File(reportsDir, "Relatorio_Dieta_Treino_$timestamp.pdf")
 
             val outputStream = FileOutputStream(pdfFile)
             pdfDocument.writeTo(outputStream)
@@ -92,7 +92,7 @@ object PdfExporter {
         paint.color = Color.WHITE
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
 
-        // Header Background Banner (Growth Orange Accent)
+        // Header Background Banner (Orange Accent)
         paint.color = Color.parseColor("#FF5500")
         canvas.drawRect(0f, 0f, width.toFloat(), 95f, paint)
 
@@ -100,7 +100,7 @@ object PdfExporter {
         paint.color = Color.WHITE
         paint.textSize = 20f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas.drawText("GROWTH DIETA & TREINO", 30f, 42f, paint)
+        canvas.drawText("DIETA & TREINO", 30f, 42f, paint)
 
         paint.textSize = 12f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
@@ -237,7 +237,7 @@ object PdfExporter {
         paint.color = Color.parseColor("#94A3B8")
         paint.textSize = 8.5f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        canvas.drawText("Growth Dieta & Treino • Página 1 de 2", 30f, height - 20f, paint)
+        canvas.drawText("Dieta & Treino • Página 1 de 2", 30f, height - 20f, paint)
     }
 
     private fun drawPageTwo(
@@ -262,7 +262,7 @@ object PdfExporter {
         paint.color = Color.WHITE
         paint.textSize = 13f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        canvas.drawText("GROWTH PROTOCOLO DE TREINOS & LISTA DE COMPRAS", 30f, 26f, paint)
+        canvas.drawText("PROTOCOLO DE TREINOS & LISTA DE COMPRAS", 30f, 26f, paint)
 
         var y = 60f
 
@@ -373,7 +373,7 @@ object PdfExporter {
         paint.color = Color.parseColor("#94A3B8")
         paint.textSize = 8.5f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        canvas.drawText("Growth Dieta & Treino • Documento Oficial de Acompanhamento • Página 2 de 2", 30f, height - 20f, paint)
+        canvas.drawText("Dieta & Treino • Documento Oficial de Acompanhamento • Página 2 de 2", 30f, height - 20f, paint)
     }
 
     private fun drawSectionHeader(canvas: Canvas, title: String, y: Float) {
@@ -401,7 +401,7 @@ object PdfExporter {
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "application/pdf"
                 putExtra(Intent.EXTRA_STREAM, uri)
-                putExtra(Intent.EXTRA_SUBJECT, "Relatório de Dieta e Treino Growth")
+                putExtra(Intent.EXTRA_SUBJECT, "Relatório de Dieta e Treino")
                 putExtra(Intent.EXTRA_TEXT, "Segue em anexo meu relatório completo de macros, dieta, treinos e evolução.")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }

@@ -59,7 +59,7 @@ import com.example.ui.theme.GrowthYellow
 fun GrowthHeader(
     title: String,
     subtitle: String? = null,
-    badgeText: String = "GROWTH FITNESS",
+    badgeText: String = "FITNESS PRO",
     trailingContent: (@Composable () -> Unit)? = null
 ) {
     Row(

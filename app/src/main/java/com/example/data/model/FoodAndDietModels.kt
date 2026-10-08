@@ -1,13 +1,14 @@
 package com.example.data.model
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 enum class FoodCategory(val label: String) {
     PROTEIN("Proteínas"),
     CARBOHYDRATE("Carboidratos"),
     FAT("Gorduras & Oleaginosas"),
-    GROWTH_SUPPLEMENT("Suplementos Growth"),
+    GROWTH_SUPPLEMENT("Suplementos"),
     FRUITS_VEGETABLES("Frutas & Vegetais"),
     DAIRY("Laticínios"),
     OTHER("Outros")
@@ -58,7 +59,10 @@ data class MacroValues(
     val fiber: Float = 0f
 )
 
-@Entity(tableName = "diet_plans")
+@Entity(
+    tableName = "diet_plans",
+    indices = [Index(value = ["isActive"])]
+)
 data class DietPlan(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
@@ -76,7 +80,13 @@ data class DietPlan(
     val notes: String = ""
 )
 
-@Entity(tableName = "meal_plan_items")
+@Entity(
+    tableName = "meal_plan_items",
+    indices = [
+        Index(value = ["dietPlanId"]),
+        Index(value = ["mealType"])
+    ]
+)
 data class MealPlanItem(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val dietPlanId: Long = 1L,
@@ -95,7 +105,13 @@ data class MealPlanItem(
     val notes: String = ""
 )
 
-@Entity(tableName = "daily_intake_history")
+@Entity(
+    tableName = "daily_intake_history",
+    indices = [
+        Index(value = ["dateMillis"]),
+        Index(value = ["dateString"])
+    ]
+)
 data class DailyIntakeHistory(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val dateString: String, // "YYYY-MM-DD"

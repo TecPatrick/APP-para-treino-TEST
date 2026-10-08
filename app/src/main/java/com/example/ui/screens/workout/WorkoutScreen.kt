@@ -47,7 +47,9 @@ import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -149,6 +151,7 @@ fun WorkoutScreen(viewModel: GrowthViewModel) {
     var presetSplitForNewRoutine by remember { mutableStateOf(WorkoutSplitType.CUSTOM) }
 
     var selectedExerciseGuide by remember { mutableStateOf<ExerciseVisualGuide?>(null) }
+    var exerciseToSubstitute by remember { mutableStateOf<WorkoutExercise?>(null) }
     var showSingleExerciseAddDialog by remember { mutableStateOf(false) }
     var showFinishWorkoutDialog by remember { mutableStateOf(false) }
     var showHistoryDialog by remember { mutableStateOf(false) }
@@ -193,6 +196,7 @@ fun WorkoutScreen(viewModel: GrowthViewModel) {
                 viewModel.updateExerciseWeight(exercise, newWeight)
             },
             onOpenGuide = { guide -> selectedExerciseGuide = guide },
+            onSubstituteExercise = { exercise -> exerciseToSubstitute = exercise },
             onAddExerciseClick = { showSingleExerciseAddDialog = true }
         )
     } else {
@@ -203,7 +207,7 @@ fun WorkoutScreen(viewModel: GrowthViewModel) {
                 .background(CarbonDark),
             contentPadding = PaddingValues(bottom = 90.dp)
         ) {
-            // Header Growth Style
+            // Header Style
             item {
                 GrowthHeader(
                     title = "Fichas de Treino",
@@ -427,6 +431,15 @@ fun WorkoutScreen(viewModel: GrowthViewModel) {
                                     routineToEdit = routine
                                     showRoutineEditorDialog = true
                                 },
+                                onShareClick = {
+                                    val text = viewModel.formatRoutineForSharing(routine)
+                                    val sendIntent = Intent().apply {
+                                        action = Intent.ACTION_SEND
+                                        putExtra(Intent.EXTRA_TEXT, text)
+                                        type = "text/plain"
+                                    }
+                                    context.startActivity(Intent.createChooser(sendIntent, "Compartilhar Ficha"))
+                                },
                                 onDeleteClick = { routineToDelete = routine }
                             )
                         }
@@ -465,6 +478,15 @@ fun WorkoutScreen(viewModel: GrowthViewModel) {
                                     onEditClick = {
                                         routineToEdit = existingForLetter
                                         showRoutineEditorDialog = true
+                                    },
+                                    onShareClick = {
+                                        val text = viewModel.formatRoutineForSharing(existingForLetter)
+                                        val sendIntent = Intent().apply {
+                                            action = Intent.ACTION_SEND
+                                            putExtra(Intent.EXTRA_TEXT, text)
+                                            type = "text/plain"
+                                        }
+                                        context.startActivity(Intent.createChooser(sendIntent, "Compartilhar Ficha"))
                                     },
                                     onDeleteClick = { routineToDelete = existingForLetter }
                                 )
@@ -515,6 +537,15 @@ fun WorkoutScreen(viewModel: GrowthViewModel) {
                                 onEditClick = {
                                     routineToEdit = routine
                                     showRoutineEditorDialog = true
+                                },
+                                onShareClick = {
+                                    val text = viewModel.formatRoutineForSharing(routine)
+                                    val sendIntent = Intent().apply {
+                                        action = Intent.ACTION_SEND
+                                        putExtra(Intent.EXTRA_TEXT, text)
+                                        type = "text/plain"
+                                    }
+                                    context.startActivity(Intent.createChooser(sendIntent, "Compartilhar Ficha"))
                                 },
                                 onDeleteClick = { routineToDelete = routine }
                             )
@@ -645,6 +676,42 @@ fun WorkoutScreen(viewModel: GrowthViewModel) {
             }
         )
     }
+
+    // 7. Substitute Exercise Dialog (1-tap swap machine/exercise)
+    if (exerciseToSubstitute != null && viewingRoutineDetail != null) {
+        SubstituteExerciseDialog(
+            currentExercise = exerciseToSubstitute!!,
+            gifImageLoader = gifImageLoader,
+            onDismiss = { exerciseToSubstitute = null },
+            onSelectSubstitute = { newGuide ->
+                val currentEx = exerciseToSubstitute!!
+                val currentList = allExercises.filter { it.routineId == viewingRoutineDetail!!.id }
+                val updatedList = currentList.map { ex ->
+                    if (ex.id == currentEx.id) {
+                        ex.copy(
+                            exerciseName = newGuide.exerciseName,
+                            muscleGroup = newGuide.muscleGroup,
+                            biomechanicsGuide = newGuide.postureTip,
+                            gifDemonstrationUrl = newGuide.gifUrl
+                        )
+                    } else {
+                        ex
+                    }
+                }
+                viewModel.saveFullRoutineWithExercises(
+                    existingRoutineId = viewingRoutineDetail!!.id,
+                    splitType = viewingRoutineDetail!!.splitType,
+                    letter = viewingRoutineDetail!!.letter,
+                    title = viewingRoutineDetail!!.title,
+                    dayOfWeekLabel = viewingRoutineDetail!!.dayOfWeekLabel,
+                    targetMuscleGroups = viewingRoutineDetail!!.targetMuscleGroups,
+                    estimatedDurationMinutes = viewingRoutineDetail!!.estimatedDurationMinutes,
+                    exercises = updatedList
+                )
+                exerciseToSubstitute = null
+            }
+        )
+    }
 }
 
 // --- SCREEN VIEW 2: DEDICATED ROUTINE DETAIL & EXERCISES EXECUTION VIEW ---
@@ -661,6 +728,7 @@ fun RoutineDetailView(
     onToggleSet: (exercise: WorkoutExercise, setIndex: Int) -> Unit,
     onUpdateWeight: (exercise: WorkoutExercise, newWeight: Float) -> Unit,
     onOpenGuide: (ExerciseVisualGuide) -> Unit,
+    onSubstituteExercise: (WorkoutExercise) -> Unit,
     onAddExerciseClick: () -> Unit
 ) {
     val isSessionRunningForThisRoutine = activeWorkout.isRunning && activeWorkout.routine?.id == routine.id
@@ -868,7 +936,8 @@ fun RoutineDetailView(
                     completedSetsInSession = loggedForThisEx.size,
                     onToggleSet = { setIndex -> onToggleSet(exercise, setIndex) },
                     onUpdateWeight = { newW -> onUpdateWeight(exercise, newW) },
-                    onOpenGuide = { onOpenGuide(guide) }
+                    onOpenGuide = { onOpenGuide(guide) },
+                    onSubstitute = { onSubstituteExercise(exercise) }
                 )
             }
         }
@@ -885,7 +954,8 @@ fun ExerciseExecutionCard(
     completedSetsInSession: Int,
     onToggleSet: (setIndex: Int) -> Unit,
     onUpdateWeight: (Float) -> Unit,
-    onOpenGuide: () -> Unit
+    onOpenGuide: () -> Unit,
+    onSubstitute: () -> Unit
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = CarbonCard),
@@ -928,17 +998,36 @@ fun ExerciseExecutionCard(
                     }
                 }
 
-                // Biomechanics & GIF guide trigger button
-                Surface(
-                    color = GrowthCyan.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier.clickable { onOpenGuide() }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // Quick Substitute button (1-tap swap)
+                    Surface(
+                        color = CarbonCardElevated,
+                        shape = RoundedCornerShape(6.dp),
+                        border = BorderStroke(1.dp, CarbonBorder),
+                        modifier = Modifier.clickable { onSubstitute() }
                     ) {
-                        Text("💡 Postura & GIF", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GrowthCyan)
+                        Row(
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.SwapHoriz, contentDescription = "Substituir", tint = GrowthOrange, modifier = Modifier.size(13.dp))
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text("Trocar", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                        }
+                    }
+
+                    // Biomechanics & GIF guide trigger button
+                    Surface(
+                        color = GrowthCyan.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier.clickable { onOpenGuide() }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("💡 Postura & GIF", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GrowthCyan)
+                        }
                     }
                 }
             }
@@ -1033,6 +1122,7 @@ fun RoutineCardItem(
     onOpenRoutine: () -> Unit,
     onStartClick: () -> Unit,
     onEditClick: () -> Unit,
+    onShareClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
     Card(
@@ -1077,7 +1167,10 @@ fun RoutineCardItem(
                     }
                 }
 
-                Row {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onShareClick, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Share, contentDescription = "Compartilhar", tint = GrowthGreen, modifier = Modifier.size(16.dp))
+                    }
                     IconButton(onClick = onEditClick, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Default.Edit, contentDescription = "Editar", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
                     }
@@ -1512,21 +1605,26 @@ fun AddExerciseDialog(
     }
 
     val availableGuides = remember { ExerciseGifMapper.getAllAvailableExercises() }
-    val muscleFilters = listOf("Todos", "Tríceps", "Bíceps", "Peitoral", "Dorsal", "Deltoide", "Quadríceps", "Posterior / Glúteos", "Panturrilha")
+    val favoriteGuides = remember { ExerciseGifMapper.getFavoriteAndTopExercises() }
+    val muscleFilters = listOf("⭐ Populares", "Todos", "Tríceps", "Bíceps", "Peitoral", "Dorsal", "Deltoide", "Quadríceps", "Posterior / Glúteos", "Panturrilha", "Antebraço", "Trapézio", "Abdômen")
 
-    val filteredCatalog = availableGuides.filter { guide ->
+    val filteredCatalog = (if (selectedMuscleFilter == "⭐ Populares") favoriteGuides else availableGuides).filter { guide ->
         val matchesSearch = guide.exerciseName.contains(searchQuery, ignoreCase = true) ||
                 guide.muscleGroup.contains(searchQuery, ignoreCase = true)
         val matchesFilter = when (selectedMuscleFilter) {
+            "⭐ Populares" -> true
             "Todos" -> true
-            "Tríceps" -> guide.muscleGroup.contains("Tríceps", ignoreCase = true) || guide.exerciseName.contains("Tríceps", ignoreCase = true)
-            "Bíceps" -> guide.muscleGroup.contains("Bíceps", ignoreCase = true) || guide.exerciseName.contains("Rosca", ignoreCase = true)
-            "Peitoral" -> guide.muscleGroup.contains("Peitoral", ignoreCase = true) || guide.exerciseName.contains("Supino", ignoreCase = true) || guide.exerciseName.contains("Crucifixo", ignoreCase = true) || guide.exerciseName.contains("Voador", ignoreCase = true)
-            "Dorsal" -> guide.muscleGroup.contains("Dorsal", ignoreCase = true) || guide.muscleGroup.contains("Costas", ignoreCase = true) || guide.exerciseName.contains("Puxada", ignoreCase = true) || guide.exerciseName.contains("Remada", ignoreCase = true) || guide.exerciseName.contains("Barra Fixa", ignoreCase = true)
-            "Deltoide" -> guide.muscleGroup.contains("Deltoide", ignoreCase = true) || guide.muscleGroup.contains("Ombro", ignoreCase = true) || guide.exerciseName.contains("Desenvolvimento", ignoreCase = true) || guide.exerciseName.contains("Lateral", ignoreCase = true) || guide.exerciseName.contains("Face Pull", ignoreCase = true)
-            "Quadríceps" -> guide.muscleGroup.contains("Quadríceps", ignoreCase = true) || guide.exerciseName.contains("Agachamento", ignoreCase = true) || guide.exerciseName.contains("Leg Press", ignoreCase = true) || guide.exerciseName.contains("Extensora", ignoreCase = true)
-            "Posterior / Glúteos" -> guide.muscleGroup.contains("Isquiotibiais", ignoreCase = true) || guide.muscleGroup.contains("Glúteo", ignoreCase = true) || guide.exerciseName.contains("Flexora", ignoreCase = true) || guide.exerciseName.contains("Stiff", ignoreCase = true) || guide.exerciseName.contains("Pélvica", ignoreCase = true) || guide.exerciseName.contains("Afundo", ignoreCase = true)
-            "Panturrilha" -> guide.muscleGroup.contains("Panturrilha", ignoreCase = true) || guide.muscleGroup.contains("Gastrocnêmio", ignoreCase = true) || guide.exerciseName.contains("Panturrilha", ignoreCase = true)
+            "Tríceps" -> guide.muscleGroup.contains("Tríceps", ignoreCase = true) || guide.muscleGroup.contains("triceps", ignoreCase = true) || guide.exerciseName.contains("Tríceps", ignoreCase = true) || guide.exerciseName.contains("tricep", ignoreCase = true) || guide.exerciseName.contains("pushdown", ignoreCase = true) || guide.exerciseName.contains("skull crusher", ignoreCase = true)
+            "Bíceps" -> guide.muscleGroup.contains("Bíceps", ignoreCase = true) || guide.muscleGroup.contains("biceps", ignoreCase = true) || guide.exerciseName.contains("Rosca", ignoreCase = true) || guide.exerciseName.contains("curl", ignoreCase = true)
+            "Peitoral" -> guide.muscleGroup.contains("Peitoral", ignoreCase = true) || guide.muscleGroup.contains("chest", ignoreCase = true) || guide.exerciseName.contains("Supino", ignoreCase = true) || guide.exerciseName.contains("bench press", ignoreCase = true) || guide.exerciseName.contains("Crucifixo", ignoreCase = true) || guide.exerciseName.contains("fly", ignoreCase = true) || guide.exerciseName.contains("Voador", ignoreCase = true) || guide.exerciseName.contains("Flexão", ignoreCase = true) || guide.exerciseName.contains("push up", ignoreCase = true) || guide.exerciseName.contains("Pullover", ignoreCase = true)
+            "Dorsal" -> guide.muscleGroup.contains("Dorsal", ignoreCase = true) || guide.muscleGroup.contains("Costas", ignoreCase = true) || guide.muscleGroup.contains("back", ignoreCase = true) || guide.exerciseName.contains("Puxada", ignoreCase = true) || guide.exerciseName.contains("pulldown", ignoreCase = true) || guide.exerciseName.contains("Remada", ignoreCase = true) || guide.exerciseName.contains("row", ignoreCase = true) || guide.exerciseName.contains("Barra Fixa", ignoreCase = true) || guide.exerciseName.contains("pull up", ignoreCase = true) || guide.exerciseName.contains("Terra", ignoreCase = true) || guide.exerciseName.contains("deadlift", ignoreCase = true)
+            "Deltoide" -> guide.muscleGroup.contains("Deltoide", ignoreCase = true) || guide.muscleGroup.contains("Ombro", ignoreCase = true) || guide.muscleGroup.contains("shoulder", ignoreCase = true) || guide.exerciseName.contains("Desenvolvimento", ignoreCase = true) || guide.exerciseName.contains("Lateral", ignoreCase = true) || guide.exerciseName.contains("Frontal", ignoreCase = true) || guide.exerciseName.contains("Face Pull", ignoreCase = true) || guide.exerciseName.contains("press", ignoreCase = true)
+            "Quadríceps" -> guide.muscleGroup.contains("Quadríceps", ignoreCase = true) || guide.muscleGroup.contains("leg", ignoreCase = true) || guide.muscleGroup.contains("pernas", ignoreCase = true) || guide.exerciseName.contains("Agachamento", ignoreCase = true) || guide.exerciseName.contains("squat", ignoreCase = true) || guide.exerciseName.contains("Leg Press", ignoreCase = true) || guide.exerciseName.contains("Extensora", ignoreCase = true) || guide.exerciseName.contains("Hack", ignoreCase = true)
+            "Posterior / Glúteos" -> guide.muscleGroup.contains("Isquiotibiais", ignoreCase = true) || guide.muscleGroup.contains("Glúteo", ignoreCase = true) || guide.muscleGroup.contains("leg", ignoreCase = true) || guide.exerciseName.contains("Flexora", ignoreCase = true) || guide.exerciseName.contains("Stiff", ignoreCase = true) || guide.exerciseName.contains("Pélvica", ignoreCase = true) || guide.exerciseName.contains("Afundo", ignoreCase = true) || guide.exerciseName.contains("lunge", ignoreCase = true) || guide.exerciseName.contains("deadlift", ignoreCase = true)
+            "Panturrilha" -> guide.muscleGroup.contains("Panturrilha", ignoreCase = true) || guide.muscleGroup.contains("calf", ignoreCase = true) || guide.muscleGroup.contains("Gastrocnêmio", ignoreCase = true) || guide.exerciseName.contains("Panturrilha", ignoreCase = true) || guide.exerciseName.contains("calf", ignoreCase = true)
+            "Antebraço" -> guide.muscleGroup.contains("Antebraço", ignoreCase = true) || guide.muscleGroup.contains("forearm", ignoreCase = true) || guide.exerciseName.contains("wrist", ignoreCase = true) || guide.exerciseName.contains("antebraço", ignoreCase = true) || guide.exerciseName.contains("punho", ignoreCase = true)
+            "Trapézio" -> guide.muscleGroup.contains("Trapézio", ignoreCase = true) || guide.muscleGroup.contains("trapezius", ignoreCase = true) || guide.exerciseName.contains("Encolhimento", ignoreCase = true) || guide.exerciseName.contains("shrug", ignoreCase = true)
+            "Abdômen" -> guide.muscleGroup.contains("Abdominal", ignoreCase = true) || guide.muscleGroup.contains("Abdômen", ignoreCase = true) || guide.muscleGroup.contains("abs", ignoreCase = true) || guide.exerciseName.contains("Abdominal", ignoreCase = true) || guide.exerciseName.contains("Crunch", ignoreCase = true) || guide.exerciseName.contains("plank", ignoreCase = true)
             else -> guide.muscleGroup.contains(selectedMuscleFilter, ignoreCase = true) ||
                     guide.exerciseName.contains(selectedMuscleFilter, ignoreCase = true)
         }
@@ -1767,6 +1865,212 @@ fun AddExerciseDialog(
                 }
             }
         },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    )
+}
+
+// Dialog for fast 1-tap exercise substitution during workout
+@Composable
+fun SubstituteExerciseDialog(
+    currentExercise: WorkoutExercise,
+    gifImageLoader: ImageLoader,
+    onDismiss: () -> Unit,
+    onSelectSubstitute: (ExerciseVisualGuide) -> Unit
+) {
+    val context = LocalContext.current
+    var searchQuery by remember { mutableStateOf("") }
+    val allGuides = remember { ExerciseGifMapper.getAllAvailableExercises() }
+    
+    // Auto-detect target muscle group based on current exercise
+    val currentMuscleLower = currentExercise.muscleGroup.lowercase()
+    val matchingMuscleGuides = remember(currentExercise) {
+        allGuides.filter { guide ->
+            val gMuscle = guide.muscleGroup.lowercase()
+            val gName = guide.exerciseName.lowercase()
+            
+            when {
+                currentMuscleLower.contains("peitoral") || currentMuscleLower.contains("chest") ->
+                    gMuscle.contains("peitoral") || gMuscle.contains("chest") || gName.contains("supino") || gName.contains("crucifixo") || gName.contains("flexão")
+                currentMuscleLower.contains("dorsal") || currentMuscleLower.contains("costas") || currentMuscleLower.contains("back") ->
+                    gMuscle.contains("dorsal") || gMuscle.contains("costas") || gMuscle.contains("back") || gName.contains("puxada") || gName.contains("remada") || gName.contains("barra fixa")
+                currentMuscleLower.contains("tríceps") || currentMuscleLower.contains("triceps") ->
+                    gMuscle.contains("tríceps") || gMuscle.contains("triceps") || gName.contains("tríceps") || gName.contains("pushdown") || gName.contains("testa")
+                currentMuscleLower.contains("bíceps") || currentMuscleLower.contains("biceps") ->
+                    gMuscle.contains("bíceps") || gMuscle.contains("biceps") || gName.contains("rosca") || gName.contains("curl")
+                currentMuscleLower.contains("ombro") || currentMuscleLower.contains("deltoide") || currentMuscleLower.contains("shoulder") ->
+                    gMuscle.contains("deltoide") || gMuscle.contains("ombro") || gMuscle.contains("shoulder") || gName.contains("desenvolvimento") || gName.contains("lateral")
+                currentMuscleLower.contains("quadríceps") || currentMuscleLower.contains("pernas") || currentMuscleLower.contains("leg") ->
+                    gMuscle.contains("quadríceps") || gMuscle.contains("leg") || gName.contains("agachamento") || gName.contains("leg press") || gName.contains("extensora")
+                currentMuscleLower.contains("posterior") || currentMuscleLower.contains("isquiotibiais") || currentMuscleLower.contains("glúteo") ->
+                    gMuscle.contains("isquiotibiais") || gMuscle.contains("glúteo") || gName.contains("flexora") || gName.contains("stiff") || gName.contains("pélvica")
+                currentMuscleLower.contains("panturrilha") || currentMuscleLower.contains("calf") ->
+                    gMuscle.contains("panturrilha") || gMuscle.contains("calf") || gName.contains("panturrilha")
+                currentMuscleLower.contains("antebraço") || currentMuscleLower.contains("forearm") ->
+                    gMuscle.contains("antebraço") || gMuscle.contains("forearm") || gName.contains("wrist")
+                currentMuscleLower.contains("trapézio") || currentMuscleLower.contains("trapezius") ->
+                    gMuscle.contains("trapézio") || gMuscle.contains("trapezius") || gName.contains("shrug") || gName.contains("encolhimento")
+                else -> gMuscle.contains(currentMuscleLower)
+            }
+        }.ifEmpty { allGuides }
+    }
+
+    val filteredList = matchingMuscleGuides.filter {
+        it.exerciseName != currentExercise.exerciseName &&
+        (it.exerciseName.contains(searchQuery, ignoreCase = true) || it.muscleGroup.contains(searchQuery, ignoreCase = true))
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = CarbonCard,
+        title = {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.SwapHoriz, contentDescription = null, tint = GrowthOrange, modifier = Modifier.size(24.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Substituir Exercício", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onBackground)
+                    }
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Fechar", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Aparelho ocupado? Escolha uma variação de mesmo músculo para trocar na ficha:",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // Banner showing current exercise
+                Surface(
+                    color = CarbonCardElevated,
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("Substituindo:", fontSize = 10.sp, color = GrowthOrangeLight, fontWeight = FontWeight.Bold)
+                            Text(currentExercise.exerciseName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                            Text("${currentExercise.muscleGroup} • Mantém ${currentExercise.sets} séries", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Buscar outra variação...", fontSize = 12.sp) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = GrowthOrange) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = GrowthOrange,
+                        unfocusedBorderColor = CarbonBorder
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(280.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(filteredList) { guide ->
+                        Surface(
+                            color = CarbonCardElevated,
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, CarbonBorder),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelectSubstitute(guide) }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(width = 60.dp, height = 48.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(CarbonDark)
+                                ) {
+                                    SubcomposeAsyncImage(
+                                        model = ImageRequest.Builder(context)
+                                            .data(guide.gifUrl)
+                                            .crossfade(true)
+                                            .build(),
+                                        imageLoader = gifImageLoader,
+                                        contentDescription = guide.exerciseName,
+                                        contentScale = ContentScale.Crop,
+                                        loading = {
+                                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                                CircularProgressIndicator(color = GrowthOrange, modifier = Modifier.size(16.dp))
+                                            }
+                                        },
+                                        error = {
+                                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                                Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = GrowthOrange.copy(alpha = 0.5f))
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(10.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = guide.exerciseName,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onBackground,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = guide.muscleGroup,
+                                        fontSize = 10.sp,
+                                        color = GrowthOrangeLight
+                                    )
+                                }
+
+                                Button(
+                                    onClick = { onSelectSubstitute(guide) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
+                                    shape = RoundedCornerShape(6.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                    modifier = Modifier.height(30.dp)
+                                ) {
+                                    Text("Trocar", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)

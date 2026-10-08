@@ -218,7 +218,7 @@ fun AuthAndOnboardingScreen(
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "GROWTH DIETA & TREINO",
+                        text = "DIETA & TREINO",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.onBackground,
@@ -335,16 +335,16 @@ fun AuthAndOnboardingScreen(
                                                 // user cancelled
                                             } catch (_: Exception) {
                                                 viewModel.loginWithFirebase(
-                                                    emailInput = email.ifBlank { "atleta@growth.com" },
-                                                    passwordInput = password.ifBlank { "Growth@2026" },
+                                                    emailInput = email.ifBlank { "atleta@fitmail.com" },
+                                                    passwordInput = password.ifBlank { "Atleta@2026" },
                                                     onSuccess = onAuthSuccess
                                                 )
                                             }
                                         }
                                     } else {
                                         viewModel.loginWithFirebase(
-                                            emailInput = email.ifBlank { "atleta@growth.com" },
-                                            passwordInput = password.ifBlank { "Growth@2026" },
+                                            emailInput = email.ifBlank { "atleta@fitmail.com" },
+                                            passwordInput = password.ifBlank { "Atleta@2026" },
                                             onSuccess = onAuthSuccess
                                         )
                                     }
@@ -611,7 +611,7 @@ fun AuthAndOnboardingScreen(
                                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                                 } else {
                                     Text(
-                                        text = if (isRegisterMode) "AVANÇAR PARA DADOS CORPORAIS (1/3)" else "ENTRAR COM FIREBASE AUTH",
+                                        text = if (isRegisterMode) "AVANÇAR PARA DADOS CORPORAIS (1/3)" else "ENTRAR NO APP",
                                         fontWeight = FontWeight.Black,
                                         fontSize = 12.sp,
                                         color = Color.White
@@ -962,8 +962,8 @@ fun AuthAndOnboardingScreen(
                                     val a = ageText.toIntOrNull() ?: 25
 
                                     viewModel.registerWithFirebase(
-                                        name = name.ifBlank { "Atleta Growth" },
-                                        email = email.ifBlank { "atleta@growth.com" },
+                                        name = name.ifBlank { "Atleta" },
+                                        email = email.ifBlank { "atleta@fitmail.com" },
                                         password = password,
                                         gender = gender,
                                         age = a,

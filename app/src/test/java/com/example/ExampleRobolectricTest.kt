@@ -13,6 +13,7 @@ import com.example.data.model.MealPlanItem
 import com.example.data.model.MealType
 import com.example.data.model.UserProfile
 import com.example.data.model.WorkoutExercise
+import com.example.data.model.WorkoutLog
 import com.example.data.model.WorkoutRoutine
 import com.example.data.model.WorkoutSplitType
 import com.example.util.MacroCalculator
@@ -50,7 +51,7 @@ class ExampleRobolectricTest {
   fun `read string from context`() {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val appName = context.getString(R.string.app_name)
-    assertEquals("Growth Dieta", appName)
+    assertEquals("Dieta & Treino", appName)
   }
 
   @Test
@@ -130,7 +131,7 @@ class ExampleRobolectricTest {
 
     val profile = UserProfile(
       id = 1,
-      name = "Atleta Growth",
+      name = "Atleta",
       weightKg = 82.5f,
       heightCm = 182f,
       goal = FitnessGoal.BULKING_CLEAN,
@@ -161,11 +162,50 @@ class ExampleRobolectricTest {
   }
 
   @Test
+  fun `test room dao updates biometrics like weight height age and activity level`() = runBlocking {
+    val dao = db.userProfileDao()
+
+    val initialProfile = UserProfile(
+      id = 1,
+      name = "Atleta Pro",
+      weightKg = 75.0f,
+      heightCm = 175f,
+      age = 25,
+      activityLevel = ActivityLevel.LIGHT,
+      goal = FitnessGoal.MAINTENANCE
+    )
+    dao.insertOrUpdateProfile(initialProfile)
+
+    val loaded = dao.getUserProfile().first()
+    assertEquals(75.0f, loaded?.weightKg)
+    assertEquals(175f, loaded?.heightCm)
+    assertEquals(25, loaded?.age)
+    assertEquals(ActivityLevel.LIGHT, loaded?.activityLevel)
+
+    // Edit biometrics
+    val updatedBiometrics = loaded!!.copy(
+      weightKg = 77.8f,
+      heightCm = 176f,
+      age = 26,
+      activityLevel = ActivityLevel.VERY_ACTIVE,
+      goal = FitnessGoal.BULKING_CLEAN
+    )
+    dao.insertOrUpdateProfile(updatedBiometrics)
+
+    val reloaded = dao.getUserProfile().first()
+    assertEquals(77.8f, reloaded?.weightKg)
+    assertEquals(176f, reloaded?.heightCm)
+    assertEquals(26, reloaded?.age)
+    assertEquals(ActivityLevel.VERY_ACTIVE, reloaded?.activityLevel)
+    assertEquals(FitnessGoal.BULKING_CLEAN, reloaded?.goal)
+  }
+
+  @Test
   fun `test room dao stores and queries diet plans`() = runBlocking {
     val dao = db.dietPlanDao()
 
     val dietPlan = DietPlan(
-      name = "Protocolo Hipertrofia Growth",
+      name = "Protocolo Hipertrofia",
       description = "Plano focado em ganho muscular limpo",
       goal = FitnessGoal.BULKING_CLEAN,
       targetCalories = 2800,
@@ -180,7 +220,7 @@ class ExampleRobolectricTest {
 
     val activePlan = dao.getActiveDietPlan().first()
     assertTrue("Active diet plan should be found", activePlan != null)
-    assertEquals("Protocolo Hipertrofia Growth", activePlan?.name)
+    assertEquals("Protocolo Hipertrofia", activePlan?.name)
     assertEquals(2800, activePlan?.targetCalories)
 
     val allPlans = dao.getAllDietPlans().first()
@@ -215,5 +255,96 @@ class ExampleRobolectricTest {
     dao.deleteRoutine(routineId)
     val afterDelete = dao.getRoutineById(routineId).first()
     assertTrue("Routine should be deleted", afterDelete == null)
+  }
+
+  @Test
+  fun `test room stores and queries workout logs with volume metrics`() = runBlocking {
+    val dao = db.growthDao()
+
+    val log1 = WorkoutLog(
+      routineId = 101L,
+      routineName = "Treino A - Peito & Tríceps",
+      dateMillis = 1000000L,
+      durationMinutes = 62,
+      totalVolumeKg = 8500f,
+      totalSetsCompleted = 20,
+      perceivedExertion = 9,
+      notes = "Supino pesado, excelente pump"
+    )
+    val log2 = WorkoutLog(
+      routineId = 102L,
+      routineName = "Treino B - Costas & Bíceps",
+      dateMillis = 2000000L,
+      durationMinutes = 55,
+      totalVolumeKg = 9200f,
+      totalSetsCompleted = 18,
+      perceivedExertion = 8,
+      notes = "Puxada frontal e remada curvada"
+    )
+
+    val id1 = dao.insertWorkoutLog(log1)
+    val id2 = dao.insertWorkoutLog(log2)
+    assertTrue("Log 1 inserted", id1 > 0)
+    assertTrue("Log 2 inserted", id2 > 0)
+
+    val allLogs = dao.getAllWorkoutLogs().first()
+    assertEquals("Should have 2 logs", 2, allLogs.size)
+    // Ordered by dateMillis DESC: log2 should be first
+    assertEquals("Treino B - Costas & Bíceps", allLogs[0].routineName)
+
+    val logsForRoutine101 = dao.getWorkoutLogsForRoutine(101L).first()
+    assertEquals(1, logsForRoutine101.size)
+    assertEquals(8500f, logsForRoutine101[0].totalVolumeKg)
+
+    val totalVolume = dao.getTotalWorkoutVolume().first()
+    assertEquals(17700f, totalVolume)
+
+    val totalCount = dao.getTotalWorkoutCount().first()
+    assertEquals(2, totalCount)
+  }
+
+  @Test
+  fun `test room updates dietary goals and switches active diet plans`() = runBlocking {
+    val dao = db.growthDao()
+
+    // 1. Initial user profile
+    dao.insertOrUpdateProfile(
+      UserProfile(
+        id = 1,
+        name = "Atleta",
+        targetCalories = 2500,
+        targetProteinGrams = 160,
+        targetCarbsGrams = 300,
+        targetFatGrams = 60,
+        targetWaterMl = 3000
+      )
+    )
+
+    // 2. Targeted update of dietary goals
+    dao.updateDietaryGoals(
+      calories = 2800,
+      protein = 180,
+      carbs = 340,
+      fat = 65,
+      water = 3500
+    )
+
+    val profile = dao.getUserProfile().first()
+    assertEquals(2800, profile?.targetCalories)
+    assertEquals(180, profile?.targetProteinGrams)
+    assertEquals(340, profile?.targetCarbsGrams)
+    assertEquals(65, profile?.targetFatGrams)
+    assertEquals(3500, profile?.targetWaterMl)
+
+    // 3. Switch active diet plans atomically
+    val planA = DietPlan(name = "Bulking", targetCalories = 3000, isActive = true)
+    val planB = DietPlan(name = "Cutting", targetCalories = 2200, isActive = false)
+    val idA = dao.insertDietPlan(planA)
+    val idB = dao.insertDietPlan(planB)
+
+    assertEquals(idA, dao.getActiveDietPlan().first()?.id)
+
+    dao.switchActiveDietPlan(idB)
+    assertEquals(idB, dao.getActiveDietPlan().first()?.id)
   }
 }

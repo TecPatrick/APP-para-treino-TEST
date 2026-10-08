@@ -1,5 +1,6 @@
 package com.example.ui.screens.dashboard
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,18 +20,23 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.LocalDrink
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Restaurant
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -42,10 +48,17 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -85,7 +98,8 @@ fun DashboardScreen(
     onNavigateToWorkout: () -> Unit,
     onNavigateToShopping: () -> Unit,
     onNavigateToCalculator: () -> Unit,
-    onNavigateToAnalytics: () -> Unit
+    onNavigateToAnalytics: () -> Unit,
+    onNavigateToProfile: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
@@ -94,6 +108,8 @@ fun DashboardScreen(
     val allExercises by viewModel.allExercises.collectAsStateWithLifecycle()
     val progressLogs by viewModel.progressLogs.collectAsStateWithLifecycle()
     val waterDrank by viewModel.waterDrankMl.collectAsStateWithLifecycle()
+    var showWaterGoalDialog by remember { mutableStateOf(false) }
+    var newWaterGoalInput by remember { mutableStateOf("") }
 
     // Daily Macro Consumption calculations
     val totalPlannedCalories = mealPlans.sumOf { it.calories.toDouble() }.toFloat()
@@ -137,13 +153,34 @@ fun DashboardScreen(
             GrowthHeader(
                 title = "Olá, ${profile.name}",
                 subtitle = dateStr.replaceFirstChar { it.uppercase() },
-                badgeText = "ESTILO GROWTH • PROTOCOLO ATIVO",
+                badgeText = "PROTOCOLO ATIVO",
                 trailingContent = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
                             color = GrowthOrange.copy(alpha = 0.15f),
                             shape = CircleShape,
                             border = androidx.compose.foundation.BorderStroke(1.dp, GrowthOrange),
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clickable { onNavigateToProfile() }
+                                .testTag("dashboard_profile_btn")
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "Perfil & Biometria",
+                                    tint = GrowthOrange,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(6.dp))
+
+                        Surface(
+                            color = CarbonCardElevated,
+                            shape = CircleShape,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
                             modifier = Modifier
                                 .size(40.dp)
                                 .clickable { onNavigateToCalculator() }
@@ -153,7 +190,7 @@ fun DashboardScreen(
                                 Icon(
                                     imageVector = Icons.Default.Calculate,
                                     contentDescription = "Calculadora",
-                                    tint = GrowthOrange,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -228,21 +265,40 @@ fun DashboardScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        Button(
-                            onClick = { onNavigateToAnalytics() },
-                            colors = ButtonDefaults.buttonColors(containerColor = CarbonCardElevated),
-                            shape = RoundedCornerShape(8.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
-                            modifier = Modifier.testTag("view_analytics_btn")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.TrendingUp,
-                                contentDescription = null,
-                                tint = GrowthGreen,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Evolução", color = Color.White, fontSize = 12.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { onNavigateToProfile() },
+                                colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange.copy(alpha = 0.15f)),
+                                shape = RoundedCornerShape(8.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.4f)),
+                                modifier = Modifier.testTag("dashboard_edit_biometrics_btn")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    tint = GrowthOrange,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Biometria", color = GrowthOrangeLight, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = { onNavigateToAnalytics() },
+                                colors = ButtonDefaults.buttonColors(containerColor = CarbonCardElevated),
+                                shape = RoundedCornerShape(8.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
+                                modifier = Modifier.testTag("view_analytics_btn")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.TrendingUp,
+                                    contentDescription = null,
+                                    tint = GrowthGreen,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Evolução", color = Color.White, fontSize = 12.sp)
+                            }
                         }
                     }
                 }
@@ -357,12 +413,30 @@ fun DashboardScreen(
                                 letterSpacing = 1.sp
                             )
                         }
-                        Text(
-                            text = "$waterDrank / ${profile.targetWaterMl} ml",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable {
+                                    newWaterGoalInput = profile.targetWaterMl.toString()
+                                    showWaterGoalDialog = true
+                                }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "$waterDrank / ${profile.targetWaterMl} ml",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Editar meta de água",
+                                tint = GrowthCyan,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -689,5 +763,175 @@ fun DashboardScreen(
                 }
             }
         }
+
+        // Backup & Data Export Section
+        item {
+            Spacer(modifier = Modifier.height(14.dp))
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CarbonCard),
+                shape = RoundedCornerShape(14.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                color = GrowthCyan.copy(alpha = 0.15f),
+                                shape = CircleShape,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.Share,
+                                        contentDescription = null,
+                                        tint = GrowthCyan,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "BACKUP & EXPORTAÇÃO",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GrowthCyan,
+                                    letterSpacing = 1.sp
+                                )
+                                Text(
+                                    text = "Exporte treinos, cardápio e histórico de evolução",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                val jsonStr = viewModel.exportFullBackupJson()
+                                val sendIntent = Intent().apply {
+                                    action = Intent.ACTION_SEND
+                                    putExtra(Intent.EXTRA_TEXT, jsonStr)
+                                    type = "application/json"
+                                }
+                                context.startActivity(Intent.createChooser(sendIntent, "Exportar Backup JSON"))
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.5f))
+                        ) {
+                            Text("Backup JSON", fontSize = 11.sp, color = GrowthCyan, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                val pdfFile = viewModel.exportPdfProgressReport(context)
+                                if (pdfFile != null) {
+                                    val uri = androidx.core.content.FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.provider",
+                                        pdfFile
+                                    )
+                                    val sendIntent = Intent().apply {
+                                        action = Intent.ACTION_SEND
+                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                        type = "application/pdf"
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(Intent.createChooser(sendIntent, "Relatório PDF"))
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange)
+                        ) {
+                            Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Relatório PDF", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(20.dp))
+        }
+    }
+
+    if (showWaterGoalDialog) {
+        val recommendedWater = (profile.weightKg * 35f).toInt().coerceAtLeast(2000)
+        AlertDialog(
+            onDismissRequest = { showWaterGoalDialog = false },
+            containerColor = CarbonCard,
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.LocalDrink, contentDescription = null, tint = GrowthCyan, modifier = Modifier.size(22.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Ajustar Meta Diária de Água", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onBackground)
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "A recomendação ideal para o seu peso atual (${profile.weightKg} kg) é de aproximadamente $recommendedWater ml por dia (35 ml/kg).",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = newWaterGoalInput,
+                        onValueChange = { newWaterGoalInput = it },
+                        label = { Text("Meta de Água (ml)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GrowthCyan,
+                            unfocusedBorderColor = CarbonBorder
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { newWaterGoalInput = "$recommendedWater" },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.5f))
+                        ) {
+                            Text("Usar Sugestão ($recommendedWater ml)", fontSize = 10.sp, color = GrowthCyan)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val parsed = newWaterGoalInput.toIntOrNull() ?: profile.targetWaterMl
+                        viewModel.updateDailyWaterGoal(parsed)
+                        showWaterGoalDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = GrowthCyan)
+                ) {
+                    Text("Salvar Meta", color = Color.Black, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showWaterGoalDialog = false }) {
+                    Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        )
     }
 }

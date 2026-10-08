@@ -7,7 +7,7 @@ import com.example.data.repository.GrowthRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 
-class GrowthApplication : Application() {
+open class MainApplication : Application() {
 
     private val applicationScope = CoroutineScope(SupervisorJob())
 
@@ -16,5 +16,8 @@ class GrowthApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        com.example.util.ExerciseGifMapper.init(this)
     }
 }
+
+typealias GrowthApplication = MainApplication

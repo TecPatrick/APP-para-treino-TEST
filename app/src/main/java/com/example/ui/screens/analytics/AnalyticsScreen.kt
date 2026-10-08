@@ -1,5 +1,8 @@
 package com.example.ui.screens.analytics
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,13 +18,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Compare
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TrendingUp
@@ -30,6 +39,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -50,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -57,6 +68,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
 import com.example.data.model.ProgressLog
 import com.example.ui.GrowthViewModel
 import com.example.ui.components.GrowthHeader
@@ -69,6 +82,7 @@ import com.example.ui.theme.GrowthCyan
 import com.example.ui.theme.GrowthGreen
 import com.example.ui.theme.GrowthOrange
 import com.example.ui.theme.GrowthOrangeLight
+import com.example.ui.theme.GrowthRed
 import com.example.ui.theme.GrowthYellow
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -97,7 +111,7 @@ fun AnalyticsScreen(viewModel: GrowthViewModel) {
             GrowthHeader(
                 title = "Análise de Desempenho",
                 subtitle = "Evolução antropométrica, volume e relatório PDF",
-                badgeText = "GROWTH ANALYTICS",
+                badgeText = "EVOLUÇÃO & ANALYTICS",
                 trailingContent = {
                     IconButton(
                         onClick = { viewModel.exportPdfProgressReport(context) },
@@ -247,6 +261,112 @@ fun AnalyticsScreen(viewModel: GrowthViewModel) {
 
                 // Antropometric measurements header & add button
                 item {
+                    val logsWithPhotos = sortedLogs.filter { it.photoUri.isNotBlank() }
+                    if (logsWithPhotos.isNotEmpty()) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = CarbonCard),
+                            shape = RoundedCornerShape(14.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.4f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Compare, contentDescription = null, tint = GrowthCyan, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("EVOLUÇÃO VISUAL (FOTOS)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = GrowthCyan, letterSpacing = 1.sp)
+                                    }
+                                    Text("${logsWithPhotos.size} registros", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                if (logsWithPhotos.size >= 2) {
+                                    val oldest = logsWithPhotos.first()
+                                    val newest = logsWithPhotos.last()
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        // Oldest (Before)
+                                        Column(
+                                            modifier = Modifier.weight(1f),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Surface(
+                                                color = CarbonDark,
+                                                shape = RoundedCornerShape(4.dp),
+                                                modifier = Modifier.padding(bottom = 4.dp)
+                                            ) {
+                                                Text("ANTES (${oldest.dateDisplay})", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                            }
+                                            SubcomposeAsyncImage(
+                                                model = oldest.photoUri,
+                                                contentDescription = "Antes",
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(140.dp)
+                                                    .clip(RoundedCornerShape(10.dp))
+                                            )
+                                            Text("${oldest.weightKg} kg", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                                        }
+
+                                        // Newest (Now/After)
+                                        Column(
+                                            modifier = Modifier.weight(1f),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Surface(
+                                                color = GrowthGreen.copy(alpha = 0.2f),
+                                                shape = RoundedCornerShape(4.dp),
+                                                modifier = Modifier.padding(bottom = 4.dp)
+                                            ) {
+                                                Text("ATUAL (${newest.dateDisplay})", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = GrowthGreen, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                            }
+                                            SubcomposeAsyncImage(
+                                                model = newest.photoUri,
+                                                contentDescription = "Atual",
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(140.dp)
+                                                    .clip(RoundedCornerShape(10.dp))
+                                            )
+                                            Text("${newest.weightKg} kg", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = GrowthGreen)
+                                        }
+                                    }
+                                } else {
+                                    val single = logsWithPhotos.first()
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        SubcomposeAsyncImage(
+                                            model = single.photoUri,
+                                            contentDescription = "Foto recente",
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier
+                                                .size(width = 80.dp, height = 90.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column {
+                                            Text("Primeira foto registrada!", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                                            Text("${single.dateDisplay} • ${single.weightKg} kg", fontSize = 11.sp, color = GrowthOrangeLight)
+                                            Text("Adicione fotos nas próximas medições para gerar a comparação Antes e Depois lado a lado.", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -331,6 +451,31 @@ fun AnalyticsScreen(viewModel: GrowthViewModel) {
                                 }
                             }
 
+                            if (log.photoUri.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(CarbonDark, shape = RoundedCornerShape(8.dp))
+                                        .padding(6.dp)
+                                ) {
+                                    SubcomposeAsyncImage(
+                                        model = log.photoUri,
+                                        contentDescription = "Foto do registro",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(54.dp)
+                                            .clip(RoundedCornerShape(6.dp))
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text("Foto corporal anexada", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = GrowthGreen)
+                                        Text("Registro visual salvo nesta pesagem", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+
                             Spacer(modifier = Modifier.height(8.dp))
 
                             Row(
@@ -362,8 +507,8 @@ fun AnalyticsScreen(viewModel: GrowthViewModel) {
         AddMeasurementDialog(
             currentWeight = profile.weightKg,
             onDismiss = { showAddMeasurementDialog = false },
-            onConfirm = { weight, bf, chest, waist, arm, thigh, notes ->
-                viewModel.addProgressLog(weight, bf, chest, waist, arm, thigh, notes)
+            onConfirm = { weight, bf, chest, waist, arm, thigh, notes, photoUri ->
+                viewModel.addProgressLog(weight, bf, chest, waist, arm, thigh, notes, photoUri)
                 showAddMeasurementDialog = false
             }
         )
@@ -403,7 +548,7 @@ private fun MetricCard(
 fun AddMeasurementDialog(
     currentWeight: Float,
     onDismiss: () -> Unit,
-    onConfirm: (Float, Float, Float, Float, Float, Float, String) -> Unit
+    onConfirm: (Float, Float, Float, Float, Float, Float, String, String) -> Unit
 ) {
     var weightText by remember { mutableStateOf(currentWeight.toString()) }
     var bfText by remember { mutableStateOf("") }
@@ -412,6 +557,15 @@ fun AddMeasurementDialog(
     var armText by remember { mutableStateOf("") }
     var thighText by remember { mutableStateOf("") }
     var notesText by remember { mutableStateOf("") }
+    var selectedPhotoUri by remember { mutableStateOf("") }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            selectedPhotoUri = uri.toString()
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -421,6 +575,71 @@ fun AddMeasurementDialog(
         },
         text = {
             LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                item {
+                    // Photo Upload Button & Preview
+                    Surface(
+                        color = CarbonCardElevated,
+                        shape = RoundedCornerShape(10.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (selectedPhotoUri.isNotBlank()) GrowthGreen else CarbonBorder),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                photoPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (selectedPhotoUri.isNotBlank()) {
+                                    SubcomposeAsyncImage(
+                                        model = selectedPhotoUri,
+                                        contentDescription = "Foto selecionada",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(46.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text("Foto Anexada com Sucesso!", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GrowthGreen)
+                                        Text("Toque para trocar de imagem", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                } else {
+                                    Surface(
+                                        color = GrowthOrange.copy(alpha = 0.15f),
+                                        shape = CircleShape,
+                                        modifier = Modifier.size(38.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(Icons.Default.AddAPhoto, contentDescription = null, tint = GrowthOrange, modifier = Modifier.size(20.dp))
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text("Foto de Comparação (Antes/Depois)", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                                        Text("Toque para escolher da galeria", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+
+                            if (selectedPhotoUri.isNotBlank()) {
+                                IconButton(
+                                    onClick = { selectedPhotoUri = "" },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(Icons.Default.Close, contentDescription = "Remover", tint = GrowthRed, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -537,7 +756,7 @@ fun AddMeasurementDialog(
                     val waist = waistText.toFloatOrNull() ?: 0f
                     val arm = armText.toFloatOrNull() ?: 0f
                     val thigh = thighText.toFloatOrNull() ?: 0f
-                    onConfirm(w, bf, chest, waist, arm, thigh, notesText)
+                    onConfirm(w, bf, chest, waist, arm, thigh, notesText, selectedPhotoUri)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
                 modifier = Modifier.testTag("confirm_save_measurement_btn")

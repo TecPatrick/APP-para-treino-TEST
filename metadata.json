@@ -1,6 +1,6 @@
 {
-  "name": "Growth Dieta & Treino",
-  "description": "Aplicativo completo estilo Growth para cálculo de macros, dieta mensal, lista de compras automática, treinos personalizados e relatórios em PDF.",
+  "name": "Dieta & Treino",
+  "description": "Aplicativo completo para cálculo de macros, dieta mensal, lista de compras automática, treinos personalizados e relatórios em PDF.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

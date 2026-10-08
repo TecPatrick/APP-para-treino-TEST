@@ -726,12 +726,12 @@ fun ExportShoppingCodeDialog(
                 Button(
                     onClick = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clip = ClipData.newPlainText("Código Lista Growth", code)
+                        val clip = ClipData.newPlainText("Código Lista de Compras", code)
                         clipboard.setPrimaryClip(clip)
 
                         val intent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, "Oi! Aqui está o código da minha dieta/lista de compras do mês para a gente somar no app Growth:\n\n$code")
+                            putExtra(Intent.EXTRA_TEXT, "Oi! Aqui está o código da minha dieta/lista de compras do mês para a gente somar no app Dieta & Treino:\n\n$code")
                         }
                         context.startActivity(Intent.createChooser(intent, "Enviar no WhatsApp"))
                     },
@@ -795,7 +795,7 @@ fun ImportPartnerShoppingDialog(
                 OutlinedTextField(
                     value = codeText,
                     onValueChange = { codeText = it },
-                    label = { Text("Código Copiado (GROWTH-SHARE:...)") },
+                    label = { Text("Código Copiado (FIT-SHARE:...)") },
                     modifier = Modifier.fillMaxWidth().testTag("partner_code_input"),
                     maxLines = 4,
                     colors = OutlinedTextFieldDefaults.colors(

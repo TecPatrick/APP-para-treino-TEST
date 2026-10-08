@@ -124,7 +124,7 @@ fun MacroCalculatorScreen(
             GrowthHeader(
                 title = "Calculadora de Macros",
                 subtitle = "Algoritmo científico Mifflin-St Jeor & Harris-Benedict",
-                badgeText = "SISTEMA DE MACROS GROWTH"
+                badgeText = "SISTEMA CIENTÍFICO DE MACROS"
             )
         }
 

@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Growth Dieta & Treino"
+rootProject.name = "Dieta & Treino"
 
 include(":app")

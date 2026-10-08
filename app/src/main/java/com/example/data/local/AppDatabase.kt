@@ -40,7 +40,7 @@ import java.util.Locale
         PurchaseReceipt::class,
         PurchaseItemLog::class
     ],
-    version = 5,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -92,6 +92,46 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("ALTER TABLE `progress_logs` ADD COLUMN `photoUri` TEXT NOT NULL DEFAULT ''")
+                } catch (_: Exception) {}
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_diet_plans_isActive` ON `diet_plans` (`isActive`)")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_meal_plan_items_dietPlanId` ON `meal_plan_items` (`dietPlanId`)")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_meal_plan_items_mealType` ON `meal_plan_items` (`mealType`)")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_daily_intake_history_dateMillis` ON `daily_intake_history` (`dateMillis`)")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_daily_intake_history_dateString` ON `daily_intake_history` (`dateString`)")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_workout_exercises_routineId` ON `workout_exercises` (`routineId`)")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_workout_logs_routineId` ON `workout_logs` (`routineId`)")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_workout_logs_dateMillis` ON `workout_logs` (`dateMillis`)")
+                } catch (_: Exception) {}
+                try {
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_progress_logs_dateMillis` ON `progress_logs` (`dateMillis`)")
+                } catch (_: Exception) {}
+            }
+        }
+
         fun getDatabase(
             context: Context,
             scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
@@ -102,9 +142,10 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "growth_diet_fitness.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     .fallbackToDestructiveMigration()
                     .fallbackToDestructiveMigrationOnDowngrade()
+                    .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                     .addCallback(AppDatabaseCallback(scope))
                     .build()
                 INSTANCE = instance
@@ -159,7 +200,7 @@ abstract class AppDatabase : RoomDatabase() {
                     bodyFatPercentage = 15.5f,
                     waistCm = 84f,
                     chestCm = 101f,
-                    notes = "Início do protocolo Growth Bulking Limpo"
+                    notes = "Início do protocolo Bulking Limpo"
                 )
             )
             dao.insertProgressLog(

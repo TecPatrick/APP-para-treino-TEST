@@ -2,7 +2,7 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Growth Style Brand Colors: Bold Orange, Energetic Neon Accents, Stealth Carbon
+// Fitness Brand Colors: Bold Orange, Energetic Neon Accents, Stealth Carbon
 val GrowthOrange = Color(0xFFFF5500)
 val GrowthOrangeDark = Color(0xFFD84315)
 val GrowthOrangeLight = Color(0xFFFF8A50)
@@ -13,6 +13,13 @@ val GrowthCyan = Color(0xFF00E5FF)
 val GrowthGreen = Color(0xFF00E676)
 val GrowthYellow = Color(0xFFFFD600)
 val GrowthRed = Color(0xFFFF1744)
+
+// Semantic aliases
+val FitnessOrange = GrowthOrange
+val FitnessCyan = GrowthCyan
+val FitnessGreen = GrowthGreen
+val FitnessYellow = GrowthYellow
+val FitnessRed = GrowthRed
 
 // Neutral Dark Backgrounds
 val CarbonDark = Color(0xFF101216)

@@ -1,12 +1,13 @@
 package com.example.data.model
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 enum class WorkoutSplitType(val title: String, val subtitle: String) {
     AB("Divisão AB (Upper / Lower)", "2 treinos alternados • Ideal para 3-4 dias/semana"),
     ABC("Divisão ABC (Push / Pull / Legs)", "3 treinos completos • Frequência alta 2x/semana"),
-    ABCDE("Divisão ABCDE (Hipertrofia Growth)", "5 treinos isolados • Foco intenso em cada grupamento"),
+    ABCDE("Divisão ABCDE (Hipertrofia Avançada)", "5 treinos isolados • Foco intenso em cada grupamento"),
     CUSTOM("Treinos Personalizados", "Crie sua própria rotina customizada do zero")
 }
 
@@ -44,7 +45,10 @@ data class WorkoutRoutine(
     val orderIndex: Int = 0
 )
 
-@Entity(tableName = "workout_exercises")
+@Entity(
+    tableName = "workout_exercises",
+    indices = [Index(value = ["routineId"])]
+)
 data class WorkoutExercise(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val routineId: Long,
@@ -62,7 +66,13 @@ data class WorkoutExercise(
     val isCompletedInCurrentSession: Boolean = false
 )
 
-@Entity(tableName = "workout_logs")
+@Entity(
+    tableName = "workout_logs",
+    indices = [
+        Index(value = ["routineId"]),
+        Index(value = ["dateMillis"])
+    ]
+)
 data class WorkoutLog(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val routineId: Long,
@@ -75,7 +85,10 @@ data class WorkoutLog(
     val notes: String = ""
 )
 
-@Entity(tableName = "progress_logs")
+@Entity(
+    tableName = "progress_logs",
+    indices = [Index(value = ["dateMillis"])]
+)
 data class ProgressLog(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val dateMillis: Long,
@@ -88,5 +101,6 @@ data class ProgressLog(
     val armRightCm: Float = 0f,
     val thighCm: Float = 0f,
     val calfCm: Float = 0f,
-    val notes: String = ""
+    val notes: String = "",
+    val photoUri: String = ""
 )

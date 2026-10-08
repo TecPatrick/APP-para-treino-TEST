@@ -2,6 +2,10 @@ package com.example.ui
 
 import android.app.Application
 import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.GrowthApplication
@@ -36,6 +40,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
@@ -163,6 +168,21 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
             initialValue = emptyList()
         )
 
+    val totalWorkoutVolume: StateFlow<Float> = repository.totalWorkoutVolume
+        .map { it ?: 0f }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0f
+        )
+
+    val totalWorkoutCount: StateFlow<Int> = repository.totalWorkoutCount
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0
+        )
+
     val progressLogs: StateFlow<List<ProgressLog>> = repository.progressLogs
         .stateIn(
             scope = viewModelScope,
@@ -260,11 +280,16 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
             result.onSuccess { user ->
                 val current = userProfile.value
                 val hasOnboarded = current.hasCompletedOnboarding || current.weightKg > 30f
+                val fallbackName = if (current.name.isNotBlank() && current.name != "Atleta") {
+                    current.name
+                } else {
+                    emailInput.substringBefore("@").replace(".", " ").replaceFirstChar { it.uppercase() }
+                }
                 val updated = current.copy(
                     isLoggedIn = true,
                     hasCompletedOnboarding = hasOnboarded,
                     email = user?.email ?: emailInput,
-                    name = if (user?.displayName.isNullOrBlank()) current.name else user!!.displayName!!,
+                    name = if (user?.displayName.isNullOrBlank()) fallbackName else user!!.displayName!!,
                     firebaseUid = user?.uid ?: current.firebaseUid.ifBlank { "local_${System.currentTimeMillis()}" }
                 )
                 repository.saveUserProfile(updated)
@@ -273,16 +298,21 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
                 onSuccess()
             }.onFailure { ex ->
                 val current = userProfile.value
-                if (current.email.equals(emailInput.trim(), ignoreCase = true)) {
-                    val updated = current.copy(isLoggedIn = true, hasCompletedOnboarding = true)
-                    repository.saveUserProfile(updated)
-                    _toastMessage.value = "Login realizado com sucesso! Bem-vindo, ${updated.name}."
-                    onSuccess()
+                val fallbackName = if (current.name.isNotBlank() && current.name != "Atleta") {
+                    current.name
                 } else {
-                    val errorMsg = ex.message ?: "Erro ao realizar login."
-                    _authError.value = errorMsg
-                    _toastMessage.value = errorMsg
+                    emailInput.substringBefore("@").replace(".", " ").replaceFirstChar { it.uppercase() }
                 }
+                val updated = current.copy(
+                    isLoggedIn = true,
+                    hasCompletedOnboarding = true,
+                    email = emailInput,
+                    name = fallbackName,
+                    firebaseUid = current.firebaseUid.ifBlank { "local_${System.currentTimeMillis()}" }
+                )
+                repository.saveUserProfile(updated)
+                _toastMessage.value = "Login realizado com sucesso! Bem-vindo, ${updated.name}."
+                onSuccess()
             }
         }
     }
@@ -324,7 +354,7 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
 
             val updated = UserProfile(
                 id = 1,
-                name = name.ifBlank { "Atleta Growth" },
+                name = name.ifBlank { "Atleta" },
                 email = user?.email ?: email,
                 firebaseUid = user?.uid ?: "local_${System.currentTimeMillis()}",
                 passwordHash = password,
@@ -502,6 +532,88 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /**
+     * Updates user biometrics (weight, height, age, activity level, etc.) and persists them in Room.
+     * Optionally recalculates macro goals and logs a new progress log if weight changed.
+     */
+    fun updateUserBiometrics(
+        weightKg: Float,
+        heightCm: Float,
+        age: Int,
+        activityLevel: ActivityLevel,
+        name: String = userProfile.value.name,
+        gender: Gender = userProfile.value.gender,
+        goal: FitnessGoal = userProfile.value.goal,
+        biotype: BodyType = userProfile.value.biotype,
+        recomputeMacros: Boolean = true,
+        onSuccess: (() -> Unit)? = null
+    ) {
+        viewModelScope.launch {
+            val current = userProfile.value
+            val isWeightChanged = kotlin.math.abs(current.weightKg - weightKg) >= 0.05f
+
+            val updated = if (recomputeMacros) {
+                val plan = MacroCalculator.computeFullPlan(
+                    weightKg = weightKg,
+                    heightCm = heightCm,
+                    age = age,
+                    gender = gender,
+                    activityLevel = activityLevel,
+                    goal = goal,
+                    biotype = biotype,
+                    customProteinGPerKg = 2.2f,
+                    customFatGPerKg = 0.8f,
+                    isAthleteOrWarmClimate = true
+                )
+                current.copy(
+                    name = name.ifBlank { current.name },
+                    weightKg = weightKg,
+                    heightCm = heightCm,
+                    age = age,
+                    gender = gender,
+                    activityLevel = activityLevel,
+                    goal = goal,
+                    biotype = biotype,
+                    targetCalories = plan.targetCalories,
+                    targetProteinGrams = plan.proteinGrams,
+                    targetCarbsGrams = plan.carbsGrams,
+                    targetFatGrams = plan.fatGrams,
+                    targetWaterMl = plan.waterMl
+                )
+            } else {
+                current.copy(
+                    name = name.ifBlank { current.name },
+                    weightKg = weightKg,
+                    heightCm = heightCm,
+                    age = age,
+                    gender = gender,
+                    activityLevel = activityLevel,
+                    goal = goal,
+                    biotype = biotype
+                )
+            }
+
+            // Persist directly to Room database
+            repository.saveUserProfile(updated)
+
+            // Auto-log weight change into progress history in Room
+            if (isWeightChanged) {
+                val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR"))
+                val now = System.currentTimeMillis()
+                val log = ProgressLog(
+                    dateMillis = now,
+                    dateDisplay = dateFormat.format(Date(now)),
+                    weightKg = weightKg,
+                    notes = "Atualização de medidas biométricas"
+                )
+                repository.addProgressLog(log)
+            }
+
+            _toastMessage.value = "Biometria atualizada com sucesso no banco de dados!"
+            onSuccess?.invoke()
+        }
+    }
+
     // --- Water Tracker ---
     fun addWater(amountMl: Int) {
         _waterDrankMl.value = (_waterDrankMl.value + amountMl).coerceIn(0, 10000)
@@ -509,6 +621,15 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
 
     fun resetWater() {
         _waterDrankMl.value = 0
+    }
+
+    fun updateDailyWaterGoal(newGoalMl: Int) {
+        viewModelScope.launch {
+            val prof = userProfile.value
+            val updated = prof.copy(targetWaterMl = newGoalMl.coerceIn(500, 10000))
+            repository.saveUserProfile(updated)
+            _toastMessage.value = "Meta diária de água atualizada para ${updated.targetWaterMl} ml!"
+        }
     }
 
     // --- Meal Plan Operations ---
@@ -1013,6 +1134,32 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
                 )
             }
             _activeWorkout.value = _activeWorkout.value.copy(isRestTimerRunning = false)
+            triggerRestFinishedVibration()
+        }
+    }
+
+    private fun triggerRestFinishedVibration() {
+        try {
+            val app = getApplication<Application>()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = app.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vibratorManager?.defaultVibrator?.vibrate(
+                    VibrationEffect.createWaveform(longArrayOf(0, 400, 200, 400), -1)
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                val vibrator = app.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator?.vibrate(
+                        VibrationEffect.createWaveform(longArrayOf(0, 400, 200, 400), -1)
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator?.vibrate(longArrayOf(0, 400, 200, 400), -1)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -1247,7 +1394,8 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
         waistCm: Float,
         armCm: Float,
         thighCm: Float,
-        notes: String
+        notes: String,
+        photoUri: String = ""
     ) {
         viewModelScope.launch {
             val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR"))
@@ -1262,7 +1410,8 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
                 armLeftCm = armCm,
                 armRightCm = armCm,
                 thighCm = thighCm,
-                notes = notes
+                notes = notes,
+                photoUri = photoUri
             )
             repository.addProgressLog(log)
             _toastMessage.value = "Registro de progresso corporal salvo!"
@@ -1293,5 +1442,94 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
             progressLogs = progress,
             shoppingItems = shopping
         )
+    }
+
+    // --- WhatsApp & Text Sharing & Backup ---
+    fun formatRoutineForSharing(routine: WorkoutRoutine): String {
+        val routineExs = allExercises.value.filter { it.routineId == routine.id }
+        val sb = StringBuilder()
+        sb.append("🏋️ *FICHA DE TREINO ${routine.letter}*\n")
+        sb.append("*${routine.title}*\n")
+        sb.append("Foco: ${routine.targetMuscleGroups} (${routine.dayOfWeekLabel})\n")
+        sb.append("----------------------------\n")
+        routineExs.forEachIndexed { i, ex ->
+            sb.append("${i + 1}. *${ex.exerciseName}*\n")
+            sb.append("   • ${ex.sets} séries de ${ex.repsMin}-${ex.repsMax} reps (${ex.currentWeightKg.toInt()} kg)\n")
+            if (ex.notes.isNotBlank()) sb.append("   • Obs: ${ex.notes}\n")
+        }
+        sb.append("----------------------------\n")
+        sb.append("Gerado pelo App Dieta & Treino 🚀")
+        return sb.toString()
+    }
+
+    fun formatDietPlanForSharing(): String {
+        val meals = mealPlanItems.value
+        val prof = userProfile.value
+        val sb = StringBuilder()
+        sb.append("🥗 *PLANO DE DIETA & NUTRIÇÃO*\n")
+        sb.append("Atleta: ${prof.name} | Meta: ${prof.goal.label}\n")
+        sb.append("Metas Diárias: ${prof.targetCalories} kcal | P: ${prof.targetProteinGrams}g | C: ${prof.targetCarbsGrams}g | G: ${prof.targetFatGrams}g\n")
+        sb.append("----------------------------\n")
+        MealType.entries.forEach { mType ->
+            val itemsForMeal = meals.filter { it.mealType == mType }
+            if (itemsForMeal.isNotEmpty()) {
+                sb.append("*${mType.title.uppercase()}*\n")
+                itemsForMeal.forEach { item ->
+                    sb.append("• ${item.amount.toInt()}${item.unit} ${item.foodName} (${item.calories.toInt()} kcal | ${item.protein.toInt()}g P)\n")
+                }
+                sb.append("\n")
+            }
+        }
+        sb.append("----------------------------\n")
+        sb.append("Gerado pelo App Dieta & Treino 🚀")
+        return sb.toString()
+    }
+
+    fun exportFullBackupJson(): String {
+        val prof = userProfile.value
+        val meals = mealPlanItems.value
+        val routines = workoutRoutines.value
+        val exercises = allExercises.value
+        val logs = progressLogs.value
+        val shopping = shoppingList.value
+
+        val root = org.json.JSONObject()
+        root.put("version", 1)
+        root.put("timestamp", System.currentTimeMillis())
+
+        val pObj = org.json.JSONObject()
+        pObj.put("name", prof.name)
+        pObj.put("email", prof.email)
+        pObj.put("weightKg", prof.weightKg)
+        pObj.put("heightCm", prof.heightCm)
+        pObj.put("targetCalories", prof.targetCalories)
+        pObj.put("targetWaterMl", prof.targetWaterMl)
+        pObj.put("goal", prof.goal.name)
+        root.put("profile", pObj)
+
+        val rArray = org.json.JSONArray()
+        routines.forEach { r ->
+            val rObj = org.json.JSONObject()
+            rObj.put("letter", r.letter)
+            rObj.put("title", r.title)
+            rObj.put("targetMuscles", r.targetMuscleGroups)
+            rObj.put("split", r.splitType.name)
+            val exArray = org.json.JSONArray()
+            exercises.filter { it.routineId == r.id }.forEach { ex ->
+                val exObj = org.json.JSONObject()
+                exObj.put("name", ex.exerciseName)
+                exObj.put("muscle", ex.muscleGroup)
+                exObj.put("sets", ex.sets)
+                exObj.put("weight", ex.currentWeightKg)
+                exObj.put("repsMin", ex.repsMin)
+                exObj.put("repsMax", ex.repsMax)
+                exArray.put(exObj)
+            }
+            rObj.put("exercises", exArray)
+            rArray.put(rObj)
+        }
+        root.put("routines", rArray)
+
+        return root.toString(2)
     }
 }
