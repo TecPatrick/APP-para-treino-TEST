@@ -58,9 +58,28 @@ data class MacroValues(
     val fiber: Float = 0f
 )
 
+@Entity(tableName = "diet_plans")
+data class DietPlan(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val description: String = "",
+    val goal: FitnessGoal = FitnessGoal.BULKING_CLEAN,
+    val targetCalories: Int = 2650,
+    val targetProteinGrams: Int = 175,
+    val targetCarbsGrams: Int = 320,
+    val targetFatGrams: Int = 65,
+    val targetWaterMl: Int = 3530,
+    val mealsCount: Int = 5,
+    val cycleType: DietCycleType = DietCycleType.FIXED_DAILY,
+    val isActive: Boolean = true,
+    val createdAtMillis: Long = System.currentTimeMillis(),
+    val notes: String = ""
+)
+
 @Entity(tableName = "meal_plan_items")
 data class MealPlanItem(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val dietPlanId: Long = 1L,
     val mealType: MealType,
     val foodItemId: Long,
     val foodName: String,

@@ -1,5 +1,8 @@
 package com.example.data.local
 
+import com.example.data.model.DietCycleType
+import com.example.data.model.DietPlan
+import com.example.data.model.FitnessGoal
 import com.example.data.model.FoodCategory
 import com.example.data.model.FoodItem
 import com.example.data.model.MealPlanItem
@@ -47,6 +50,22 @@ object PrepopulatedData {
         FoodItem(id = 25, name = "Brócolis Cozido no Vapor", category = FoodCategory.FRUITS_VEGETABLES, servingUnit = "g", baseServingAmount = 100f, calories = 35f, protein = 2.4f, carbs = 7.2f, fat = 0.4f, fiber = 3.3f)
     )
 
+    val defaultDietPlan = DietPlan(
+        id = 1,
+        name = "Plano Hipertrofia Growth (Bulking Limpo)",
+        description = "Plano nutricional de alta performance com superávit calórico controlado e foco em hipertrofia.",
+        goal = FitnessGoal.BULKING_CLEAN,
+        targetCalories = 2650,
+        targetProteinGrams = 175,
+        targetCarbsGrams = 320,
+        targetFatGrams = 65,
+        targetWaterMl = 3530,
+        mealsCount = 5,
+        cycleType = DietCycleType.FIXED_DAILY,
+        isActive = true,
+        notes = "Foco em bater metas diárias de proteína e água."
+    )
+
     val defaultMealPlan = listOf(
         MealPlanItem(mealType = MealType.BREAKFAST, foodItemId = 9, foodName = "Ovo de Galinha Inteiro Cozido", foodCategory = FoodCategory.PROTEIN, amount = 150f, unit = "g", calories = 234f, protein = 18.9f, carbs = 1.8f, fat = 15.9f),
         MealPlanItem(mealType = MealType.BREAKFAST, foodItemId = 16, foodName = "Aveia em Flocos Finos", foodCategory = FoodCategory.CARBOHYDRATE, amount = 60f, unit = "g", calories = 233.4f, protein = 10.1f, carbs = 39.8f, fat = 4.1f),
@@ -68,67 +87,9 @@ object PrepopulatedData {
     )
 
     // Complete Pre-populated Routines for AB, ABC, and ABCDE
-    val defaultRoutines = listOf(
-        // Divisão AB (Upper / Lower)
-        WorkoutRoutine(id = 101, splitType = WorkoutSplitType.AB, letter = "A", title = "Upper (Superior Completo)", dayOfWeekLabel = "Segunda & Quinta", targetMuscleGroups = "Peito, Costas, Ombros, Braços", estimatedDurationMinutes = 65, orderIndex = 0),
-        WorkoutRoutine(id = 102, splitType = WorkoutSplitType.AB, letter = "B", title = "Lower (Inferior & Core)", dayOfWeekLabel = "Terça & Sexta", targetMuscleGroups = "Quadríceps, Posterior, Panturrilha, Abdômen", estimatedDurationMinutes = 65, orderIndex = 1),
+    val defaultRoutines = emptyList<WorkoutRoutine>()
 
-        // Divisão ABC (Push / Pull / Legs)
-        WorkoutRoutine(id = 201, splitType = WorkoutSplitType.ABC, letter = "A", title = "Push (Peito, Deltoide Frontal e Tríceps)", dayOfWeekLabel = "Segunda-feira", targetMuscleGroups = "Peitoral, Ombros, Tríceps", estimatedDurationMinutes = 60, orderIndex = 0),
-        WorkoutRoutine(id = 202, splitType = WorkoutSplitType.ABC, letter = "B", title = "Pull (Dorsais, Deltoide Posterior e Bíceps)", dayOfWeekLabel = "Terça-feira", targetMuscleGroups = "Costas, Deltoide Posterior, Bíceps, Trapézio", estimatedDurationMinutes = 60, orderIndex = 1),
-        WorkoutRoutine(id = 203, splitType = WorkoutSplitType.ABC, letter = "C", title = "Legs (Pernas Completo & Abdômen)", dayOfWeekLabel = "Quarta-feira", targetMuscleGroups = "Quadríceps, Isquiotibiais, Panturrilhas, Core", estimatedDurationMinutes = 65, orderIndex = 2),
-
-        // Divisão ABCDE (Hipertrofia Growth)
-        WorkoutRoutine(id = 1, splitType = WorkoutSplitType.ABCDE, letter = "A", title = "Peitoral & Deltoide Anterior", dayOfWeekLabel = "Segunda-feira", targetMuscleGroups = "Peito Superior e Médio, Deltoide Frontal", estimatedDurationMinutes = 65, orderIndex = 0),
-        WorkoutRoutine(id = 2, splitType = WorkoutSplitType.ABCDE, letter = "B", title = "Dorsal, Deltoide Posterior e Trapézio", dayOfWeekLabel = "Terça-feira", targetMuscleGroups = "Latíssimo, Romboides, Trapézio, Deltoide Posterior", estimatedDurationMinutes = 65, orderIndex = 1),
-        WorkoutRoutine(id = 3, splitType = WorkoutSplitType.ABCDE, letter = "C", title = "Quadríceps & Panturrilhas", dayOfWeekLabel = "Quarta-feira", targetMuscleGroups = "Quadríceps, Adutores, Panturrilhas", estimatedDurationMinutes = 70, orderIndex = 2),
-        WorkoutRoutine(id = 4, splitType = WorkoutSplitType.ABCDE, letter = "D", title = "Ombros Completo & Abdômen", dayOfWeekLabel = "Quinta-feira", targetMuscleGroups = "Deltoide Lateral, Frontal e Posterior, Core", estimatedDurationMinutes = 55, orderIndex = 3),
-        WorkoutRoutine(id = 5, splitType = WorkoutSplitType.ABCDE, letter = "E", title = "Bíceps, Tríceps & Antebraço", dayOfWeekLabel = "Sexta-feira", targetMuscleGroups = "Bíceps Braquial, Tríceps (3 cabeças), Braquiorradial", estimatedDurationMinutes = 60, orderIndex = 4),
-
-        // Divisão Personalizada (Custom)
-        WorkoutRoutine(id = 301, splitType = WorkoutSplitType.CUSTOM, letter = "P1", title = "Minha Ficha Personalizada 1", dayOfWeekLabel = "Segunda-feira", targetMuscleGroups = "Peito, Ombros, Tríceps", estimatedDurationMinutes = 60, orderIndex = 0)
-    )
-
-    val defaultExercises = listOf(
-        // Custom Routine 301
-        WorkoutExercise(routineId = 301, exerciseName = "Supino Reto com Barra", muscleGroup = "Peitoral Maior", sets = 4, repsMin = 8, repsMax = 10, currentWeightKg = 80f, restSeconds = 90, orderIndex = 0, biomechanicsGuide = "Escápulas retraídas e pés firmes no chão.", gifDemonstrationUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Barbell-Bench-Press.gif"),
-        WorkoutExercise(routineId = 301, exerciseName = "Desenvolvimento com Halteres", muscleGroup = "Deltoide Anterior", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 22f, restSeconds = 75, orderIndex = 1, biomechanicsGuide = "Empurre na vertical no plano escapular.", gifDemonstrationUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Shoulder-Press.gif"),
-        WorkoutExercise(routineId = 301, exerciseName = "Tríceps Pulley Corda", muscleGroup = "Tríceps", sets = 4, repsMin = 10, repsMax = 12, currentWeightKg = 30f, restSeconds = 60, orderIndex = 2, biomechanicsGuide = "Abra a corda no final da extensão.", gifDemonstrationUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Pushdown.gif"),
-        // ABCDE - Routine 1 (Peito)
-        WorkoutExercise(routineId = 1, exerciseName = "Supino Reto com Barra", muscleGroup = "Peitoral Maior", sets = 4, repsMin = 6, repsMax = 10, currentWeightKg = 80f, restSeconds = 90, orderIndex = 0, notes = "Aquecimento progressivo. Última série até falha concêntrica.", biomechanicsGuide = "Pés firmes no chão, escápulas em retração e depressão, descida controlada tocando o esterno médio.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/barbell-bench-press/"),
-        WorkoutExercise(routineId = 1, exerciseName = "Supino Inclinado com Halteres (30°)", muscleGroup = "Peitoral Superior", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 28f, restSeconds = 75, orderIndex = 1, notes = "Alongamento completo no ponto zero.", biomechanicsGuide = "Banco regulado em 30 graus para focar a porção clavicular sem recrutar excessivamente o deltoide.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/incline-dumbbell-press/"),
-        WorkoutExercise(routineId = 1, exerciseName = "Crucifixo no Cross / Crossover", muscleGroup = "Peitoral", sets = 3, repsMin = 10, repsMax = 15, currentWeightKg = 20f, restSeconds = 60, orderIndex = 2, notes = "Pico de contração de 1s.", biomechanicsGuide = "Leve flexão nos cotovelos, aproxime os punhos esmagando o peitoral no centro.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/cable-crossover/"),
-        WorkoutExercise(routineId = 1, exerciseName = "Desenvolvimento com Halteres", muscleGroup = "Deltoide Anterior", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 22f, restSeconds = 75, orderIndex = 3, notes = "Escápulas travadas.", biomechanicsGuide = "Empurre na vertical no plano escapular (levemente à frente do tronco).", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/dumbbell-shoulder-press/"),
-
-        // ABCDE - Routine 2 (Costas)
-        WorkoutExercise(routineId = 2, exerciseName = "Puxada Alta Aberta no Pulley", muscleGroup = "Dorsal", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 65f, restSeconds = 90, orderIndex = 0, notes = "Puxar em direção ao peitoral superior.", biomechanicsGuide = "Inicie puxando com as escápulas para baixo antes de dobrar os cotovelos.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/lat-pulldown/"),
-        WorkoutExercise(routineId = 2, exerciseName = "Remada Curvada com Barra", muscleGroup = "Dorsais / Miolo", sets = 4, repsMin = 8, repsMax = 10, currentWeightKg = 70f, restSeconds = 90, orderIndex = 1, notes = "Tronco a 45 graus, coluna alinhada.", biomechanicsGuide = "Mantenha o core rígido e puxe a barra rente às coxas em direção ao umbigo.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/barbell-bent-over-row/"),
-        WorkoutExercise(routineId = 2, exerciseName = "Crucifixo Inverso no Voador", muscleGroup = "Deltoide Posterior", sets = 4, repsMin = 12, repsMax = 15, currentWeightKg = 40f, restSeconds = 60, orderIndex = 2, notes = "Controle de movimento.", biomechanicsGuide = "Cotovelos na altura dos ombros, afaste os braços focando na parte de trás dos ombros.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/rear-delt-fly/"),
-
-        // ABCDE - Routine 3 (Pernas)
-        WorkoutExercise(routineId = 3, exerciseName = "Agachamento Livre com Barra", muscleGroup = "Quadríceps & Glúteos", sets = 4, repsMin = 6, repsMax = 10, currentWeightKg = 100f, restSeconds = 120, orderIndex = 0, notes = "Profundidade abaixo de 90°.", biomechanicsGuide = "Joelhos acompanham a linha dos pés, peito aberto, respiração diafragmática travada (Valsalva).", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/barbell-squat/"),
-        WorkoutExercise(routineId = 3, exerciseName = "Leg Press 45°", muscleGroup = "Quadríceps", sets = 4, repsMin = 10, repsMax = 12, currentWeightKg = 240f, restSeconds = 90, orderIndex = 1, notes = "Pés largura dos ombros.", biomechanicsGuide = "Desça até formar ângulo de 90 graus no joelho sem descolar a lombar do encosto.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/leg-press/"),
-        WorkoutExercise(routineId = 3, exerciseName = "Cadeira Extensora", muscleGroup = "Quadríceps", sets = 4, repsMin = 12, repsMax = 15, currentWeightKg = 65f, restSeconds = 60, orderIndex = 2, notes = "Drop-set na última série.", biomechanicsGuide = "Extensão completa sem hiperextensão abrupta, 1s de contração no topo.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/leg-extension/"),
-
-        // AB - Routine 101 (Upper)
-        WorkoutExercise(routineId = 101, exerciseName = "Supino Reto com Barra", muscleGroup = "Peitoral", sets = 4, repsMin = 8, repsMax = 10, currentWeightKg = 75f, restSeconds = 90, orderIndex = 0, biomechanicsGuide = "Escápulas travadas, pegada média firme.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/barbell-bench-press/"),
-        WorkoutExercise(routineId = 101, exerciseName = "Remada Curvada com Barra", muscleGroup = "Dorsal", sets = 4, repsMin = 8, repsMax = 10, currentWeightKg = 65f, restSeconds = 90, orderIndex = 1, biomechanicsGuide = "Tronco inclinado, coluna reta.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/barbell-bent-over-row/"),
-        WorkoutExercise(routineId = 101, exerciseName = "Desenvolvimento Militar com Halteres", muscleGroup = "Ombros", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 20f, restSeconds = 75, orderIndex = 2, biomechanicsGuide = "Subida vertical controlada.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/dumbbell-shoulder-press/"),
-        WorkoutExercise(routineId = 101, exerciseName = "Rosca Direta com Barra W", muscleGroup = "Bíceps", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 28f, restSeconds = 60, orderIndex = 3, biomechanicsGuide = "Cotovelos fixos ao lado do corpo.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/ez-bar-curl/"),
-        WorkoutExercise(routineId = 101, exerciseName = "Tríceps Testa com Halteres", muscleGroup = "Tríceps", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 12f, restSeconds = 60, orderIndex = 4, biomechanicsGuide = "Flexão dos cotovelos mantendo os braços estáveis.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/dumbbell-lying-triceps-extension/"),
-
-        // AB - Routine 102 (Lower)
-        WorkoutExercise(routineId = 102, exerciseName = "Agachamento Livre com Barra", muscleGroup = "Quadríceps & Glúteos", sets = 4, repsMin = 8, repsMax = 10, currentWeightKg = 90f, restSeconds = 120, orderIndex = 0, biomechanicsGuide = "Descida controlada e explosão na subida.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/barbell-squat/"),
-        WorkoutExercise(routineId = 102, exerciseName = "Stiff com Barra / RDL", muscleGroup = "Isquiotibiais", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 60f, restSeconds = 90, orderIndex = 1, biomechanicsGuide = "Empurre o quadril para trás com joelhos levemente destravados.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/barbell-romanian-deadlift/"),
-        WorkoutExercise(routineId = 102, exerciseName = "Leg Press 45°", muscleGroup = "Pernas", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 200f, restSeconds = 90, orderIndex = 2, biomechanicsGuide = "Amplitude segura e pés paralelos.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/leg-press/"),
-        WorkoutExercise(routineId = 102, exerciseName = "Panturrilha no Smith em Pé", muscleGroup = "Panturrilhas", sets = 4, repsMin = 12, repsMax = 15, currentWeightKg = 70f, restSeconds = 60, orderIndex = 3, biomechanicsGuide = "Alongamento total na descida.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/standing-calf-raises/"),
-
-        // ABC - Routine 201 (Push)
-        WorkoutExercise(routineId = 201, exerciseName = "Supino Inclinado com Halteres", muscleGroup = "Peitoral Superior", sets = 4, repsMin = 8, repsMax = 10, currentWeightKg = 26f, restSeconds = 90, orderIndex = 0, biomechanicsGuide = "Banco em 30 graus, focar na parte de cima do peito.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/incline-dumbbell-press/"),
-        WorkoutExercise(routineId = 201, exerciseName = "Supino Reto com Barra", muscleGroup = "Peitoral", sets = 4, repsMin = 8, repsMax = 10, currentWeightKg = 80f, restSeconds = 90, orderIndex = 1, biomechanicsGuide = "Pegada firme, pés no chão.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/barbell-bench-press/"),
-        WorkoutExercise(routineId = 201, exerciseName = "Elevação Lateral com Halteres", muscleGroup = "Deltoide Lateral", sets = 4, repsMin = 12, repsMax = 15, currentWeightKg = 12f, restSeconds = 60, orderIndex = 2, biomechanicsGuide = "Eleve até a linha dos ombros com cotovelos levemente flexionados.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/dumbbell-lateral-raise/"),
-        WorkoutExercise(routineId = 201, exerciseName = "Tríceps Pulley Corda", muscleGroup = "Tríceps", sets = 4, repsMin = 10, repsMax = 12, currentWeightKg = 30f, restSeconds = 60, orderIndex = 3, biomechanicsGuide = "Abra a corda no final da extensão.", gifDemonstrationUrl = "https://fitnessprogramer.com/exercise/cable-tricep-pushdown/")
-    )
+    val defaultExercises = emptyList<WorkoutExercise>()
 
     // Prepopulated Price History to show inflation tracking
     val sampleReceipts = listOf(

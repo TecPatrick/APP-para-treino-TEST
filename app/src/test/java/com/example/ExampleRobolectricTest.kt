@@ -5,11 +5,13 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.local.GrowthDatabase
 import com.example.data.model.ActivityLevel
+import com.example.data.model.DietPlan
 import com.example.data.model.FitnessGoal
 import com.example.data.model.FoodCategory
 import com.example.data.model.Gender
 import com.example.data.model.MealPlanItem
 import com.example.data.model.MealType
+import com.example.data.model.UserProfile
 import com.example.data.model.WorkoutExercise
 import com.example.data.model.WorkoutRoutine
 import com.example.data.model.WorkoutSplitType
@@ -120,5 +122,98 @@ class ExampleRobolectricTest {
     assertEquals(1, exercises.size)
     assertEquals("Supino Reto com Barra", exercises[0].exerciseName)
     assertEquals(80f, exercises[0].currentWeightKg)
+  }
+
+  @Test
+  fun `test room dao stores and updates user profile biometrics`() = runBlocking {
+    val dao = db.userProfileDao()
+
+    val profile = UserProfile(
+      id = 1,
+      name = "Atleta Growth",
+      weightKg = 82.5f,
+      heightCm = 182f,
+      goal = FitnessGoal.BULKING_CLEAN,
+      targetCalories = 2900,
+      targetProteinGrams = 180,
+      targetCarbsGrams = 350,
+      targetFatGrams = 70
+    )
+    dao.insertOrUpdateProfile(profile)
+
+    val loaded = dao.getUserProfile().first()
+    assertTrue("UserProfile should be retrieved", loaded != null)
+    assertEquals(82.5f, loaded?.weightKg)
+    assertEquals(182f, loaded?.heightCm)
+    assertEquals(FitnessGoal.BULKING_CLEAN, loaded?.goal)
+    assertEquals(2900, loaded?.targetCalories)
+
+    // Update weight and goal
+    val updatedProfile = loaded!!.copy(
+      weightKg = 81.0f,
+      goal = FitnessGoal.CUTTING_MODERATE
+    )
+    dao.insertOrUpdateProfile(updatedProfile)
+
+    val updatedLoaded = dao.getUserProfile().first()
+    assertEquals(81.0f, updatedLoaded?.weightKg)
+    assertEquals(FitnessGoal.CUTTING_MODERATE, updatedLoaded?.goal)
+  }
+
+  @Test
+  fun `test room dao stores and queries diet plans`() = runBlocking {
+    val dao = db.dietPlanDao()
+
+    val dietPlan = DietPlan(
+      name = "Protocolo Hipertrofia Growth",
+      description = "Plano focado em ganho muscular limpo",
+      goal = FitnessGoal.BULKING_CLEAN,
+      targetCalories = 2800,
+      targetProteinGrams = 180,
+      targetCarbsGrams = 330,
+      targetFatGrams = 65,
+      targetWaterMl = 3600,
+      isActive = true
+    )
+    val planId = dao.insertDietPlan(dietPlan)
+    assertTrue("DietPlan ID should be generated", planId > 0)
+
+    val activePlan = dao.getActiveDietPlan().first()
+    assertTrue("Active diet plan should be found", activePlan != null)
+    assertEquals("Protocolo Hipertrofia Growth", activePlan?.name)
+    assertEquals(2800, activePlan?.targetCalories)
+
+    val allPlans = dao.getAllDietPlans().first()
+    assertEquals(1, allPlans.size)
+  }
+
+  @Test
+  fun `test room dao workout routine management`() = runBlocking {
+    val dao = db.workoutRoutineDao()
+
+    val routine = WorkoutRoutine(
+      splitType = WorkoutSplitType.ABCDE,
+      letter = "B",
+      title = "Costas e Bíceps",
+      dayOfWeekLabel = "Terça-feira",
+      targetMuscleGroups = "Dorsais, Trapézio, Bíceps",
+      estimatedDurationMinutes = 55
+    )
+    val routineId = dao.insertRoutine(routine)
+    assertTrue("Workout routine should be inserted", routineId > 0)
+
+    val fetched = dao.getRoutineById(routineId).first()
+    assertTrue("Routine should exist", fetched != null)
+    assertEquals("Costas e Bíceps", fetched?.title)
+
+    val updated = fetched!!.copy(title = "Dorsais Completo e Bíceps")
+    dao.updateRoutine(updated)
+
+    val fetchedUpdated = dao.getRoutineById(routineId).first()
+    assertEquals("Dorsais Completo e Bíceps", fetchedUpdated?.title)
+
+    dao.deleteRoutine(routineId)
+    val afterDelete = dao.getRoutineById(routineId).first()
+    assertTrue("Routine should be deleted", afterDelete == null)
   }
 }

@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.data.model.DailyIntakeHistory
+import com.example.data.model.DietPlan
 import com.example.data.model.FoodItem
 import com.example.data.model.MealPlanItem
 import com.example.data.model.ProgressLog
@@ -27,6 +28,7 @@ import java.util.Locale
 @Database(
     entities = [
         UserProfile::class,
+        DietPlan::class,
         FoodItem::class,
         MealPlanItem::class,
         DailyIntakeHistory::class,
@@ -38,18 +40,35 @@ import java.util.Locale
         PurchaseReceipt::class,
         PurchaseItemLog::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
-abstract class GrowthDatabase : RoomDatabase() {
+abstract class AppDatabase : RoomDatabase() {
 
-    abstract fun growthDao(): GrowthDao
+    abstract fun appDao(): AppDao
+
+    fun growthDao(): GrowthDao = appDao()
+    fun userProfileDao(): UserProfileDao = appDao()
+    fun dietPlanDao(): DietPlanDao = appDao()
+    fun workoutRoutineDao(): WorkoutRoutineDao = appDao()
 
     companion object {
         @Volatile
-        private var INSTANCE: GrowthDatabase? = null
+        private var INSTANCE: AppDatabase? = null
 
-        private val MIGRATION_3_4 = object : Migration(3, 4) {
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Initial schema upgrade support
+            }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Version 2 to 3 migration support
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 try {
                     db.execSQL("ALTER TABLE user_profile ADD COLUMN firebaseUid TEXT NOT NULL DEFAULT ''")
@@ -57,17 +76,36 @@ abstract class GrowthDatabase : RoomDatabase() {
             }
         }
 
-        fun getDatabase(context: Context, scope: CoroutineScope): GrowthDatabase {
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL(
+                        "CREATE TABLE IF NOT EXISTS `diet_plans` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `description` TEXT NOT NULL, `goal` TEXT NOT NULL, `targetCalories` INTEGER NOT NULL, `targetProteinGrams` INTEGER NOT NULL, `targetCarbsGrams` INTEGER NOT NULL, `targetFatGrams` INTEGER NOT NULL, `targetWaterMl` INTEGER NOT NULL, `mealsCount` INTEGER NOT NULL, `cycleType` TEXT NOT NULL, `isActive` INTEGER NOT NULL, `createdAtMillis` INTEGER NOT NULL, `notes` TEXT NOT NULL)"
+                    )
+                } catch (_: Exception) {}
+
+                try {
+                    db.execSQL(
+                        "ALTER TABLE `meal_plan_items` ADD COLUMN `dietPlanId` INTEGER NOT NULL DEFAULT 1"
+                    )
+                } catch (_: Exception) {}
+            }
+        }
+
+        fun getDatabase(
+            context: Context,
+            scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
+        ): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
-                    GrowthDatabase::class.java,
+                    AppDatabase::class.java,
                     "growth_diet_fitness.db"
                 )
-                    .addMigrations(MIGRATION_3_4)
-                    .fallbackToDestructiveMigration(true)
-                    .fallbackToDestructiveMigrationOnDowngrade(true)
-                    .addCallback(GrowthDatabaseCallback(scope))
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigrationOnDowngrade()
+                    .addCallback(AppDatabaseCallback(scope))
                     .build()
                 INSTANCE = instance
                 instance
@@ -75,21 +113,24 @@ abstract class GrowthDatabase : RoomDatabase() {
         }
     }
 
-    private class GrowthDatabaseCallback(
+    private class AppDatabaseCallback(
         private val scope: CoroutineScope
     ) : RoomDatabase.Callback() {
         override fun onCreate(db: SupportSQLiteDatabase) {
             super.onCreate(db)
             INSTANCE?.let { database ->
                 scope.launch(Dispatchers.IO) {
-                    populateDatabase(database.growthDao())
+                    populateDatabase(database.appDao())
                 }
             }
         }
 
-        private suspend fun populateDatabase(dao: GrowthDao) {
+        private suspend fun populateDatabase(dao: AppDao) {
             // Seed Profile
             dao.insertOrUpdateProfile(UserProfile())
+
+            // Seed Active Diet Plan
+            dao.insertDietPlan(PrepopulatedData.defaultDietPlan)
 
             // Seed Foods
             dao.insertFoods(PrepopulatedData.defaultFoods)
@@ -114,42 +155,22 @@ abstract class GrowthDatabase : RoomDatabase() {
                 ProgressLog(
                     dateMillis = now - (21 * dayMillis),
                     dateDisplay = dateFormat.format(Date(now - (21 * dayMillis))),
-                    weightKg = 77.0f,
-                    bodyFatPercentage = 13.5f,
-                    chestCm = 101.0f,
-                    waistCm = 80.0f,
-                    armLeftCm = 37.5f,
-                    armRightCm = 37.5f,
-                    thighCm = 58.0f,
-                    notes = "Início do protocolo de hipertrofia Growth"
-                )
-            )
-            dao.insertProgressLog(
-                ProgressLog(
-                    dateMillis = now - (14 * dayMillis),
-                    dateDisplay = dateFormat.format(Date(now - (14 * dayMillis))),
-                    weightKg = 77.6f,
-                    bodyFatPercentage = 13.2f,
-                    chestCm = 101.5f,
-                    waistCm = 79.8f,
-                    armLeftCm = 38.0f,
-                    armRightCm = 38.0f,
-                    thighCm = 58.5f,
-                    notes = "Boa recuperação muscular e aumento de força no supino"
+                    weightKg = 79.8f,
+                    bodyFatPercentage = 15.5f,
+                    waistCm = 84f,
+                    chestCm = 101f,
+                    notes = "Início do protocolo Growth Bulking Limpo"
                 )
             )
             dao.insertProgressLog(
                 ProgressLog(
                     dateMillis = now - (7 * dayMillis),
                     dateDisplay = dateFormat.format(Date(now - (7 * dayMillis))),
-                    weightKg = 78.1f,
-                    bodyFatPercentage = 13.0f,
-                    chestCm = 102.5f,
-                    waistCm = 80.0f,
-                    armLeftCm = 38.5f,
-                    armRightCm = 38.5f,
-                    thighCm = 59.0f,
-                    notes = "Consistência de 100% nos macros da dieta"
+                    weightKg = 79.1f,
+                    bodyFatPercentage = 14.8f,
+                    waistCm = 83f,
+                    chestCm = 102f,
+                    notes = "Semana 2: aumento de cargas no Supino e Agachamento"
                 )
             )
             dao.insertProgressLog(
@@ -157,41 +178,14 @@ abstract class GrowthDatabase : RoomDatabase() {
                     dateMillis = now,
                     dateDisplay = dateFormat.format(Date(now)),
                     weightKg = 78.5f,
-                    bodyFatPercentage = 12.8f,
-                    chestCm = 103.0f,
-                    waistCm = 79.5f,
-                    armLeftCm = 39.0f,
-                    armRightCm = 39.0f,
-                    thighCm = 59.5f,
-                    notes = "Evolução sólida: +1.5kg com redução de dobra abdominal"
-                )
-            )
-
-            // Seed initial workout logs
-            dao.insertWorkoutLog(
-                WorkoutLog(
-                    routineId = 1,
-                    routineName = "Peitoral & Deltoide Anterior",
-                    dateMillis = now - (2 * dayMillis),
-                    durationMinutes = 62,
-                    totalVolumeKg = 14200f,
-                    totalSetsCompleted = 22,
-                    perceivedExertion = 9,
-                    notes = "Cargas progredidas no supino reto e inclinado"
-                )
-            )
-            dao.insertWorkoutLog(
-                WorkoutLog(
-                    routineId = 2,
-                    routineName = "Dorsal, Deltoide Posterior e Trapézio",
-                    dateMillis = now - (1 * dayMillis),
-                    durationMinutes = 58,
-                    totalVolumeKg = 15800f,
-                    totalSetsCompleted = 21,
-                    perceivedExertion = 8,
-                    notes = "Pumps excelentes e execução limpa nas remadas"
+                    bodyFatPercentage = 14.2f,
+                    waistCm = 82f,
+                    chestCm = 103f,
+                    notes = "Semana 3: definição muscular visível e excelente recuperação"
                 )
             )
         }
     }
 }
+
+typealias GrowthDatabase = AppDatabase

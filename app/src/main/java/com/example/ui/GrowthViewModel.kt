@@ -10,6 +10,7 @@ import com.example.data.firestore.FirestoreSyncManager
 import com.example.data.model.ActivityLevel
 import com.example.data.model.BodyType
 import com.example.data.model.DietCycleType
+import com.example.data.model.DietPlan
 import com.example.data.model.FitnessGoal
 import com.example.data.model.FoodCategory
 import com.example.data.model.FoodItem
@@ -111,6 +112,20 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
+        )
+
+    val allDietPlans: StateFlow<List<DietPlan>> = repository.allDietPlans
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val activeDietPlan: StateFlow<DietPlan?> = repository.activeDietPlan
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
         )
 
     val mealPlanItems: StateFlow<List<MealPlanItem>> = repository.mealPlanItems
@@ -530,6 +545,25 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun saveDietPlan(dietPlan: DietPlan) {
+        viewModelScope.launch {
+            if (dietPlan.id == 0L) {
+                repository.addDietPlan(dietPlan)
+                _toastMessage.value = "Plano de dieta criado!"
+            } else {
+                repository.updateDietPlan(dietPlan)
+                _toastMessage.value = "Plano de dieta atualizado!"
+            }
+        }
+    }
+
+    fun deleteDietPlan(id: Long) {
+        viewModelScope.launch {
+            repository.deleteDietPlan(id)
+            _toastMessage.value = "Plano de dieta removido!"
+        }
+    }
+
     fun toggleMealItemCompleted(item: MealPlanItem) {
         viewModelScope.launch {
             repository.toggleMealCompletion(item.id, item.isCompletedToday)
@@ -742,7 +776,8 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
 
     fun saveWorkoutRoutineWithExercises(
         routine: WorkoutRoutine,
-        exercises: List<WorkoutExercise>
+        exercises: List<WorkoutExercise>,
+        onSuccess: ((Long) -> Unit)? = null
     ) {
         viewModelScope.launch {
             val routineId = if (routine.id == 0L) {
@@ -762,10 +797,14 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
                 )
             }
             _toastMessage.value = if (routine.id == 0L) "Treino salvo com sucesso!" else "Treino atualizado com sucesso!"
+            onSuccess?.invoke(routineId)
         }
     }
 
-    fun createTemplateCustomRoutine(templateType: String) {
+    fun createTemplateCustomRoutine(
+        templateType: String,
+        onSuccess: ((Long) -> Unit)? = null
+    ) {
         viewModelScope.launch {
             val letter = when (templateType) {
                 "CHEST_TRICEPS" -> "P1"
@@ -816,6 +855,59 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
             _toastMessage.value = "Ficha personalizada criada com sucesso!"
+            onSuccess?.invoke(newRoutineId)
+        }
+    }
+
+    fun generateWorkoutProtocolForProfile(onSuccess: ((Long) -> Unit)? = null) {
+        viewModelScope.launch {
+            val profile = userProfile.value
+            val days = profile.trainingDaysPerWeek
+
+            if (days <= 3) {
+                val r1 = repository.addWorkoutRoutine(
+                    WorkoutRoutine(splitType = WorkoutSplitType.CUSTOM, letter = "P1", title = "Treino IA: Push (Peito, Ombro & Tríceps)", dayOfWeekLabel = "Segunda-feira", targetMuscleGroups = "Peitoral, Deltoides, Tríceps", estimatedDurationMinutes = 60)
+                )
+                repository.addWorkoutExercise(WorkoutExercise(routineId = r1, exerciseName = "Supino Reto com Barra", muscleGroup = "Peitoral Maior", sets = 4, repsMin = 8, repsMax = 10, currentWeightKg = 80f, restSeconds = 90, biomechanicsGuide = "Escápulas retraídas e pés firmes no chão.", gifDemonstrationUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Barbell-Bench-Press.gif"))
+                repository.addWorkoutExercise(WorkoutExercise(routineId = r1, exerciseName = "Supino Inclinado com Halteres", muscleGroup = "Peitoral Superior", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 28f, restSeconds = 75, biomechanicsGuide = "Banco em 30 graus.", gifDemonstrationUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Incline-Dumbbell-Press.gif"))
+                repository.addWorkoutExercise(WorkoutExercise(routineId = r1, exerciseName = "Desenvolvimento com Halteres", muscleGroup = "Deltoide Anterior", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 22f, restSeconds = 75, biomechanicsGuide = "Empurre na vertical no plano escapular.", gifDemonstrationUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Shoulder-Press.gif"))
+                repository.addWorkoutExercise(WorkoutExercise(routineId = r1, exerciseName = "Tríceps Pulley Corda", muscleGroup = "Tríceps", sets = 4, repsMin = 10, repsMax = 12, currentWeightKg = 30f, restSeconds = 60, biomechanicsGuide = "Abra a corda no final.", gifDemonstrationUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Pushdown.gif"))
+
+                val r2 = repository.addWorkoutRoutine(
+                    WorkoutRoutine(splitType = WorkoutSplitType.CUSTOM, letter = "P2", title = "Treino IA: Pull (Costas & Bíceps)", dayOfWeekLabel = "Quarta-feira", targetMuscleGroups = "Latíssimo, Romboides, Bíceps", estimatedDurationMinutes = 60)
+                )
+                repository.addWorkoutExercise(WorkoutExercise(routineId = r2, exerciseName = "Puxada Alta Aberta no Pulley", muscleGroup = "Dorsal", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 65f, restSeconds = 90, biomechanicsGuide = "Inicie puxando com as escápulas.", gifDemonstrationUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Lat-Pulldown.gif"))
+                repository.addWorkoutExercise(WorkoutExercise(routineId = r2, exerciseName = "Remada Curvada com Barra", muscleGroup = "Dorsais / Miolo", sets = 4, repsMin = 8, repsMax = 10, currentWeightKg = 70f, restSeconds = 90, biomechanicsGuide = "Tronco a 45 graus.", gifDemonstrationUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Barbell-Bent-Over-Row.gif"))
+                repository.addWorkoutExercise(WorkoutExercise(routineId = r2, exerciseName = "Rosca Direta com Barra W", muscleGroup = "Bíceps", sets = 4, repsMin = 10, repsMax = 12, currentWeightKg = 28f, restSeconds = 60, biomechanicsGuide = "Cotovelos fixos ao lado do tronco.", gifDemonstrationUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/EZ-Bar-Curl.gif"))
+
+                val r3 = repository.addWorkoutRoutine(
+                    WorkoutRoutine(splitType = WorkoutSplitType.CUSTOM, letter = "P3", title = "Treino IA: Legs (Pernas Completo)", dayOfWeekLabel = "Sexta-feira", targetMuscleGroups = "Quadríceps, Isquiotibiais, Panturrilhas", estimatedDurationMinutes = 65)
+                )
+                repository.addWorkoutExercise(WorkoutExercise(routineId = r3, exerciseName = "Agachamento Livre com Barra", muscleGroup = "Quadríceps", sets = 4, repsMin = 6, repsMax = 10, currentWeightKg = 100f, restSeconds = 120, biomechanicsGuide = "Descida controlada.", gifDemonstrationUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/BARBELL-SQUAT.gif"))
+                repository.addWorkoutExercise(WorkoutExercise(routineId = r3, exerciseName = "Leg Press 45°", muscleGroup = "Quadríceps", sets = 4, repsMin = 10, repsMax = 12, currentWeightKg = 240f, restSeconds = 90, biomechanicsGuide = "Nunca descole a lombar.", gifDemonstrationUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Leg-Press.gif"))
+
+                _toastMessage.value = "Protocolo IA Personalizado (3 Dias) gerado com sucesso!"
+                onSuccess?.invoke(r1)
+            } else {
+                val r1 = repository.addWorkoutRoutine(
+                    WorkoutRoutine(splitType = WorkoutSplitType.CUSTOM, letter = "P1", title = "Treino IA: Peitoral & Deltoide Frontal", dayOfWeekLabel = "Segunda-feira", targetMuscleGroups = "Peitoral Maior, Deltoide Frontal", estimatedDurationMinutes = 60)
+                )
+                repository.addWorkoutExercise(WorkoutExercise(routineId = r1, exerciseName = "Supino Reto com Barra", muscleGroup = "Peitoral Maior", sets = 4, repsMin = 8, repsMax = 10, currentWeightKg = 80f, restSeconds = 90, biomechanicsGuide = "Escápulas retraídas.", gifDemonstrationUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Barbell-Bench-Press.gif"))
+                repository.addWorkoutExercise(WorkoutExercise(routineId = r1, exerciseName = "Supino Inclinado com Halteres", muscleGroup = "Peitoral Superior", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 28f, restSeconds = 75, biomechanicsGuide = "Banco em 30 graus.", gifDemonstrationUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Incline-Dumbbell-Press.gif"))
+
+                val r2 = repository.addWorkoutRoutine(
+                    WorkoutRoutine(splitType = WorkoutSplitType.CUSTOM, letter = "P2", title = "Treino IA: Dorsal & Trapézio", dayOfWeekLabel = "Terça-feira", targetMuscleGroups = "Latíssimo, Romboides, Trapézio", estimatedDurationMinutes = 60)
+                )
+                repository.addWorkoutExercise(WorkoutExercise(routineId = r2, exerciseName = "Puxada Alta Aberta no Pulley", muscleGroup = "Dorsal", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 65f, restSeconds = 90, biomechanicsGuide = "Inicie puxando com escápulas.", gifDemonstrationUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Lat-Pulldown.gif"))
+
+                val r3 = repository.addWorkoutRoutine(
+                    WorkoutRoutine(splitType = WorkoutSplitType.CUSTOM, letter = "P3", title = "Treino IA: Quadríceps & Panturrilhas", dayOfWeekLabel = "Quarta-feira", targetMuscleGroups = "Quadríceps, Panturrilhas", estimatedDurationMinutes = 65)
+                )
+                repository.addWorkoutExercise(WorkoutExercise(routineId = r3, exerciseName = "Agachamento Livre com Barra", muscleGroup = "Quadríceps", sets = 4, repsMin = 6, repsMax = 10, currentWeightKg = 100f, restSeconds = 120, biomechanicsGuide = "Descida controlada.", gifDemonstrationUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/BARBELL-SQUAT.gif"))
+
+                _toastMessage.value = "Protocolo IA Personalizado gerado com sucesso!"
+                onSuccess?.invoke(r1)
+            }
         }
     }
 

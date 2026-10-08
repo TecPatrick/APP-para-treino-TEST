@@ -209,10 +209,10 @@ fun WorkoutRoutineEditorDialog(
                                             label = {
                                                 Text(
                                                     text = when (st) {
-                                                        WorkoutSplitType.AB -> "Divisão AB"
-                                                        WorkoutSplitType.ABC -> "Divisão ABC"
-                                                        WorkoutSplitType.ABCDE -> "Divisão ABCDE"
-                                                        WorkoutSplitType.CUSTOM -> "Personalizado"
+                                                        WorkoutSplitType.AB -> "Modelo AB"
+                                                        WorkoutSplitType.ABC -> "Modelo ABC"
+                                                        WorkoutSplitType.ABCDE -> "Modelo ABCDE"
+                                                        WorkoutSplitType.CUSTOM -> "Livre / Customizado"
                                                     },
                                                     fontSize = 11.sp
                                                 )

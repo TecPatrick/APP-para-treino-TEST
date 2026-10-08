@@ -1,8 +1,10 @@
 package com.example.data.repository
 
 import android.util.Base64
+import com.example.data.local.AppDao
 import com.example.data.local.GrowthDao
 import com.example.data.model.DailyIntakeHistory
+import com.example.data.model.DietPlan
 import com.example.data.model.FoodCategory
 import com.example.data.model.FoodItem
 import com.example.data.model.ItemPriceInflationStat
@@ -27,9 +29,11 @@ import java.util.Locale
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
-class GrowthRepository(private val dao: GrowthDao) {
+class GrowthRepository(private val dao: AppDao) {
 
     val userProfile: Flow<UserProfile?> = dao.getUserProfile()
+    val allDietPlans: Flow<List<DietPlan>> = dao.getAllDietPlans()
+    val activeDietPlan: Flow<DietPlan?> = dao.getActiveDietPlan()
     val allFoods: Flow<List<FoodItem>> = dao.getAllFoods()
     val mealPlanItems: Flow<List<MealPlanItem>> = dao.getAllMealPlanItems()
     val shoppingList: Flow<List<ShoppingItem>> = dao.getShoppingList()
@@ -49,6 +53,12 @@ class GrowthRepository(private val dao: GrowthDao) {
     suspend fun saveUserProfile(profile: UserProfile) {
         dao.insertOrUpdateProfile(profile)
     }
+
+    suspend fun addDietPlan(plan: DietPlan): Long = dao.insertDietPlan(plan)
+
+    suspend fun updateDietPlan(plan: DietPlan) = dao.updateDietPlan(plan)
+
+    suspend fun deleteDietPlan(id: Long) = dao.deleteDietPlan(id)
 
     suspend fun addFoodItem(food: FoodItem): Long = dao.insertFood(food)
 
