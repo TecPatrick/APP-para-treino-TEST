@@ -1,5 +1,6 @@
 package com.example.ui.screens.workout
 
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,6 +37,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -56,7 +58,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -64,6 +69,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import coil.ImageLoader
+import coil.compose.SubcomposeAsyncImage
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
+import coil.request.ImageRequest
 import com.example.data.model.WorkoutExercise
 import com.example.data.model.WorkoutRoutine
 import com.example.data.model.WorkoutSplitType
@@ -77,6 +87,7 @@ import com.example.ui.theme.GrowthOrange
 import com.example.ui.theme.GrowthOrangeLight
 import com.example.ui.theme.GrowthRed
 import com.example.util.ExerciseGifMapper
+import com.example.util.ExerciseVisualGuide
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -543,40 +554,51 @@ fun WorkoutRoutineEditorDialog(
     }
 }
 
-// Modal de Seleção Múltipla da Biblioteca de Exercícios
+// Modal de Seleção Múltipla da Biblioteca de Exercícios com GIFs
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MultiExerciseLibraryPickerModal(
     onDismiss: () -> Unit,
     onConfirmSelection: (List<String>) -> Unit
 ) {
+    val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
-    val catalog = remember {
-        listOf(
-            "Supino Reto com Barra",
-            "Supino Inclinado com Halteres",
-            "Crucifixo no Cross / Crossover",
-            "Desenvolvimento com Halteres",
-            "Puxada Alta Aberta no Pulley",
-            "Remada Curvada com Barra",
-            "Crucifixo Inverso no Voador",
-            "Agachamento Livre com Barra",
-            "Leg Press 45°",
-            "Cadeira Extensora",
-            "Desenvolvimento Militar com Halteres",
-            "Elevação Lateral com Halteres",
-            "Rosca Direta com Barra W",
-            "Tríceps Testa com Halteres",
-            "Tríceps Pulley Corda",
-            "Stiff com Barra / RDL",
-            "Panturrilha no Smith em Pé"
-        )
+    var selectedMuscleFilter by remember { mutableStateOf("Todos") }
+
+    val gifImageLoader = remember(context) {
+        ImageLoader.Builder(context)
+            .components {
+                if (Build.VERSION.SDK_INT >= 28) {
+                    add(ImageDecoderDecoder.Factory())
+                } else {
+                    add(GifDecoder.Factory())
+                }
+            }
+            .build()
     }
 
+    val availableGuides = remember { ExerciseGifMapper.getAllAvailableExercises() }
     val selectedItems = remember { mutableStateListOf<String>() }
 
-    val filteredCatalog = catalog.filter {
-        it.contains(searchQuery, ignoreCase = true)
+    val muscleFilters = listOf("Todos", "Tríceps", "Bíceps", "Peitoral", "Dorsal", "Deltoide", "Quadríceps", "Posterior / Glúteos", "Panturrilha")
+
+    val filteredCatalog = availableGuides.filter { guide ->
+        val matchesSearch = guide.exerciseName.contains(searchQuery, ignoreCase = true) ||
+                guide.muscleGroup.contains(searchQuery, ignoreCase = true)
+        val matchesFilter = when (selectedMuscleFilter) {
+            "Todos" -> true
+            "Tríceps" -> guide.muscleGroup.contains("Tríceps", ignoreCase = true) || guide.exerciseName.contains("Tríceps", ignoreCase = true)
+            "Bíceps" -> guide.muscleGroup.contains("Bíceps", ignoreCase = true) || guide.exerciseName.contains("Rosca", ignoreCase = true)
+            "Peitoral" -> guide.muscleGroup.contains("Peitoral", ignoreCase = true) || guide.exerciseName.contains("Supino", ignoreCase = true) || guide.exerciseName.contains("Crucifixo", ignoreCase = true) || guide.exerciseName.contains("Voador", ignoreCase = true)
+            "Dorsal" -> guide.muscleGroup.contains("Dorsal", ignoreCase = true) || guide.muscleGroup.contains("Costas", ignoreCase = true) || guide.exerciseName.contains("Puxada", ignoreCase = true) || guide.exerciseName.contains("Remada", ignoreCase = true) || guide.exerciseName.contains("Barra Fixa", ignoreCase = true)
+            "Deltoide" -> guide.muscleGroup.contains("Deltoide", ignoreCase = true) || guide.muscleGroup.contains("Ombro", ignoreCase = true) || guide.exerciseName.contains("Desenvolvimento", ignoreCase = true) || guide.exerciseName.contains("Lateral", ignoreCase = true) || guide.exerciseName.contains("Face Pull", ignoreCase = true)
+            "Quadríceps" -> guide.muscleGroup.contains("Quadríceps", ignoreCase = true) || guide.exerciseName.contains("Agachamento", ignoreCase = true) || guide.exerciseName.contains("Leg Press", ignoreCase = true) || guide.exerciseName.contains("Extensora", ignoreCase = true)
+            "Posterior / Glúteos" -> guide.muscleGroup.contains("Isquiotibiais", ignoreCase = true) || guide.muscleGroup.contains("Glúteo", ignoreCase = true) || guide.exerciseName.contains("Flexora", ignoreCase = true) || guide.exerciseName.contains("Stiff", ignoreCase = true) || guide.exerciseName.contains("Pélvica", ignoreCase = true) || guide.exerciseName.contains("Afundo", ignoreCase = true)
+            "Panturrilha" -> guide.muscleGroup.contains("Panturrilha", ignoreCase = true) || guide.muscleGroup.contains("Gastrocnêmio", ignoreCase = true) || guide.exerciseName.contains("Panturrilha", ignoreCase = true)
+            else -> guide.muscleGroup.contains(selectedMuscleFilter, ignoreCase = true) ||
+                    guide.exerciseName.contains(selectedMuscleFilter, ignoreCase = true)
+        }
+        matchesSearch && matchesFilter
     }
 
     AlertDialog(
@@ -584,8 +606,17 @@ fun MultiExerciseLibraryPickerModal(
         containerColor = CarbonCard,
         title = {
             Column {
-                Text("Biblioteca de Exercícios", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                Text("Selecione um ou mais exercícios para adicionar à ficha:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Biblioteca de Exercícios com GIFs", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onBackground)
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Fechar", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Text("Selecione os exercícios com prévia em GIF para adicionar à ficha:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         },
         text = {
@@ -593,57 +624,119 @@ fun MultiExerciseLibraryPickerModal(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("Buscar exercício...") },
+                    placeholder = { Text("Buscar exercício ou músculo...", fontSize = 12.sp) },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = GrowthOrange) },
                     modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = GrowthOrange,
                         unfocusedBorderColor = CarbonBorder
                     )
                 )
 
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Muscle Category Filter Bar
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(muscleFilters) { muscle ->
+                        val isSel = selectedMuscleFilter == muscle
+                        FilterChip(
+                            selected = isSel,
+                            onClick = { selectedMuscleFilter = muscle },
+                            label = { Text(muscle, fontSize = 11.sp, fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = GrowthOrange,
+                                selectedLabelColor = Color.White,
+                                containerColor = CarbonCardElevated,
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = isSel,
+                                borderColor = CarbonBorder,
+                                selectedBorderColor = GrowthOrange
+                            )
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(10.dp))
 
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(280.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                        .height(320.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filteredCatalog) { exerciseName ->
-                        val isChecked = selectedItems.contains(exerciseName)
-                        val guide = remember(exerciseName) { ExerciseGifMapper.getGuideForExercise(exerciseName) }
+                    items(filteredCatalog) { guide ->
+                        val isChecked = selectedItems.contains(guide.exerciseName)
 
                         Surface(
-                            color = if (isChecked) GrowthOrange.copy(alpha = 0.15f) else CarbonCardElevated,
-                            shape = RoundedCornerShape(8.dp),
+                            color = if (isChecked) GrowthOrange.copy(alpha = 0.18f) else CarbonCardElevated,
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, if (isChecked) GrowthOrange else CarbonBorder),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    if (isChecked) selectedItems.remove(exerciseName) else selectedItems.add(exerciseName)
+                                    if (isChecked) selectedItems.remove(guide.exerciseName) else selectedItems.add(guide.exerciseName)
                                 }
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                    .padding(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                // Animated GIF Preview Thumbnail Box
+                                Box(
+                                    modifier = Modifier
+                                        .size(width = 68.dp, height = 56.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(CarbonDark)
+                                ) {
+                                    SubcomposeAsyncImage(
+                                        model = ImageRequest.Builder(context)
+                                            .data(guide.gifUrl)
+                                            .crossfade(true)
+                                            .build(),
+                                        imageLoader = gifImageLoader,
+                                        contentDescription = guide.exerciseName,
+                                        contentScale = ContentScale.Crop,
+                                        loading = {
+                                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                                CircularProgressIndicator(color = GrowthOrange, modifier = Modifier.size(20.dp))
+                                            }
+                                        },
+                                        error = {
+                                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                                Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = GrowthOrange, modifier = Modifier.size(20.dp))
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(10.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(guide.exerciseName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                                    Text(guide.muscleGroup, fontSize = 10.sp, color = GrowthOrangeLight, fontWeight = FontWeight.Bold)
+                                    Text(guide.postureTip, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                                }
+
                                 Checkbox(
                                     checked = isChecked,
                                     onCheckedChange = { checked ->
-                                        if (checked == true) selectedItems.add(exerciseName) else selectedItems.remove(exerciseName)
+                                        if (checked == true) selectedItems.add(guide.exerciseName) else selectedItems.remove(guide.exerciseName)
                                     },
                                     colors = CheckboxDefaults.colors(
                                         checkedColor = GrowthOrange,
                                         uncheckedColor = CarbonBorder
                                     )
                                 )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Column {
-                                    Text(exerciseName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                                    Text(guide.muscleGroup, fontSize = 10.sp, color = GrowthOrangeLight)
-                                }
                             }
                         }
                     }
@@ -656,7 +749,7 @@ fun MultiExerciseLibraryPickerModal(
                 enabled = selectedItems.isNotEmpty(),
                 colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange)
             ) {
-                Text("Adicionar (${selectedItems.size}) Exercício(s)", color = Color.White)
+                Text("Adicionar (${selectedItems.size}) Exercício(s)", color = Color.White, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {

@@ -1061,6 +1061,178 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun startFreeWorkout() {
+        workoutTimerJob?.cancel()
+        restTimerJob?.cancel()
+
+        val freeRoutine = WorkoutRoutine(
+            id = 99999L,
+            splitType = WorkoutSplitType.CUSTOM,
+            letter = "L",
+            title = "Treino Livre",
+            dayOfWeekLabel = "Hoje",
+            targetMuscleGroups = "Personalizado",
+            estimatedDurationMinutes = 45
+        )
+
+        _activeWorkout.value = ActiveWorkoutSession(
+            routine = freeRoutine,
+            exercises = emptyList(),
+            isRunning = true,
+            elapsedSeconds = 0,
+            currentExerciseIndex = 0,
+            completedSetsCount = 0
+        )
+
+        workoutTimerJob = viewModelScope.launch {
+            while (true) {
+                delay(1000)
+                _activeWorkout.value = _activeWorkout.value.copy(
+                    elapsedSeconds = _activeWorkout.value.elapsedSeconds + 1
+                )
+            }
+        }
+    }
+
+    fun addExerciseToActiveFreeWorkout(name: String, group: String, sets: Int = 3, weightKg: Float = 20f) {
+        val current = _activeWorkout.value
+        val exId = System.currentTimeMillis()
+        val guide = com.example.util.ExerciseGifMapper.getGuideForExercise(name)
+        val newEx = WorkoutExercise(
+            id = exId,
+            routineId = 99999L,
+            exerciseName = name,
+            muscleGroup = group.ifBlank { guide.muscleGroup },
+            sets = sets,
+            repsMin = 10,
+            repsMax = 12,
+            currentWeightKg = weightKg,
+            restSeconds = 60,
+            biomechanicsGuide = guide.postureTip,
+            gifDemonstrationUrl = guide.gifUrl
+        )
+        _activeWorkout.value = current.copy(
+            exercises = current.exercises + newEx
+        )
+    }
+
+    fun downloadSuggestedRoutine(templateType: String, onSuccess: ((Long) -> Unit)? = null) {
+        viewModelScope.launch {
+            when (templateType) {
+                "FULL_BODY" -> {
+                    val r = repository.addWorkoutRoutine(
+                        WorkoutRoutine(
+                            splitType = WorkoutSplitType.CUSTOM,
+                            letter = "FB",
+                            title = "Full Body Iniciante",
+                            dayOfWeekLabel = "3x por semana",
+                            targetMuscleGroups = "Corpo Todo",
+                            estimatedDurationMinutes = 50
+                        )
+                    )
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Agachamento Livre com Barra", muscleGroup = "Pernas", sets = 3, repsMin = 10, repsMax = 10, currentWeightKg = 40f, restSeconds = 90))
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Supino Reto com Barra", muscleGroup = "Peito", sets = 3, repsMin = 10, repsMax = 10, currentWeightKg = 50f, restSeconds = 90))
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Remada Curvada com Barra", muscleGroup = "Costas", sets = 3, repsMin = 10, repsMax = 10, currentWeightKg = 40f, restSeconds = 90))
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Desenvolvimento com Halteres", muscleGroup = "Ombros", sets = 3, repsMin = 12, repsMax = 12, currentWeightKg = 14f, restSeconds = 60))
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Rosca Direta com Barra W", muscleGroup = "Bíceps", sets = 3, repsMin = 12, repsMax = 12, currentWeightKg = 16f, restSeconds = 45))
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Tríceps Pulley Corda", muscleGroup = "Tríceps", sets = 3, repsMin = 12, repsMax = 12, currentWeightKg = 20f, restSeconds = 45))
+                    _toastMessage.value = "Ficha 'Full Body Iniciante' baixada!"
+                    onSuccess?.invoke(r)
+                }
+                "ABC" -> {
+                    val rA = repository.addWorkoutRoutine(
+                        WorkoutRoutine(splitType = WorkoutSplitType.ABC, letter = "A", title = "A — Peito & Tríceps", dayOfWeekLabel = "Segunda-feira", targetMuscleGroups = "Peitoral, Tríceps", estimatedDurationMinutes = 60)
+                    )
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = rA, exerciseName = "Supino Reto com Barra", muscleGroup = "Peito", sets = 4, repsMin = 8, repsMax = 10, currentWeightKg = 70f, restSeconds = 120))
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = rA, exerciseName = "Supino Inclinado com Halteres", muscleGroup = "Peito", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 24f, restSeconds = 90))
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = rA, exerciseName = "Crucifixo no Cross / Crossover", muscleGroup = "Peito", sets = 3, repsMin = 12, repsMax = 15, currentWeightKg = 15f, restSeconds = 60))
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = rA, exerciseName = "Tríceps Testa com Halteres", muscleGroup = "Tríceps", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 14f, restSeconds = 60))
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = rA, exerciseName = "Tríceps Pulley Corda", muscleGroup = "Tríceps", sets = 3, repsMin = 12, repsMax = 15, currentWeightKg = 25f, restSeconds = 45))
+
+                    val rB = repository.addWorkoutRoutine(
+                        WorkoutRoutine(splitType = WorkoutSplitType.ABC, letter = "B", title = "B — Costas & Bíceps", dayOfWeekLabel = "Quarta-feira", targetMuscleGroups = "Costas, Bíceps", estimatedDurationMinutes = 60)
+                    )
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = rB, exerciseName = "Puxada Alta Aberta no Pulley", muscleGroup = "Costas", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 60f, restSeconds = 90))
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = rB, exerciseName = "Remada Curvada com Barra", muscleGroup = "Costas", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 50f, restSeconds = 90))
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = rB, exerciseName = "Rosca Direta com Barra W", muscleGroup = "Bíceps", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 22f, restSeconds = 60))
+
+                    val rC = repository.addWorkoutRoutine(
+                        WorkoutRoutine(splitType = WorkoutSplitType.ABC, letter = "C", title = "C — Pernas & Ombros", dayOfWeekLabel = "Sexta-feira", targetMuscleGroups = "Pernas, Ombros", estimatedDurationMinutes = 65)
+                    )
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = rC, exerciseName = "Agachamento Livre com Barra", muscleGroup = "Pernas", sets = 4, repsMin = 8, repsMax = 10, currentWeightKg = 80f, restSeconds = 150))
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = rC, exerciseName = "Leg Press 45°", muscleGroup = "Pernas", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 180f, restSeconds = 120))
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = rC, exerciseName = "Cadeira Extensora", muscleGroup = "Quadríceps", sets = 3, repsMin = 12, repsMax = 15, currentWeightKg = 50f, restSeconds = 60))
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = rC, exerciseName = "Desenvolvimento com Halteres", muscleGroup = "Ombros", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 18f, restSeconds = 90))
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = rC, exerciseName = "Elevação Lateral com Halteres", muscleGroup = "Ombros", sets = 3, repsMin = 15, repsMax = 15, currentWeightKg = 10f, restSeconds = 45))
+
+                    _toastMessage.value = "Ficha 'ABC Hipertrofia' baixada com sucesso!"
+                    onSuccess?.invoke(rA)
+                }
+                "EM_CASA" -> {
+                    val r = repository.addWorkoutRoutine(
+                        WorkoutRoutine(
+                            splitType = WorkoutSplitType.CUSTOM,
+                            letter = "EC",
+                            title = "Em Casa — Sem Equipamento",
+                            dayOfWeekLabel = "Qualquer dia",
+                            targetMuscleGroups = "Full Body (Peso Corporal)",
+                            estimatedDurationMinutes = 40
+                        )
+                    )
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Agachamento Livre", muscleGroup = "Pernas", sets = 3, repsMin = 15, repsMax = 20, currentWeightKg = 0f, restSeconds = 45))
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Flexão de Braço", muscleGroup = "Peito", sets = 3, repsMin = 10, repsMax = 15, currentWeightKg = 0f, restSeconds = 45))
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Afundo Alternado", muscleGroup = "Pernas", sets = 3, repsMin = 12, repsMax = 12, currentWeightKg = 0f, restSeconds = 45))
+                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Prancha Abdominal", muscleGroup = "Core", sets = 3, repsMin = 30, repsMax = 45, currentWeightKg = 0f, restSeconds = 30, notes = "Reps = segundos de sustentação"))
+
+                    _toastMessage.value = "Ficha 'Em Casa' baixada!"
+                    onSuccess?.invoke(r)
+                }
+            }
+        }
+    }
+
+    fun deleteWorkoutLog(id: Long) {
+        viewModelScope.launch {
+            repository.deleteWorkoutLog(id)
+            _toastMessage.value = "Registro de treino excluído do histórico."
+        }
+    }
+
+    fun updateExerciseWeight(exercise: WorkoutExercise, newWeightKg: Float) {
+        viewModelScope.launch {
+            repository.addWorkoutExercise(exercise.copy(currentWeightKg = newWeightKg))
+            val current = _activeWorkout.value
+            if (current.isRunning) {
+                val updatedList = current.exercises.map {
+                    if (it.id == exercise.id) it.copy(currentWeightKg = newWeightKg) else it
+                }
+                _activeWorkout.value = current.copy(exercises = updatedList)
+            }
+        }
+    }
+
+    fun toggleSetLog(exercise: WorkoutExercise, setIndex: Int) {
+        val current = _activeWorkout.value
+        if (!current.isRunning) return
+
+        val exId = exercise.id
+        val existingSets = current.loggedExerciseSets[exId] ?: emptyList()
+
+        if (existingSets.size >= setIndex) {
+            // Remove set
+            val updated = existingSets.take(setIndex - 1)
+            val updatedMap = current.loggedExerciseSets + (exId to updated)
+            val newCompletedCount = (current.completedSetsCount - 1).coerceAtLeast(0)
+            _activeWorkout.value = current.copy(
+                completedSetsCount = newCompletedCount,
+                loggedExerciseSets = updatedMap
+            )
+        } else {
+            // Log set
+            logSetAndStartRest(exercise, exercise.repsMin, exercise.currentWeightKg)
+        }
+    }
+
     fun cancelActiveWorkout() {
         workoutTimerJob?.cancel()
         restTimerJob?.cancel()

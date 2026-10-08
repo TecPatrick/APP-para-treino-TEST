@@ -401,6 +401,8 @@ class GrowthRepository(private val dao: AppDao) {
         )
     }
 
+    suspend fun deleteWorkoutLog(id: Long) = dao.deleteWorkoutLog(id)
+
     // --- Progress & Analytics ---
     suspend fun addProgressLog(log: ProgressLog): Long = dao.insertProgressLog(log)
 

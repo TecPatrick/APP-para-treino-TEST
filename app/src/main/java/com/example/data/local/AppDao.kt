@@ -206,6 +206,9 @@ interface AppDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWorkoutLog(log: WorkoutLog): Long
 
+    @Query("DELETE FROM workout_logs WHERE id = :id")
+    suspend fun deleteWorkoutLog(id: Long)
+
     // =========================================================================
     // 📈 Progress & Daily Intake DAO Operations
     // =========================================================================

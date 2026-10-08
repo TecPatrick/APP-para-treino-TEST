@@ -48,8 +48,12 @@ class FirebaseAuthService(
             }
             Result.success(user)
         } catch (e: Exception) {
-            val msg = e.message.orEmpty()
-            if (msg.contains("operation is not allowed", ignoreCase = true) || msg.contains("ERROR_OPERATION_NOT_ALLOWED", ignoreCase = true)) {
+            val fullMsg = "${e.message} ${e.cause?.message} ${e.toString()}"
+            if (fullMsg.contains("operation is not allowed", ignoreCase = true) ||
+                fullMsg.contains("disabled", ignoreCase = true) ||
+                fullMsg.contains("ERROR_OPERATION_NOT_ALLOWED", ignoreCase = true) ||
+                fullMsg.contains("RecaptchaAction", ignoreCase = true) ||
+                fullMsg.contains("signInWithPassword", ignoreCase = true)) {
                 // Email/Password provider is disabled in Firebase console, fallback to local storage
                 Result.success(null)
             } else {
@@ -66,8 +70,12 @@ class FirebaseAuthService(
             val result = auth.signInWithEmailAndPassword(email.trim(), password).await()
             Result.success(result.user)
         } catch (e: Exception) {
-            val msg = e.message.orEmpty()
-            if (msg.contains("operation is not allowed", ignoreCase = true) || msg.contains("ERROR_OPERATION_NOT_ALLOWED", ignoreCase = true)) {
+            val fullMsg = "${e.message} ${e.cause?.message} ${e.toString()}"
+            if (fullMsg.contains("operation is not allowed", ignoreCase = true) ||
+                fullMsg.contains("disabled", ignoreCase = true) ||
+                fullMsg.contains("ERROR_OPERATION_NOT_ALLOWED", ignoreCase = true) ||
+                fullMsg.contains("RecaptchaAction", ignoreCase = true) ||
+                fullMsg.contains("signInWithPassword", ignoreCase = true)) {
                 // Fallback to local profile check
                 Result.success(null)
             } else {
@@ -81,7 +89,16 @@ class FirebaseAuthService(
             auth.sendPasswordResetEmail(email.trim()).await()
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(Exception(translateAuthError(e)))
+            val fullMsg = "${e.message} ${e.cause?.message} ${e.toString()}"
+            if (fullMsg.contains("operation is not allowed", ignoreCase = true) ||
+                fullMsg.contains("disabled", ignoreCase = true) ||
+                fullMsg.contains("ERROR_OPERATION_NOT_ALLOWED", ignoreCase = true) ||
+                fullMsg.contains("RecaptchaAction", ignoreCase = true) ||
+                fullMsg.contains("signInWithPassword", ignoreCase = true)) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception(translateAuthError(e)))
+            }
         }
     }
 
