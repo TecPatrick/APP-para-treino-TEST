@@ -218,7 +218,7 @@ fun AuthAndOnboardingScreen(
                     }
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "DIETA & TREINO",
+                        text = "Victus Dieta & Treino",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.onBackground,
@@ -226,7 +226,7 @@ fun AuthAndOnboardingScreen(
                     )
                     Text(
                         text = when (onboardingStep) {
-                            0 -> if (isRegisterMode) "Cadastro Seguro com Firebase Auth & LGPD" else "Acesse com sua conta Firebase Auth"
+                            0 -> if (isRegisterMode) "Cadastro de Nova Conta" else ""
                             1 -> "Passo 1/3: Informações Biométricas"
                             2 -> "Passo 2/3: Guia e Escolha de Biotipo"
                             else -> "Passo 3/3: Rotina e Metas Nutricionais"
@@ -287,25 +287,12 @@ fun AuthAndOnboardingScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = if (isRegisterMode) "CRIAR CONTA SEGURA" else "ENTRAR COM FIREBASE",
+                                    text = if (isRegisterMode) "CRIAR CONTA" else "ENTRAR",
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = GrowthOrangeLight,
                                     letterSpacing = 1.sp
                                 )
-                                Surface(
-                                    color = GrowthGreen.copy(alpha = 0.15f),
-                                    shape = RoundedCornerShape(6.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(Icons.Default.Security, contentDescription = null, tint = GrowthGreen, modifier = Modifier.size(12.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("LGPD Compliant", fontSize = 10.sp, color = GrowthGreen, fontWeight = FontWeight.Bold)
-                                    }
-                                }
                             }
                             Spacer(modifier = Modifier.height(16.dp))
 

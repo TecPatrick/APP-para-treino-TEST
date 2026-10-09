@@ -8,7 +8,7 @@ enum class FoodCategory(val label: String) {
     PROTEIN("Proteínas"),
     CARBOHYDRATE("Carboidratos"),
     FAT("Gorduras & Oleaginosas"),
-    GROWTH_SUPPLEMENT("Suplementos"),
+    GROWTH_SUPPLEMENT("Suplementos Growth"),
     FRUITS_VEGETABLES("Frutas & Vegetais"),
     DAIRY("Laticínios"),
     OTHER("Outros")
