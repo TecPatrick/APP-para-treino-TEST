@@ -393,9 +393,13 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
             val result = authService.sendPasswordReset(email)
             _isAuthLoading.value = false
             result.onSuccess {
-                onComplete(true, "E-mail de recuperação enviado com sucesso para $email!")
+                val msg = "E-mail de recuperação enviado com sucesso para $email!"
+                _toastMessage.value = msg
+                onComplete(true, msg)
             }.onFailure { ex ->
-                onComplete(false, ex.message ?: "Falha ao enviar e-mail de recuperação.")
+                val errorMsg = ex.message ?: "Falha ao enviar e-mail de recuperação."
+                _toastMessage.value = errorMsg
+                onComplete(false, errorMsg)
             }
         }
     }

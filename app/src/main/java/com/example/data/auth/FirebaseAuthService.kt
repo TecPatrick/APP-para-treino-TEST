@@ -78,6 +78,9 @@ class FirebaseAuthService(
 
     suspend fun sendPasswordReset(email: String): Result<Unit> {
         return try {
+            if (email.isBlank()) {
+                return Result.failure(Exception("Digite um e-mail válido para a recuperação de senha."))
+            }
             auth.sendPasswordResetEmail(email.trim()).await()
             Result.success(Unit)
         } catch (e: Exception) {
@@ -114,10 +117,8 @@ class FirebaseAuthService(
             return lower.contains("operation is not allowed") ||
                     lower.contains("disabled") ||
                     lower.contains("error_operation_not_allowed") ||
-                    lower.contains("recaptcha") ||
-                    lower.contains("signinwithpassword") ||
                     lower.contains("sign_in_provider_disabled") ||
-                    lower.contains("not allowed")
+                    lower.contains("admin_restricted_operation")
         }
 
         fun translateAuthError(e: Exception): String {
@@ -138,7 +139,14 @@ class FirebaseAuthService(
                         "ERROR_TOO_MANY_REQUESTS" -> "Muitas tentativas sem sucesso. Por segurança e proteção de dados (LGPD), aguarde alguns instantes."
                         "ERROR_NETWORK_REQUEST_FAILED" -> "Falha de conexão com a rede. Verifique seu Wi-Fi/dados móveis."
                         "ERROR_OPERATION_NOT_ALLOWED" -> "Autenticação via Google Sign-In disponível. Use o botão Entrar com Google."
-                        else -> e.localizedMessage ?: "Erro na autenticação. Verifique os dados e tente novamente."
+                        else -> {
+                            val msg = e.message.orEmpty()
+                            if (msg.contains("credential", ignoreCase = true) || msg.contains("incorrect", ignoreCase = true) || msg.contains("expired", ignoreCase = true) || msg.contains("malformed", ignoreCase = true)) {
+                                "Credenciais inválidas. Verifique se o e-mail está correto e se a senha confere."
+                            } else {
+                                e.localizedMessage ?: "Erro na autenticação. Verifique os dados e tente novamente."
+                            }
+                        }
                     }
                 }
                 else -> {
@@ -147,6 +155,8 @@ class FirebaseAuthService(
                         "Sem conexão com a internet. Verifique sua rede para autenticar no Firebase."
                     } else if (msg.contains("operation is not allowed", ignoreCase = true)) {
                         "Autenticação via Google Sign-In disponível. Use o botão Entrar com Google."
+                    } else if (msg.contains("credential", ignoreCase = true) || msg.contains("incorrect", ignoreCase = true) || msg.contains("expired", ignoreCase = true) || msg.contains("malformed", ignoreCase = true) || msg.contains("signinwithpassword", ignoreCase = true)) {
+                        "Credenciais inválidas. Verifique se o e-mail está correto e se a senha confere."
                     } else {
                         msg.ifBlank { "Erro inesperado ao processar autenticação. Tente novamente." }
                     }

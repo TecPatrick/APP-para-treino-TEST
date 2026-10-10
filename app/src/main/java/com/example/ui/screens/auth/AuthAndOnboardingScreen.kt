@@ -174,6 +174,27 @@ fun AuthAndOnboardingScreen(
             .fillMaxSize()
             .background(CarbonDark)
     ) {
+        if (onboardingStep == 0) {
+            Image(
+                painter = painterResource(id = R.drawable.login_gym_bg),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                CarbonDark.copy(alpha = 0.80f),
+                                CarbonDark.copy(alpha = 0.95f)
+                            )
+                        )
+                    )
+            )
+        }
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -1058,7 +1079,10 @@ fun AuthAndOnboardingScreen(
                 text = {
                     Column {
                         Text(
-                            text = "Digite o e-mail cadastrado para enviarmos um link oficial do Firebase para redefinição de senha com segurança:",
+                            text = "Digite o e-mail cadastrado. O Firebase enviará um link de redefinição.\n\n" +
+                                    "Atenção:\n" +
+                                    "• O e-mail só é enviado se a conta estiver cadastrada no Firebase.\n" +
+                                    "• Verifique sua caixa de Spam ou Lixo Eletrônico caso não encontre na Caixa de Entrada.",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

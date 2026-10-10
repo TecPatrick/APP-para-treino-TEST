@@ -105,7 +105,7 @@ fun DietScreen(
     var showAddFoodDialog by remember { mutableStateOf(false) }
     var selectedMealTypeForAdd by remember { mutableStateOf(MealType.BREAKFAST) }
     var showCustomFoodDialog by remember { mutableStateOf(false) }
-    var selectedTab by remember { mutableStateOf(0) } // 0: Refeições Diárias, 1: Ciclo Mensal
+    var selectedTab by remember { mutableStateOf(0) } // 0: Refeições Diárias, 1: Dieta Mensal, 2: Configuração Mensal
 
     val totalPlanCalories = mealPlans.sumOf { it.calories.toDouble() }.toFloat()
     val totalPlanProtein = mealPlans.sumOf { it.protein.toDouble() }.toFloat()
@@ -188,9 +188,20 @@ fun DietScreen(
                     onClick = { selectedTab = 1 },
                     text = {
                         Text(
-                            "Configuração Mensal",
+                            "Dieta Mensal",
                             fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal,
                             color = if (selectedTab == 1) GrowthOrange else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = {
+                        Text(
+                            "Configuração",
+                            fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selectedTab == 2) GrowthOrange else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 )
