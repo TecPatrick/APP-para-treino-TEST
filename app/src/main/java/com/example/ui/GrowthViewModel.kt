@@ -18,6 +18,7 @@ import com.example.data.model.DietPlan
 import com.example.data.model.FitnessGoal
 import com.example.data.model.FoodCategory
 import com.example.data.model.FoodItem
+import com.example.data.model.FoodRecord
 import com.example.data.model.Gender
 import com.example.data.model.ItemPriceInflationStat
 import com.example.data.model.MealPlanItem
@@ -27,8 +28,10 @@ import com.example.data.model.PurchaseItemLog
 import com.example.data.model.PurchaseReceipt
 import com.example.data.model.ShoppingItem
 import com.example.data.model.UserProfile
+import com.example.data.model.WeeklyDietPlan
 import com.example.data.model.WorkoutExercise
 import com.example.data.model.WorkoutLog
+import com.example.data.model.WorkoutPlan
 import com.example.data.model.WorkoutRoutine
 import com.example.data.model.WorkoutSplitType
 import com.example.data.repository.GrowthRepository
@@ -147,6 +150,34 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
             initialValue = emptyList()
         )
 
+    val allFoodRecords: StateFlow<List<FoodRecord>> = repository.allFoodRecords
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val weeklyDietPlans: StateFlow<List<WeeklyDietPlan>> = repository.getWeeklyDietPlans()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val allWorkoutPlans: StateFlow<List<WorkoutPlan>> = repository.allWorkoutPlans
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val activeWorkoutPlan: StateFlow<WorkoutPlan?> = repository.activeWorkoutPlan
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
+
     val workoutRoutines: StateFlow<List<WorkoutRoutine>> = repository.workoutRoutines
         .stateIn(
             scope = viewModelScope,
@@ -221,6 +252,10 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
 
     fun clearToast() {
         _toastMessage.value = null
+    }
+
+    fun showToast(message: String) {
+        _toastMessage.value = message
     }
 
     fun logout() {
@@ -314,6 +349,22 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
                 _toastMessage.value = "Login realizado com sucesso! Bem-vindo, ${updated.name}."
                 onSuccess()
             }
+        }
+    }
+
+    /**
+     * Authenticates user via device biometric prompt (fingerprint / face unlock)
+     */
+    fun loginWithBiometrics(onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            val current = userProfile.value
+            val updated = current.copy(
+                isLoggedIn = true,
+                hasCompletedOnboarding = true
+            )
+            repository.saveUserProfile(updated)
+            _toastMessage.value = "Autenticação biométrica confirmada! Bem-vindo(a), ${updated.name}."
+            onSuccess()
         }
     }
 
@@ -689,6 +740,31 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun saveWeeklyDietPlan(plan: WeeklyDietPlan) {
+        viewModelScope.launch {
+            if (plan.id == 0L) {
+                repository.addWeeklyDietPlan(plan)
+            } else {
+                repository.updateWeeklyDietPlan(plan)
+            }
+            _toastMessage.value = "Meta semanal salva!"
+        }
+    }
+
+    fun logFoodConsumption(record: FoodRecord) {
+        viewModelScope.launch {
+            repository.addFoodRecord(record)
+            _toastMessage.value = "${record.foodName} registrado no seu diário alimentar!"
+        }
+    }
+
+    fun deleteFoodRecord(id: Long) {
+        viewModelScope.launch {
+            repository.deleteFoodRecord(id)
+            _toastMessage.value = "Alimento removido do diário!"
+        }
+    }
+
     fun toggleMealItemCompleted(item: MealPlanItem) {
         viewModelScope.launch {
             repository.toggleMealCompletion(item.id, item.isCompletedToday)
@@ -824,6 +900,33 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
 
     fun computeInflationStats(logs: List<PurchaseItemLog>): List<ItemPriceInflationStat> {
         return repository.computeInflationStats(logs)
+    }
+
+    // --- Workout Plans (Programas de Treino Offline) ---
+    fun saveWorkoutPlan(plan: WorkoutPlan) {
+        viewModelScope.launch {
+            if (plan.id == 0L) {
+                repository.addWorkoutPlan(plan)
+                _toastMessage.value = "Plano de treino criado!"
+            } else {
+                repository.updateWorkoutPlan(plan)
+                _toastMessage.value = "Plano de treino atualizado!"
+            }
+        }
+    }
+
+    fun switchActiveWorkoutPlan(planId: Long) {
+        viewModelScope.launch {
+            repository.switchActiveWorkoutPlan(planId)
+            _toastMessage.value = "Plano de treino ativado!"
+        }
+    }
+
+    fun deleteWorkoutPlan(id: Long) {
+        viewModelScope.launch {
+            repository.deleteWorkoutPlan(id)
+            _toastMessage.value = "Plano de treino excluído!"
+        }
     }
 
     // --- Workout Operations ---

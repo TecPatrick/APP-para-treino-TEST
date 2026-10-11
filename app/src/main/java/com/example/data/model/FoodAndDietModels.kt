@@ -59,6 +59,35 @@ data class MacroValues(
     val fiber: Float = 0f
 )
 
+/**
+ * Entidade para registros de consumo alimentar diário (Diário Alimentar offline)
+ */
+@Entity(
+    tableName = "food_records",
+    indices = [
+        Index(value = ["dateString"]),
+        Index(value = ["dateMillis"]),
+        Index(value = ["mealType"])
+    ]
+)
+data class FoodRecord(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val dateString: String, // "YYYY-MM-DD" ou "dd/MM/yyyy"
+    val dateMillis: Long = System.currentTimeMillis(),
+    val mealType: MealType = MealType.LUNCH,
+    val foodItemId: Long = 0,
+    val foodName: String,
+    val foodCategory: FoodCategory = FoodCategory.PROTEIN,
+    val amount: Float, // porção consumida (g, ml, un)
+    val unit: String = "g",
+    val calories: Float,
+    val protein: Float,
+    val carbs: Float,
+    val fat: Float,
+    val fiber: Float = 0f,
+    val notes: String = ""
+)
+
 @Entity(
     tableName = "diet_plans",
     indices = [Index(value = ["isActive"])]
@@ -80,6 +109,30 @@ data class DietPlan(
     val notes: String = ""
 )
 
+/**
+ * Entidade para estruturação de Dietas Semanais (dia a dia da semana de 1 a 7)
+ */
+@Entity(
+    tableName = "weekly_diet_plans",
+    indices = [
+        Index(value = ["dietPlanId"]),
+        Index(value = ["dayOfWeek"])
+    ]
+)
+data class WeeklyDietPlan(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val dietPlanId: Long = 1L,
+    val dayOfWeek: Int, // 1 = Segunda, 2 = Terça, 3 = Quarta, 4 = Quinta, 5 = Sexta, 6 = Sábado, 7 = Domingo
+    val dayName: String, // "Segunda-feira", "Terça-feira", etc.
+    val targetCalories: Int = 2650,
+    val targetProteinGrams: Int = 175,
+    val targetCarbsGrams: Int = 320,
+    val targetFatGrams: Int = 65,
+    val targetWaterMl: Int = 3500,
+    val isTrainingDay: Boolean = true,
+    val notes: String = ""
+)
+
 @Entity(
     tableName = "meal_plan_items",
     indices = [
@@ -94,7 +147,7 @@ data class MealPlanItem(
     val foodItemId: Long,
     val foodName: String,
     val foodCategory: FoodCategory,
-    val amount: Float, // in grams / units / scoops
+    val amount: Float, // em gramas / unidades / scoops
     val unit: String = "g",
     val calories: Float,
     val protein: Float,

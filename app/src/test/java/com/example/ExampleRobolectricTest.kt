@@ -347,4 +347,132 @@ class ExampleRobolectricTest {
     dao.switchActiveDietPlan(idB)
     assertEquals(idB, dao.getActiveDietPlan().first()?.id)
   }
+
+  @Test
+  fun `test offline persistence for food records daily journal`() = runBlocking {
+    val dao = db.growthDao()
+
+    val record1 = com.example.data.model.FoodRecord(
+      dateString = "2026-10-11",
+      dateMillis = 1760000000000L,
+      mealType = MealType.BREAKFAST,
+      foodItemId = 9L,
+      foodName = "Ovo Frito no Azeite de Oliva",
+      foodCategory = FoodCategory.PROTEIN,
+      amount = 120f,
+      unit = "g",
+      calories = 230f,
+      protein = 12.8f,
+      carbs = 1.0f,
+      fat = 19.6f
+    )
+    val record2 = com.example.data.model.FoodRecord(
+      dateString = "2026-10-11",
+      dateMillis = 1760000010000L,
+      mealType = MealType.LUNCH,
+      foodItemId = 15L,
+      foodName = "Peito de Frango Grelhado",
+      foodCategory = FoodCategory.PROTEIN,
+      amount = 180f,
+      unit = "g",
+      calories = 297f,
+      protein = 55.8f,
+      carbs = 0f,
+      fat = 6.5f
+    )
+
+    val id1 = dao.insertFoodRecord(record1)
+    val id2 = dao.insertFoodRecord(record2)
+    assertTrue("Food record 1 inserted", id1 > 0)
+    assertTrue("Food record 2 inserted", id2 > 0)
+
+    val todayRecords = dao.getFoodRecordsForDate("2026-10-11").first()
+    assertEquals(2, todayRecords.size)
+    assertEquals("Ovo Frito no Azeite de Oliva", todayRecords[0].foodName)
+
+    val breakfastRecords = dao.getFoodRecordsForMeal("2026-10-11", MealType.BREAKFAST).first()
+    assertEquals(1, breakfastRecords.size)
+    assertEquals("Ovo Frito no Azeite de Oliva", breakfastRecords[0].foodName)
+
+    dao.deleteFoodRecord(id1)
+    val afterDelete = dao.getFoodRecordsForDate("2026-10-11").first()
+    assertEquals(1, afterDelete.size)
+    assertEquals("Peito de Frango Grelhado", afterDelete[0].foodName)
+  }
+
+  @Test
+  fun `test offline persistence for weekly diet plans`() = runBlocking {
+    val dao = db.growthDao()
+
+    val weeklyPlanMonday = com.example.data.model.WeeklyDietPlan(
+      dietPlanId = 1L,
+      dayOfWeek = 1,
+      dayName = "Segunda-feira",
+      targetCalories = 2800,
+      targetProteinGrams = 185,
+      targetCarbsGrams = 350,
+      targetFatGrams = 65,
+      isTrainingDay = true,
+      notes = "Treino pesado de Peito e Tríceps"
+    )
+    val weeklyPlanSunday = com.example.data.model.WeeklyDietPlan(
+      dietPlanId = 1L,
+      dayOfWeek = 7,
+      dayName = "Domingo",
+      targetCalories = 2400,
+      targetProteinGrams = 175,
+      targetCarbsGrams = 250,
+      targetFatGrams = 70,
+      isTrainingDay = false,
+      notes = "Descanso total e carbo reduzido"
+    )
+
+    dao.insertWeeklyDietPlans(listOf(weeklyPlanMonday, weeklyPlanSunday))
+
+    val plans = dao.getWeeklyDietPlans(1L).first()
+    assertEquals(2, plans.size)
+    assertEquals("Segunda-feira", plans[0].dayName)
+    assertEquals(2800, plans[0].targetCalories)
+    assertTrue(plans[0].isTrainingDay)
+
+    val sundayPlan = dao.getWeeklyDietPlanForDay(1L, 7).first()
+    assertTrue(sundayPlan != null)
+    assertEquals("Domingo", sundayPlan?.dayName)
+    assertEquals(false, sundayPlan?.isTrainingDay)
+  }
+
+  @Test
+  fun `test offline persistence for workout programs and switching active plan`() = runBlocking {
+    val dao = db.growthDao()
+
+    val program1 = com.example.data.model.WorkoutPlan(
+      name = "Plano Hipertrofia ABCDE",
+      description = "5 dias isolados",
+      splitType = WorkoutSplitType.ABCDE,
+      durationWeeks = 12,
+      daysPerWeek = 5,
+      isActive = true
+    )
+    val program2 = com.example.data.model.WorkoutPlan(
+      name = "Plano Força & Volume ABC",
+      description = "3 dias de alta intensidade",
+      splitType = WorkoutSplitType.ABC,
+      durationWeeks = 8,
+      daysPerWeek = 3,
+      isActive = false
+    )
+
+    val p1Id = dao.insertWorkoutPlan(program1)
+    val p2Id = dao.insertWorkoutPlan(program2)
+
+    val active = dao.getActiveWorkoutPlan().first()
+    assertEquals(p1Id, active?.id)
+    assertEquals("Plano Hipertrofia ABCDE", active?.name)
+
+    // Switch active workout plan
+    dao.switchActiveWorkoutPlan(p2Id)
+    val newActive = dao.getActiveWorkoutPlan().first()
+    assertEquals(p2Id, newActive?.id)
+    assertEquals("Plano Força & Volume ABC", newActive?.name)
+  }
 }

@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.LocalDrink
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -99,7 +100,8 @@ fun DashboardScreen(
     onNavigateToShopping: () -> Unit,
     onNavigateToCalculator: () -> Unit,
     onNavigateToAnalytics: () -> Unit,
-    onNavigateToProfile: () -> Unit = {}
+    onNavigateToProfile: () -> Unit = {},
+    onNavigateToReceipts: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
@@ -161,7 +163,7 @@ fun DashboardScreen(
                             shape = CircleShape,
                             border = androidx.compose.foundation.BorderStroke(1.dp, GrowthOrange),
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(44.dp)
                                 .clickable { onNavigateToProfile() }
                                 .testTag("dashboard_profile_btn")
                         ) {
@@ -170,7 +172,7 @@ fun DashboardScreen(
                                     imageVector = Icons.Default.Person,
                                     contentDescription = "Perfil & Biometria",
                                     tint = GrowthOrange,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(24.dp)
                                 )
                             }
                         }
@@ -182,7 +184,7 @@ fun DashboardScreen(
                             shape = CircleShape,
                             border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(44.dp)
                                 .clickable { onNavigateToCalculator() }
                                 .testTag("profile_calc_btn")
                         ) {
@@ -191,7 +193,7 @@ fun DashboardScreen(
                                     imageVector = Icons.Default.Calculate,
                                     contentDescription = "Calculadora",
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(24.dp)
                                 )
                             }
                         }
@@ -200,13 +202,13 @@ fun DashboardScreen(
 
                         IconButton(
                             onClick = { viewModel.logout() },
-                            modifier = Modifier.size(40.dp).testTag("logout_btn")
+                            modifier = Modifier.size(44.dp).testTag("logout_btn")
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ExitToApp,
                                 contentDescription = "Sair da Conta",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }
@@ -590,9 +592,9 @@ fun DashboardScreen(
                             .clickable { viewModel.exportPdfProgressReport(context) }
                             .testTag("quick_export_pdf_btn")
                     ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 imageVector = Icons.Default.PictureAsPdf,
@@ -600,33 +602,8 @@ fun DashboardScreen(
                                 tint = GrowthOrange,
                                 modifier = Modifier.size(24.dp)
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("Exportar PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
-                    }
-
-                    // Shopping List Button
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = CarbonCardElevated),
-                        shape = RoundedCornerShape(12.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { onNavigateToShopping() }
-                            .testTag("quick_shopping_btn")
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ShoppingCart,
-                                contentDescription = "Compras",
-                                tint = GrowthGreen,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("Lista Compras", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Exportar PDF", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
 
@@ -640,9 +617,9 @@ fun DashboardScreen(
                             .clickable { onNavigateToDiet() }
                             .testTag("quick_diet_btn")
                     ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Restaurant,
@@ -650,8 +627,65 @@ fun DashboardScreen(
                                 tint = GrowthCyan,
                                 modifier = Modifier.size(24.dp)
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("Dieta Mensal", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Dieta Mensal", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Shopping List Button
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CarbonCardElevated),
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onNavigateToShopping() }
+                            .testTag("quick_shopping_btn")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ShoppingCart,
+                                contentDescription = "Compras",
+                                tint = GrowthGreen,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Lista Compras", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        }
+                    }
+
+                    // Price & Receipts Inflation Button
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CarbonCardElevated),
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onNavigateToReceipts() }
+                            .testTag("quick_receipts_btn")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ReceiptLong,
+                                contentDescription = "Preços/NF",
+                                tint = GrowthYellow,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Preços & NF", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
                 }

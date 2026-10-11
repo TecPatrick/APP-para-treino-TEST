@@ -7,6 +7,7 @@ import com.example.data.model.DailyIntakeHistory
 import com.example.data.model.DietPlan
 import com.example.data.model.FoodCategory
 import com.example.data.model.FoodItem
+import com.example.data.model.FoodRecord
 import com.example.data.model.ItemPriceInflationStat
 import com.example.data.model.MealPlanItem
 import com.example.data.model.MealType
@@ -15,8 +16,10 @@ import com.example.data.model.PurchaseItemLog
 import com.example.data.model.PurchaseReceipt
 import com.example.data.model.ShoppingItem
 import com.example.data.model.UserProfile
+import com.example.data.model.WeeklyDietPlan
 import com.example.data.model.WorkoutExercise
 import com.example.data.model.WorkoutLog
+import com.example.data.model.WorkoutPlan
 import com.example.data.model.WorkoutRoutine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
@@ -32,11 +35,15 @@ import kotlin.math.roundToInt
 class GrowthRepository(private val dao: AppDao) {
 
     val userProfile: Flow<UserProfile?> = dao.getUserProfile()
+    val allUserProfiles: Flow<List<UserProfile>> = dao.getAllUserProfiles()
     val allDietPlans: Flow<List<DietPlan>> = dao.getAllDietPlans()
     val activeDietPlan: Flow<DietPlan?> = dao.getActiveDietPlan()
     val allFoods: Flow<List<FoodItem>> = dao.getAllFoods()
+    val allFoodRecords: Flow<List<FoodRecord>> = dao.getAllFoodRecords()
     val mealPlanItems: Flow<List<MealPlanItem>> = dao.getAllMealPlanItems()
     val shoppingList: Flow<List<ShoppingItem>> = dao.getShoppingList()
+    val allWorkoutPlans: Flow<List<WorkoutPlan>> = dao.getAllWorkoutPlans()
+    val activeWorkoutPlan: Flow<WorkoutPlan?> = dao.getActiveWorkoutPlan()
     val workoutRoutines: Flow<List<WorkoutRoutine>> = dao.getAllRoutines()
     val allExercises: Flow<List<WorkoutExercise>> = dao.getAllExercises()
     val workoutLogs: Flow<List<WorkoutLog>> = dao.getAllWorkoutLogs()
@@ -436,4 +443,59 @@ class GrowthRepository(private val dao: AppDao) {
     suspend fun addProgressLog(log: ProgressLog): Long = dao.insertProgressLog(log)
 
     suspend fun deleteProgressLog(id: Long) = dao.deleteProgressLog(id)
+
+    // --- Registros de Consumo Alimentar (Diário Offline) ---
+    fun getFoodRecordsForDate(dateString: String): Flow<List<FoodRecord>> =
+        dao.getFoodRecordsForDate(dateString)
+
+    fun getFoodRecordsForMeal(dateString: String, mealType: MealType): Flow<List<FoodRecord>> =
+        dao.getFoodRecordsForMeal(dateString, mealType)
+
+    fun getFoodRecordsBetween(startMillis: Long, endMillis: Long): Flow<List<FoodRecord>> =
+        dao.getFoodRecordsBetween(startMillis, endMillis)
+
+    suspend fun addFoodRecord(record: FoodRecord): Long = dao.insertFoodRecord(record)
+
+    suspend fun updateFoodRecord(record: FoodRecord) = dao.updateFoodRecord(record)
+
+    suspend fun deleteFoodRecord(id: Long) = dao.deleteFoodRecord(id)
+
+    suspend fun deleteFoodRecordsForDate(dateString: String) =
+        dao.deleteFoodRecordsForDate(dateString)
+
+    // --- Dietas Semanais (Dia a Dia) ---
+    fun getWeeklyDietPlans(dietPlanId: Long = 1L): Flow<List<WeeklyDietPlan>> =
+        dao.getWeeklyDietPlans(dietPlanId)
+
+    fun getWeeklyDietPlanForDay(dietPlanId: Long = 1L, dayOfWeek: Int): Flow<WeeklyDietPlan?> =
+        dao.getWeeklyDietPlanForDay(dietPlanId, dayOfWeek)
+
+    suspend fun addWeeklyDietPlan(plan: WeeklyDietPlan): Long =
+        dao.insertWeeklyDietPlan(plan)
+
+    suspend fun updateWeeklyDietPlan(plan: WeeklyDietPlan) =
+        dao.updateWeeklyDietPlan(plan)
+
+    suspend fun deleteWeeklyDietPlan(id: Long) =
+        dao.deleteWeeklyDietPlan(id)
+
+    // --- Planos de Treino (Training Programs) ---
+    suspend fun addWorkoutPlan(plan: WorkoutPlan): Long =
+        dao.insertWorkoutPlan(plan)
+
+    suspend fun updateWorkoutPlan(plan: WorkoutPlan) =
+        dao.updateWorkoutPlan(plan)
+
+    suspend fun deleteWorkoutPlan(id: Long) =
+        dao.deleteWorkoutPlan(id)
+
+    suspend fun switchActiveWorkoutPlan(planId: Long) =
+        dao.switchActiveWorkoutPlan(planId)
+
+    fun getRoutinesForSplit(splitType: com.example.data.model.WorkoutSplitType): Flow<List<WorkoutRoutine>> =
+        dao.getRoutinesForSplit(splitType)
+
+    // --- Gestão de Perfis Adicionais ---
+    suspend fun deleteUserProfile(id: Int) =
+        dao.deleteUserProfile(id)
 }

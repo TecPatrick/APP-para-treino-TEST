@@ -11,6 +11,26 @@ enum class WorkoutSplitType(val title: String, val subtitle: String) {
     CUSTOM("Treinos Personalizados", "Crie sua própria rotina customizada do zero")
 }
 
+/**
+ * Entidade para Planos de Treino (Training Plans / Workout Programs)
+ */
+@Entity(
+    tableName = "workout_plans",
+    indices = [Index(value = ["isActive"])]
+)
+data class WorkoutPlan(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String, // ex: "Plano Hipertrofia Clássico ABCDE"
+    val description: String = "",
+    val splitType: WorkoutSplitType = WorkoutSplitType.ABCDE,
+    val goal: String = "Hipertrofia Muscular",
+    val durationWeeks: Int = 8,
+    val daysPerWeek: Int = 5,
+    val isActive: Boolean = true,
+    val createdAtMillis: Long = System.currentTimeMillis(),
+    val notes: String = ""
+)
+
 @Entity(tableName = "shopping_items")
 data class ShoppingItem(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

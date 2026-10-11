@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -84,7 +85,10 @@ import com.example.ui.theme.GrowthYellow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReceiptsInflationScreen(viewModel: GrowthViewModel) {
+fun ReceiptsInflationScreen(
+    viewModel: GrowthViewModel,
+    onNavigateBack: () -> Unit = {}
+) {
     val receipts by viewModel.allReceipts.collectAsStateWithLifecycle()
     val purchaseLogs by viewModel.allPurchaseLogs.collectAsStateWithLifecycle()
     val inflationStats = remember(purchaseLogs) {
@@ -110,11 +114,23 @@ fun ReceiptsInflationScreen(viewModel: GrowthViewModel) {
                 subtitle = "Acompanhamento da inflação dos alimentos mês a mês",
                 badgeText = "HISTÓRICO FINANCEIRO",
                 trailingContent = {
-                    IconButton(
-                        onClick = { showAddReceiptDialog = true },
-                        modifier = Modifier.testTag("add_receipt_top_btn")
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Nova Compra", tint = GrowthOrange)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { showAddReceiptDialog = true },
+                            modifier = Modifier.testTag("add_receipt_top_btn")
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Nova Compra", tint = GrowthOrange)
+                        }
+                        IconButton(
+                            onClick = onNavigateBack,
+                            modifier = Modifier.testTag("receipts_back_btn")
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Voltar",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             )

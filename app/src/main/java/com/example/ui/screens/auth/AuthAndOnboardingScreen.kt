@@ -31,6 +31,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
@@ -40,6 +41,8 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.fragment.app.FragmentActivity
+import com.example.util.BiometricAuthHelper
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -317,10 +320,63 @@ fun AuthAndOnboardingScreen(
                             }
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            // Google Sign In Button
                             val context = LocalContext.current
                             val coroutineScope = rememberCoroutineScope()
                             val credentialManager = remember { CredentialManager.create(context) }
+
+                            // Biometric Sign In Option (Fingerprint / Face Unlock)
+                            if (!isRegisterMode) {
+                                val fragmentActivity = context as? FragmentActivity
+                                Button(
+                                    onClick = {
+                                        if (fragmentActivity != null) {
+                                            BiometricAuthHelper.promptBiometricAuth(
+                                                activity = fragmentActivity,
+                                                title = "Login com Biometria",
+                                                subtitle = "Victus Dieta & Treino",
+                                                description = "Confirme sua digital ou Face para entrar rapidamente no seu plano.",
+                                                onSuccess = {
+                                                    viewModel.loginWithBiometrics(onSuccess = onAuthSuccess)
+                                                },
+                                                onError = { errorMsg ->
+                                                    viewModel.showToast(errorMsg)
+                                                }
+                                            )
+                                        } else {
+                                            viewModel.showToast("Sensor biométrico não suportado neste ambiente.")
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp)
+                                        .testTag("biometric_login_btn"),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = GrowthOrange,
+                                        contentColor = Color.White
+                                    )
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Fingerprint,
+                                            contentDescription = "Biometria",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Entrar com Biometria (Digital / Face)",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+                            }
 
                             OutlinedButton(
                                 onClick = {

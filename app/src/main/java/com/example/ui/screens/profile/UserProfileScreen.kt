@@ -26,9 +26,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccessibilityNew
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DirectionsRun
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Height
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.LocalDrink
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.MonitorWeight
@@ -65,7 +67,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.fragment.app.FragmentActivity
+import com.example.util.BiometricAuthHelper
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -875,6 +880,128 @@ fun UserProfileScreen(
                             ),
                             modifier = Modifier.testTag("recalculate_macros_switch")
                         )
+                    }
+                }
+            }
+
+            // 8b. Biometric Security Info & Test
+            item {
+                val context = LocalContext.current
+                val fragmentActivity = context as? FragmentActivity
+                val biometricStatus = remember(context) { BiometricAuthHelper.checkBiometricSupport(context) }
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("biometric_security_card"),
+                    colors = CardDefaults.cardColors(containerColor = CarbonCard),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, CarbonBorder)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Fingerprint,
+                                    contentDescription = null,
+                                    tint = GrowthCyan,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Login com Biometria",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+
+                            Surface(
+                                color = if (biometricStatus == BiometricAuthHelper.BiometricAvailability.AVAILABLE)
+                                    GrowthGreen.copy(alpha = 0.15f)
+                                else
+                                    GrowthOrange.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (biometricStatus == BiometricAuthHelper.BiometricAvailability.AVAILABLE)
+                                        GrowthGreen.copy(alpha = 0.4f)
+                                    else
+                                        GrowthOrange.copy(alpha = 0.4f)
+                                )
+                            ) {
+                                Text(
+                                    text = if (biometricStatus == BiometricAuthHelper.BiometricAvailability.AVAILABLE)
+                                        "Ativo no Aparelho"
+                                    else
+                                        "Compatível",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (biometricStatus == BiometricAuthHelper.BiometricAvailability.AVAILABLE)
+                                        GrowthGreen
+                                    else
+                                        GrowthOrangeLight,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Acesse seu treino e diário com rapidez usando o leitor ultrassônico de digital ou reconhecimento facial do seu Galaxy/smartphone Android.",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        OutlinedButton(
+                            onClick = {
+                                if (fragmentActivity != null) {
+                                    BiometricAuthHelper.promptBiometricAuth(
+                                        activity = fragmentActivity,
+                                        title = "Teste de Biometria",
+                                        subtitle = "Sensor biométrico verificado com sucesso",
+                                        description = "Toque no sensor biométrico do aparelho.",
+                                        onSuccess = {
+                                            viewModel.showToast("Sensor biométrico reconhecido e validado com sucesso!")
+                                        },
+                                        onError = { error ->
+                                            viewModel.showToast(error)
+                                        }
+                                    )
+                                } else {
+                                    viewModel.showToast("Biometria não disponível nesta sessão")
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(40.dp)
+                                .testTag("test_biometric_btn"),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, CarbonBorder),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = CarbonCardElevated,
+                                contentColor = GrowthCyan
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Security,
+                                contentDescription = null,
+                                tint = GrowthCyan,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Testar Sensor Biométrico (Digital / Face)",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
                 }
             }

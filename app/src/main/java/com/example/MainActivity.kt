@@ -2,7 +2,7 @@ package com.example
 
 import android.os.Bundle
 import android.widget.Toast
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -87,7 +87,7 @@ enum class AppNavigationScreen(
     AUTH("Conta", Icons.Filled.LocalFireDepartment, Icons.Outlined.LocalFireDepartment, "nav_auth")
 }
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     private val viewModel: GrowthViewModel by viewModels()
 
@@ -154,7 +154,6 @@ fun MainAppScreen(viewModel: GrowthViewModel) {
                         AppNavigationScreen.DIET,
                         AppNavigationScreen.WORKOUT,
                         AppNavigationScreen.SHOPPING,
-                        AppNavigationScreen.RECEIPTS,
                         AppNavigationScreen.ANALYTICS
                     )
 
@@ -167,14 +166,15 @@ fun MainAppScreen(viewModel: GrowthViewModel) {
                                 Icon(
                                     imageVector = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
                                     contentDescription = screen.title,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(24.dp)
                                 )
                             },
                             label = {
                                 Text(
                                     text = screen.title,
-                                    fontSize = 10.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    maxLines = 1
                                 )
                             },
                             colors = NavigationBarItemDefaults.colors(
@@ -182,7 +182,7 @@ fun MainAppScreen(viewModel: GrowthViewModel) {
                                 selectedTextColor = GrowthOrangeLight,
                                 unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                 unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                indicatorColor = GrowthOrange.copy(alpha = 0.15f)
+                                indicatorColor = GrowthOrange.copy(alpha = 0.20f)
                             ),
                             modifier = Modifier.testTag(screen.testTag)
                         )
@@ -209,7 +209,8 @@ fun MainAppScreen(viewModel: GrowthViewModel) {
                         onNavigateToShopping = { currentScreen = AppNavigationScreen.SHOPPING },
                         onNavigateToCalculator = { currentScreen = AppNavigationScreen.CALCULATOR },
                         onNavigateToAnalytics = { currentScreen = AppNavigationScreen.ANALYTICS },
-                        onNavigateToProfile = { currentScreen = AppNavigationScreen.PROFILE }
+                        onNavigateToProfile = { currentScreen = AppNavigationScreen.PROFILE },
+                        onNavigateToReceipts = { currentScreen = AppNavigationScreen.RECEIPTS }
                     )
                     AppNavigationScreen.DIET -> DietScreen(
                         viewModel = viewModel,
@@ -219,10 +220,12 @@ fun MainAppScreen(viewModel: GrowthViewModel) {
                         viewModel = viewModel
                     )
                     AppNavigationScreen.SHOPPING -> ShoppingListScreen(
-                        viewModel = viewModel
+                        viewModel = viewModel,
+                        onNavigateToReceipts = { currentScreen = AppNavigationScreen.RECEIPTS }
                     )
                     AppNavigationScreen.RECEIPTS -> ReceiptsInflationScreen(
-                        viewModel = viewModel
+                        viewModel = viewModel,
+                        onNavigateBack = { currentScreen = AppNavigationScreen.DASHBOARD }
                     )
                     AppNavigationScreen.ANALYTICS -> AnalyticsScreen(
                         viewModel = viewModel

@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.GroupAdd
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LinkOff
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Upload
@@ -92,7 +93,10 @@ import com.example.ui.theme.GrowthYellow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ShoppingListScreen(viewModel: GrowthViewModel) {
+fun ShoppingListScreen(
+    viewModel: GrowthViewModel,
+    onNavigateToReceipts: () -> Unit = {}
+) {
     val context = LocalContext.current
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
     val shoppingList by viewModel.shoppingList.collectAsStateWithLifecycle()
@@ -124,6 +128,19 @@ fun ShoppingListScreen(viewModel: GrowthViewModel) {
                 badgeText = if (isJointShoppingActive) "MODO COMPRA COLETIVA" else "MERCADO & SUPLEMENTAÇÃO",
                 trailingContent = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Receipts & Price Inflation shortcut
+                        IconButton(
+                            onClick = onNavigateToReceipts,
+                            modifier = Modifier.testTag("nav_to_receipts_from_shopping_btn")
+                        ) {
+                            Icon(
+                                Icons.Default.ReceiptLong,
+                                contentDescription = "Preços e NF",
+                                tint = GrowthCyan,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
                         // Export Code Button
                         IconButton(
                             onClick = {
