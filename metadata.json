@@ -1,5 +1,5 @@
 {
-  "name": "Dieta & Treino",
+  "name": "Virtus",
   "description": "Aplicativo completo para cálculo de macros, dieta mensal, lista de compras automática, treinos personalizados e relatórios em PDF.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
