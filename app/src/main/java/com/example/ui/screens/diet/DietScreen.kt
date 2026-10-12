@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -406,6 +407,11 @@ fun DietScreen(
                         }
                     }
                 }
+            } else if (selectedTab == 1) {
+                MonthlyDietOverviewSection(
+                    profile = profile,
+                    onNavigateToConfig = { selectedTab = 2 }
+                )
             } else {
                 // Monthly Diet Configuration Screen
                 MonthlyDietConfigSection(
@@ -425,6 +431,7 @@ fun DietScreen(
                             monthlyNotes = notes,
                             dietCycleType = cycleType
                         )
+                        selectedTab = 1
                     }
                 )
             }
@@ -453,6 +460,96 @@ fun DietScreen(
                 showCustomFoodDialog = false
             }
         )
+    }
+}
+
+// Monthly Diet Overview Section composable
+@Composable
+fun MonthlyDietOverviewSection(
+    profile: com.example.data.model.UserProfile,
+    onNavigateToConfig: () -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        contentPadding = PaddingValues(bottom = 96.dp)
+    ) {
+        item {
+            Text(
+                text = "RESUMO DA DIETA MENSAL (30 DIAS)",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = GrowthOrangeLight,
+                letterSpacing = 1.sp
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CarbonCard),
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Estratégia Atual",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = profile.dietCycleType.label,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = GrowthOrange
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(text = "Peso Alvo", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(text = "${profile.monthlyTargetWeightKg} kg", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                        }
+                        Column {
+                            Text(text = "Dias de Treino", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(text = "${profile.trainingDaysPerWeek} dias/sem", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(text = "Observações da Periodização:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = profile.monthlyNotes.ifEmpty { "Nenhuma observação cadastrada." },
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = onNavigateToConfig,
+                colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+            ) {
+                Text("EDITAR CONFIGURAÇÃO MENSAL", fontWeight = FontWeight.Bold, color = Color.White)
+            }
+        }
     }
 }
 
@@ -916,13 +1013,32 @@ fun CustomFoodRegistrationDialog(
                         OutlinedTextField(
                             value = unit,
                             onValueChange = { unit = it },
-                            label = { Text("Unidade (g/ml)") },
+                            label = { Text("Unidade (g, kg, ml, L)") },
                             modifier = Modifier.weight(1f),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = GrowthOrange,
                                 unfocusedBorderColor = CarbonBorder
                             )
                         )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        listOf("g", "kg", "ml", "L").forEach { u ->
+                            OutlinedButton(
+                                onClick = { unit = u },
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = if (unit == u) GrowthOrange.copy(alpha = 0.2f) else Color.Transparent
+                                ),
+                                border = BorderStroke(1.dp, if (unit == u) GrowthOrange else CarbonBorder),
+                                modifier = Modifier.weight(1f).height(32.dp),
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text(u, color = if (unit == u) GrowthOrange else MaterialTheme.colorScheme.onBackground, fontSize = 12.sp)
+                            }
+                        }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 }

@@ -30,13 +30,13 @@ object PrepopulatedData {
         FoodItem(id = 5, name = "Albumina 80% Growth", category = FoodCategory.GROWTH_SUPPLEMENT, servingUnit = "g", baseServingAmount = 30f, calories = 114f, protein = 24f, carbs = 1.5f, fat = 0f, fiber = 0f, isGrowthProduct = true),
         FoodItem(id = 6, name = "Hipercalórico 7000 Growth", category = FoodCategory.GROWTH_SUPPLEMENT, servingUnit = "g", baseServingAmount = 120f, calories = 460f, protein = 30f, carbs = 76f, fat = 3.5f, fiber = 2.0f, isGrowthProduct = true),
         FoodItem(id = 7, name = "Glutamina 100% Pura Growth", category = FoodCategory.GROWTH_SUPPLEMENT, servingUnit = "g", baseServingAmount = 5f, calories = 20f, protein = 5f, carbs = 0f, fat = 0f, fiber = 0f, isGrowthProduct = true),
-        FoodItem(id = 8, name = "Multivitamínico Growth", category = FoodCategory.GROWTH_SUPPLEMENT, servingUnit = "un", baseServingAmount = 1f, calories = 0f, protein = 0f, carbs = 0f, fat = 0f, fiber = 0f, isGrowthProduct = true),
+        FoodItem(id = 8, name = "Multivitamínico Growth", category = FoodCategory.GROWTH_SUPPLEMENT, servingUnit = "g", baseServingAmount = 1f, calories = 0f, protein = 0f, carbs = 0f, fat = 0f, fiber = 0f, isGrowthProduct = true),
 
         // --- Ovos e Preparações ---
-        FoodItem(id = 9, name = "Ovo Frito no Azeite de Oliva", category = FoodCategory.PROTEIN, servingUnit = "un", baseServingAmount = 60f, calories = 115f, protein = 6.4f, carbs = 0.5f, fat = 9.8f, fiber = 0f),
-        FoodItem(id = 10, name = "Ovo Frito na Manteiga", category = FoodCategory.PROTEIN, servingUnit = "un", baseServingAmount = 60f, calories = 120f, protein = 6.3f, carbs = 0.6f, fat = 10.3f, fiber = 0f),
-        FoodItem(id = 11, name = "Ovo de Galinha Inteiro Cozido", category = FoodCategory.PROTEIN, servingUnit = "un", baseServingAmount = 50f, calories = 78f, protein = 6.3f, carbs = 0.6f, fat = 5.3f, fiber = 0f),
-        FoodItem(id = 12, name = "Ovo Mexido Simples", category = FoodCategory.PROTEIN, servingUnit = "un", baseServingAmount = 55f, calories = 92f, protein = 6.3f, carbs = 0.8f, fat = 7.1f, fiber = 0f),
+        FoodItem(id = 9, name = "Ovo Frito no Azeite de Oliva", category = FoodCategory.PROTEIN, servingUnit = "g", baseServingAmount = 60f, calories = 115f, protein = 6.4f, carbs = 0.5f, fat = 9.8f, fiber = 0f),
+        FoodItem(id = 10, name = "Ovo Frito na Manteiga", category = FoodCategory.PROTEIN, servingUnit = "g", baseServingAmount = 60f, calories = 120f, protein = 6.3f, carbs = 0.6f, fat = 10.3f, fiber = 0f),
+        FoodItem(id = 11, name = "Ovo de Galinha Inteiro Cozido", category = FoodCategory.PROTEIN, servingUnit = "g", baseServingAmount = 50f, calories = 78f, protein = 6.3f, carbs = 0.6f, fat = 5.3f, fiber = 0f),
+        FoodItem(id = 12, name = "Ovo Mexido Simples", category = FoodCategory.PROTEIN, servingUnit = "g", baseServingAmount = 55f, calories = 92f, protein = 6.3f, carbs = 0.8f, fat = 7.1f, fiber = 0f),
         FoodItem(id = 13, name = "Clara de Ovo Cozida / Pasteurizada", category = FoodCategory.PROTEIN, servingUnit = "g", baseServingAmount = 100f, calories = 52f, protein = 11f, carbs = 0.7f, fat = 0.2f, fiber = 0f),
         FoodItem(id = 14, name = "Omelete de Claras com Aveia", category = FoodCategory.PROTEIN, servingUnit = "g", baseServingAmount = 150f, calories = 160f, protein = 18f, carbs = 12f, fat = 3.5f, fiber = 2f),
 
@@ -68,7 +68,7 @@ object PrepopulatedData {
         FoodItem(id = 35, name = "Mandioca / Aipim Cozido", category = FoodCategory.CARBOHYDRATE, servingUnit = "g", baseServingAmount = 100f, calories = 125f, protein = 0.6f, carbs = 30.1f, fat = 0.3f, fiber = 1.6f),
         FoodItem(id = 36, name = "Aveia em Flocos Finos", category = FoodCategory.CARBOHYDRATE, servingUnit = "g", baseServingAmount = 100f, calories = 389f, protein = 16.9f, carbs = 66.3f, fat = 6.9f, fiber = 10.6f),
         FoodItem(id = 37, name = "Pão 100% Integral", category = FoodCategory.CARBOHYDRATE, servingUnit = "g", baseServingAmount = 50f, calories = 122f, protein = 5.2f, carbs = 23f, fat = 1.4f, fiber = 3.8f),
-        FoodItem(id = 38, name = "Pão Francês Tradicional", category = FoodCategory.CARBOHYDRATE, servingUnit = "un", baseServingAmount = 50f, calories = 150f, protein = 4.5f, carbs = 29.5f, fat = 1.5f, fiber = 1.1f),
+        FoodItem(id = 38, name = "Pão Francês Tradicional", category = FoodCategory.CARBOHYDRATE, servingUnit = "g", baseServingAmount = 50f, calories = 150f, protein = 4.5f, carbs = 29.5f, fat = 1.5f, fiber = 1.1f),
         FoodItem(id = 39, name = "Macarrão Integral Cozido", category = FoodCategory.CARBOHYDRATE, servingUnit = "g", baseServingAmount = 100f, calories = 124f, protein = 5.3f, carbs = 25f, fat = 0.9f, fiber = 3.9f),
         FoodItem(id = 40, name = "Tapioca / Goma Hidratada", category = FoodCategory.CARBOHYDRATE, servingUnit = "g", baseServingAmount = 100f, calories = 240f, protein = 0f, carbs = 60f, fat = 0f, fiber = 0.2f),
         FoodItem(id = 41, name = "Cuscuz de Milho Cozido", category = FoodCategory.CARBOHYDRATE, servingUnit = "g", baseServingAmount = 100f, calories = 112f, protein = 2.2f, carbs = 25.1f, fat = 0.7f, fiber = 1.8f),
