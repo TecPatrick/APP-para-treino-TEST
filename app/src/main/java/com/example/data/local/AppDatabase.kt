@@ -16,6 +16,7 @@ import com.example.data.model.PurchaseItemLog
 import com.example.data.model.PurchaseReceipt
 import com.example.data.model.ShoppingItem
 import com.example.data.model.UserProfile
+import com.example.data.model.GpsRouteLog
 import com.example.data.model.WeeklyDietPlan
 import com.example.data.model.WorkoutExercise
 import com.example.data.model.WorkoutLog
@@ -44,9 +45,10 @@ import java.util.Locale
         WorkoutLog::class,
         ProgressLog::class,
         PurchaseReceipt::class,
-        PurchaseItemLog::class
+        PurchaseItemLog::class,
+        GpsRouteLog::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -80,7 +82,8 @@ abstract class AppDatabase : RoomDatabase() {
                     "gender", "age", "weightKg", "heightCm", "biotype", "trainingDaysPerWeek",
                     "activityLevel", "goal", "dietCycleType", "isAthleteOrWarmClimate",
                     "targetCalories", "targetProteinGrams", "targetCarbsGrams", "targetFatGrams",
-                    "targetWaterMl", "monthlyTargetWeightKg", "monthlyTargetDurationWeeks", "monthlyNotes"
+                    "targetWaterMl", "monthlyTargetWeightKg", "monthlyTargetDurationWeeks", "monthlyNotes",
+                    "isDarkMode"
                 )
 
                 if (!existingColumns.containsAll(expectedColumns) || existingColumns.size != expectedColumns.size) {
@@ -113,6 +116,7 @@ abstract class AppDatabase : RoomDatabase() {
                             `monthlyTargetWeightKg` REAL NOT NULL,
                             `monthlyTargetDurationWeeks` INTEGER NOT NULL,
                             `monthlyNotes` TEXT NOT NULL,
+                            `isDarkMode` INTEGER NOT NULL,
                             PRIMARY KEY(`id`)
                         )
                     """.trimIndent())
@@ -145,33 +149,15 @@ abstract class AppDatabase : RoomDatabase() {
                             "targetWaterMl" to "3530",
                             "monthlyTargetWeightKg" to "81.0",
                             "monthlyTargetDurationWeeks" to "4",
-                            "monthlyNotes" to "'Fase de hipertrofia com foco em peitoral e dorsais.'"
+                            "monthlyNotes" to "'Fase de hipertrofia com foco em peitoral e dorsais.'",
+                            "isDarkMode" to "1"
                         )
                         val selectExprs = expectedColumns.joinToString(", ") { col ->
                             if (existingColumns.contains(col)) "`$col`" else "${defaultValues[col]} AS `$col`"
                         }
                         val targetCols = expectedColumns.joinToString(", ") { "`$it`" }
                         db.execSQL("INSERT OR REPLACE INTO `user_profile_temp` ($targetCols) SELECT $selectExprs FROM `user_profile`")
-                    } else {
-                        db.execSQL("""
-                            INSERT OR REPLACE INTO `user_profile_temp` (
-                                `id`, `name`, `email`, `firebaseUid`, `passwordHash`, `isLoggedIn`,
-                                `hasCompletedOnboarding`, `lgpdConsentAccepted`, `lgpdConsentDate`,
-                                `gender`, `age`, `weightKg`, `heightCm`, `biotype`, `trainingDaysPerWeek`,
-                                `activityLevel`, `goal`, `dietCycleType`, `isAthleteOrWarmClimate`,
-                                `targetCalories`, `targetProteinGrams`, `targetCarbsGrams`, `targetFatGrams`,
-                                `targetWaterMl`, `monthlyTargetWeightKg`, `monthlyTargetDurationWeeks`, `monthlyNotes`
-                            ) VALUES (
-                                1, 'Atleta', 'atleta@fitmail.com', '', 'Atleta@2026', 0,
-                                0, 0, ${System.currentTimeMillis()},
-                                'MASCULINO', 26, 78.5, 178.0, 'MESOMORPH', 5,
-                                'MODERATE', 'BULKING_CLEAN', 'FIXED_DAILY', 1,
-                                2650, 175, 320, 65, 3530, 81.0, 4,
-                                'Fase de hipertrofia com foco em peitoral e dorsais.'
-                            )
-                        """.trimIndent())
                     }
-
                     db.execSQL("DROP TABLE IF EXISTS `user_profile`")
                     db.execSQL("ALTER TABLE `user_profile_temp` RENAME TO `user_profile`")
                 }
@@ -347,6 +333,26 @@ abstract class AppDatabase : RoomDatabase() {
                 """.trimIndent())
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_workout_plans_isActive` ON `workout_plans` (`isActive`)")
             } catch (_: Exception) {}
+
+            try {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `gps_route_logs` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `routeName` TEXT NOT NULL,
+                        `activityType` TEXT NOT NULL,
+                        `dateMillis` INTEGER NOT NULL,
+                        `dateDisplay` TEXT NOT NULL,
+                        `durationSeconds` INTEGER NOT NULL,
+                        `distanceMeters` REAL NOT NULL,
+                        `stepsCount` INTEGER NOT NULL,
+                        `caloriesBurned` REAL NOT NULL,
+                        `averagePaceMinPerKm` REAL NOT NULL,
+                        `routePointsJson` TEXT NOT NULL,
+                        `notes` TEXT NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_gps_route_logs_dateMillis` ON `gps_route_logs` (`dateMillis`)")
+            } catch (_: Exception) {}
         }
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -459,6 +465,30 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS `gps_route_logs` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `routeName` TEXT NOT NULL,
+                            `activityType` TEXT NOT NULL,
+                            `dateMillis` INTEGER NOT NULL,
+                            `dateDisplay` TEXT NOT NULL,
+                            `durationSeconds` INTEGER NOT NULL,
+                            `distanceMeters` REAL NOT NULL,
+                            `stepsCount` INTEGER NOT NULL,
+                            `caloriesBurned` REAL NOT NULL,
+                            `averagePaceMinPerKm` REAL NOT NULL,
+                            `routePointsJson` TEXT NOT NULL,
+                            `notes` TEXT NOT NULL
+                        )
+                    """.trimIndent())
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_gps_route_logs_dateMillis` ON `gps_route_logs` (`dateMillis`)")
+                } catch (_: Exception) {}
+            }
+        }
+
         fun getDatabase(
             context: Context,
             scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
@@ -467,7 +497,7 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     AppDatabase::class.java,
-                    "growth_diet_fitness.db"
+                    "victus_clean_fitness.db"
                 )
                     .addMigrations(
                         MIGRATION_1_2,
@@ -481,7 +511,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_9_10,
                         MIGRATION_7_10,
                         MIGRATION_8_10,
-                        MIGRATION_1_10
+                        MIGRATION_1_10,
+                        MIGRATION_10_11
                     )
                     .fallbackToDestructiveMigration()
                     .fallbackToDestructiveMigrationOnDowngrade()
@@ -506,9 +537,16 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        override fun onOpen(db: SupportSQLiteDatabase) {
+            super.onOpen(db)
+            try {
+                // Ensure no residual or dummy test users remain in database
+                db.execSQL("DELETE FROM user_profile WHERE email = 'atleta@fitmail.com' OR name = 'Atleta' OR (isLoggedIn = 0 AND hasCompletedOnboarding = 0)")
+            } catch (_: Exception) {}
+        }
+
         private suspend fun populateDatabase(dao: AppDao) {
-            // Seed Profile
-            dao.insertOrUpdateProfile(UserProfile())
+            // No default user profile seeded: database starts zeroed / clean for new user registration
 
             // Seed Master Diet Plan & Weekly Diet Plans (Segunda a Domingo)
             dao.insertDietPlan(PrepopulatedData.defaultDietPlan)

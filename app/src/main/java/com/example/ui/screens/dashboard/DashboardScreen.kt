@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.LocalDrink
@@ -101,7 +102,8 @@ fun DashboardScreen(
     onNavigateToCalculator: () -> Unit,
     onNavigateToAnalytics: () -> Unit,
     onNavigateToProfile: () -> Unit = {},
-    onNavigateToReceipts: () -> Unit = {}
+    onNavigateToReceipts: () -> Unit = {},
+    onNavigateToGps: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
@@ -146,7 +148,7 @@ fun DashboardScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(CarbonDark),
+            .background(MaterialTheme.colorScheme.background),
         contentPadding = PaddingValues(bottom = 96.dp)
     ) {
         // Header
@@ -482,6 +484,106 @@ fun DashboardScreen(
                             border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder)
                         ) {
                             Text("+1 Litro", color = GrowthCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        // GPS & Steps Outdoor Tracking Card
+        item {
+            val allGpsLogs by viewModel.allGpsRouteLogs.collectAsStateWithLifecycle()
+            val activeGps by viewModel.activeGpsSession.collectAsStateWithLifecycle()
+            val todayStart = remember {
+                val cal = java.util.Calendar.getInstance()
+                cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                cal.set(java.util.Calendar.MINUTE, 0)
+                cal.set(java.util.Calendar.SECOND, 0)
+                cal.set(java.util.Calendar.MILLISECOND, 0)
+                cal.timeInMillis
+            }
+            val todayLogs = allGpsLogs.filter { it.dateMillis >= todayStart }
+            val todayDistKm = (todayLogs.sumOf { it.distanceMeters.toDouble() } + activeGps.distanceMeters) / 1000.0
+            val todayCalories = todayLogs.sumOf { it.caloriesBurned.toDouble() } + activeGps.caloriesBurned
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = CarbonCard),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.35f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .testTag("dashboard_gps_running_card")
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.DirectionsRun,
+                                contentDescription = null,
+                                tint = GrowthOrange,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "CORRIDA AO AR LIVRE & GPS",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = GrowthOrangeLight,
+                                letterSpacing = 1.sp
+                            )
+                        }
+                        if (activeGps.isRunning) {
+                            Surface(
+                                color = GrowthGreen.copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text(
+                                    text = if (activeGps.isPaused) "PAUSADO" else "AO VIVO",
+                                    color = if (activeGps.isPaused) GrowthYellow else GrowthGreen,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = String.format(Locale.getDefault(), "%.2f km", todayDistKm),
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Black,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Text(
+                                text = if (todayDistKm > 0.05) {
+                                    String.format(Locale.getDefault(), "%d treino(s) hoje • %.0f kcal", todayLogs.size + if (activeGps.isRunning) 1 else 0, todayCalories)
+                                } else {
+                                    "Nenhuma corrida hoje • Inicie agora"
+                                },
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Button(
+                            onClick = onNavigateToGps,
+                            colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("open_gps_tracker_btn")
+                        ) {
+                            Text(if (activeGps.isRunning) "Ver Corrida" else "Iniciar Corrida", fontSize = 11.sp, color = Color.White)
                         }
                     }
                 }

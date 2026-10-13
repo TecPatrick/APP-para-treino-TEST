@@ -23,8 +23,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.AccessibilityNew
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.FitnessCenter
@@ -38,10 +40,12 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -113,6 +117,7 @@ fun UserProfileScreen(
     var selectedGoal by remember { mutableStateOf(profile.goal) }
     var selectedBiotype by remember { mutableStateOf(profile.biotype) }
     var recomputeMacrosAuto by remember { mutableStateOf(true) }
+    var showResetDatabaseDialog by remember { mutableStateOf(false) }
 
     // Sync state when profile is first loaded or changes
     LaunchedEffect(profile) {
@@ -150,7 +155,7 @@ fun UserProfileScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(CarbonDark)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         // Header
         GrowthHeader(
@@ -1079,6 +1084,92 @@ fun UserProfileScreen(
                     )
                 }
             }
+
+            // 11. Account Management & Database Wipe Actions
+            item {
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { viewModel.logout() },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(46.dp)
+                            .testTag("logout_btn"),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, CarbonBorder),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ExitToApp,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = "Sair da Conta", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = { showResetDatabaseDialog = true },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(46.dp)
+                            .testTag("reset_database_users_btn"),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, GrowthRed.copy(alpha = 0.5f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = GrowthRed)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteForever,
+                            contentDescription = null,
+                            tint = GrowthRed,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = "Zerar Banco", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GrowthRed)
+                    }
+                }
+            }
+        }
+
+        if (showResetDatabaseDialog) {
+            AlertDialog(
+                onDismissRequest = { showResetDatabaseDialog = false },
+                containerColor = CarbonCard,
+                title = {
+                    Text(
+                        text = "Excluir Usuários & Zerar Banco?",
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                },
+                text = {
+                    Text(
+                        text = "Isso excluirá todos os perfis e credenciais de usuários da base de dados, permitindo iniciar o aplicativo 100% zerado para novos cadastros.",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            viewModel.clearAllUsersAndResetDatabase()
+                            showResetDatabaseDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = GrowthRed),
+                        modifier = Modifier.testTag("confirm_wipe_users_btn")
+                    ) {
+                        Text("Sim, Excluir Tudo", color = Color.White)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showResetDatabaseDialog = false }) {
+                        Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            )
         }
     }
 }

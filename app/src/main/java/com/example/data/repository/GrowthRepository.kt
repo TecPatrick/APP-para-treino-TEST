@@ -16,6 +16,7 @@ import com.example.data.model.PurchaseItemLog
 import com.example.data.model.PurchaseReceipt
 import com.example.data.model.ShoppingItem
 import com.example.data.model.UserProfile
+import com.example.data.model.GpsRouteLog
 import com.example.data.model.WeeklyDietPlan
 import com.example.data.model.WorkoutExercise
 import com.example.data.model.WorkoutLog
@@ -23,6 +24,7 @@ import com.example.data.model.WorkoutPlan
 import com.example.data.model.WorkoutRoutine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
 import org.json.JSONArray
 import org.json.JSONObject
 import java.nio.charset.StandardCharsets
@@ -51,6 +53,13 @@ class GrowthRepository(private val dao: AppDao) {
     val recentIntakeHistory: Flow<List<DailyIntakeHistory>> = dao.getRecentIntakeHistory()
     val allReceipts: Flow<List<PurchaseReceipt>> = dao.getAllReceipts()
     val allPurchaseLogs: Flow<List<PurchaseItemLog>> = dao.getAllPurchaseLogs()
+    val allGpsRouteLogs: Flow<List<GpsRouteLog>> = dao.getAllGpsRouteLogs()
+    val totalGpsDistanceMeters: Flow<Float> = dao.getTotalGpsDistanceMeters().map { it ?: 0f }
+    val totalGpsSteps: Flow<Int> = dao.getTotalGpsSteps().map { it ?: 0 }
+
+    suspend fun insertGpsRouteLog(log: GpsRouteLog): Long = dao.insertGpsRouteLog(log)
+    suspend fun saveGpsRouteLog(log: GpsRouteLog): Long = dao.insertGpsRouteLog(log)
+    suspend fun deleteGpsRouteLog(id: Long) = dao.deleteGpsRouteLog(id)
 
     fun searchFoods(query: String): Flow<List<FoodItem>> = dao.searchFoods(query)
 
@@ -59,6 +68,14 @@ class GrowthRepository(private val dao: AppDao) {
 
     suspend fun saveUserProfile(profile: UserProfile) {
         dao.insertOrUpdateProfile(profile)
+    }
+
+    suspend fun deleteAllUserProfiles() {
+        dao.deleteAllUserProfiles()
+    }
+
+    suspend fun getUserProfileDirect(id: Int = 1): UserProfile? {
+        return dao.getUserProfileDirect(id)
     }
 
     suspend fun updateDietaryGoals(calories: Int, protein: Int, carbs: Int, fat: Int, water: Int) {

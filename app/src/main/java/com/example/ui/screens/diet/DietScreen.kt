@@ -116,7 +116,7 @@ fun DietScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(CarbonDark)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             GrowthHeader(
@@ -888,11 +888,19 @@ fun AddFoodToMealDialog(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
+                    val amountVal = amountText.toFloatOrNull()
+                    val isAmountValid = amountVal != null && amountVal > 0f
                     OutlinedTextField(
                         value = amountText,
                         onValueChange = { amountText = it },
                         label = { Text("Quantidade (${food.servingUnit})") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        isError = !isAmountValid && amountText.isNotBlank(),
+                        supportingText = {
+                            if (!isAmountValid && amountText.isNotBlank()) {
+                                Text("Digite um valor numérico válido (> 0)", color = Color(0xFFEF4444), fontSize = 10.sp)
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth().testTag("food_amount_input"),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = GrowthOrange,
@@ -933,11 +941,14 @@ fun AddFoodToMealDialog(
         },
         confirmButton = {
             if (selectedFood != null) {
+                val amountVal = amountText.toFloatOrNull()
+                val isAmountValid = amountVal != null && amountVal > 0f
                 Button(
                     onClick = {
-                        val amount = amountText.toFloatOrNull() ?: 100f
+                        val amount = amountVal ?: 100f
                         onConfirm(selectedFood!!, amount, notesText)
                     },
+                    enabled = isAmountValid,
                     colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
                     modifier = Modifier.testTag("confirm_add_food_btn")
                 ) {
@@ -1106,23 +1117,36 @@ fun CustomFoodRegistrationDialog(
             }
         },
         confirmButton = {
+            val servingVal = servingAmount.toFloatOrNull()
+            val calsVal = calories.toFloatOrNull()
+            val protVal = protein.toFloatOrNull()
+            val carbsVal = carbs.toFloatOrNull()
+            val fatVal = fat.toFloatOrNull()
+            val isFormValid = name.isNotBlank() &&
+                servingVal != null && servingVal > 0f &&
+                calsVal != null && calsVal >= 0f &&
+                protVal != null && protVal >= 0f &&
+                carbsVal != null && carbsVal >= 0f &&
+                fatVal != null && fatVal >= 0f
+
             Button(
                 onClick = {
-                    if (name.isNotBlank()) {
+                    if (isFormValid) {
                         onSave(
-                            name,
+                            name.trim(),
                             category,
-                            servingAmount.toFloatOrNull() ?: 100f,
+                            servingVal!!,
                             unit,
-                            calories.toFloatOrNull() ?: 0f,
-                            protein.toFloatOrNull() ?: 0f,
-                            carbs.toFloatOrNull() ?: 0f,
-                            fat.toFloatOrNull() ?: 0f,
+                            calsVal!!,
+                            protVal!!,
+                            carbsVal!!,
+                            fatVal!!,
                             0f,
                             isGrowth
                         )
                     }
                 },
+                enabled = isFormValid,
                 colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
                 modifier = Modifier.testTag("save_custom_food_btn")
             ) {

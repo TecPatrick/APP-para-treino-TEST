@@ -64,6 +64,9 @@ import com.example.ui.screens.profile.UserProfileScreen
 import com.example.ui.screens.receipts.ReceiptsInflationScreen
 import com.example.ui.screens.shopping.ShoppingListScreen
 import com.example.ui.screens.workout.WorkoutScreen
+import androidx.compose.material.icons.filled.DirectionsRun
+import androidx.compose.material.icons.outlined.DirectionsRun
+import com.example.ui.screens.gps.GpsTrackerScreen
 import com.example.ui.theme.CarbonCard
 import com.example.ui.theme.CarbonDark
 import com.example.ui.theme.GrowthOrange
@@ -79,6 +82,7 @@ enum class AppNavigationScreen(
     DASHBOARD("Início", Icons.Filled.LocalFireDepartment, Icons.Outlined.LocalFireDepartment, "nav_dashboard"),
     DIET("Dieta", Icons.Filled.Restaurant, Icons.Outlined.Restaurant, "nav_diet"),
     WORKOUT("Treinos", Icons.Filled.FitnessCenter, Icons.Outlined.FitnessCenter, "nav_workout"),
+    GPS("Corrida", Icons.Filled.DirectionsRun, Icons.Outlined.DirectionsRun, "nav_running"),
     SHOPPING("Mercado", Icons.Filled.ShoppingCart, Icons.Outlined.ShoppingCart, "nav_shopping"),
     RECEIPTS("Preços/NF", Icons.Filled.ReceiptLong, Icons.Outlined.ReceiptLong, "nav_receipts"),
     ANALYTICS("Evolução", Icons.Filled.TrendingUp, Icons.Outlined.TrendingUp, "nav_analytics"),
@@ -137,22 +141,23 @@ fun MainAppScreen(viewModel: GrowthViewModel) {
         }
     }
 
-    val showBottomBar = currentScreen != AppNavigationScreen.CALCULATOR && currentScreen != AppNavigationScreen.AUTH && currentScreen != AppNavigationScreen.PROFILE
+    val showBottomBar = currentScreen != AppNavigationScreen.CALCULATOR && currentScreen != AppNavigationScreen.AUTH && currentScreen != AppNavigationScreen.PROFILE && currentScreen != AppNavigationScreen.GPS
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = CarbonDark,
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar(
-                    containerColor = CarbonCard,
+                    containerColor = MaterialTheme.colorScheme.surface,
                     tonalElevation = 8.dp
                 ) {
                     val navItems = listOf(
                         AppNavigationScreen.DASHBOARD,
                         AppNavigationScreen.DIET,
                         AppNavigationScreen.WORKOUT,
+                        AppNavigationScreen.GPS,
                         AppNavigationScreen.SHOPPING,
                         AppNavigationScreen.ANALYTICS
                     )
@@ -210,7 +215,8 @@ fun MainAppScreen(viewModel: GrowthViewModel) {
                         onNavigateToCalculator = { currentScreen = AppNavigationScreen.CALCULATOR },
                         onNavigateToAnalytics = { currentScreen = AppNavigationScreen.ANALYTICS },
                         onNavigateToProfile = { currentScreen = AppNavigationScreen.PROFILE },
-                        onNavigateToReceipts = { currentScreen = AppNavigationScreen.RECEIPTS }
+                        onNavigateToReceipts = { currentScreen = AppNavigationScreen.RECEIPTS },
+                        onNavigateToGps = { currentScreen = AppNavigationScreen.GPS }
                     )
                     AppNavigationScreen.DIET -> DietScreen(
                         viewModel = viewModel,
@@ -218,6 +224,10 @@ fun MainAppScreen(viewModel: GrowthViewModel) {
                     )
                     AppNavigationScreen.WORKOUT -> WorkoutScreen(
                         viewModel = viewModel
+                    )
+                    AppNavigationScreen.GPS -> GpsTrackerScreen(
+                        viewModel = viewModel,
+                        onNavigateBack = { currentScreen = AppNavigationScreen.DASHBOARD }
                     )
                     AppNavigationScreen.SHOPPING -> ShoppingListScreen(
                         viewModel = viewModel,

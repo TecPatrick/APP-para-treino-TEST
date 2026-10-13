@@ -137,6 +137,7 @@ fun WorkoutScreen(viewModel: GrowthViewModel) {
     val allExercises by viewModel.allExercises.collectAsStateWithLifecycle()
     val workoutLogs by viewModel.workoutLogs.collectAsStateWithLifecycle()
     val activeWorkout by viewModel.activeWorkout.collectAsStateWithLifecycle()
+    val userProfile by viewModel.userProfile.collectAsStateWithLifecycle()
 
     var selectedFilter by remember { mutableStateOf(WorkoutDivisionFilter.ALL) }
 

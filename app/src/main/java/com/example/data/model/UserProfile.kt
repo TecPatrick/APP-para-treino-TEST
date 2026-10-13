@@ -64,10 +64,10 @@ enum class DietCycleType(val label: String) {
 @Entity(tableName = "user_profile")
 data class UserProfile(
     @PrimaryKey val id: Int = 1,
-    val name: String = "Atleta",
-    val email: String = "atleta@fitmail.com",
+    val name: String = "",
+    val email: String = "",
     val firebaseUid: String = "",
-    val passwordHash: String = "Atleta@2026",
+    val passwordHash: String = "",
     val isLoggedIn: Boolean = false,
     val hasCompletedOnboarding: Boolean = false,
     val lgpdConsentAccepted: Boolean = false,
@@ -95,5 +95,6 @@ data class UserProfile(
     // Monthly configurations
     val monthlyTargetWeightKg: Float = 81.0f,
     val monthlyTargetDurationWeeks: Int = 4,
-    val monthlyNotes: String = "Fase de hipertrofia com foco em peitoral e dorsais."
+    val monthlyNotes: String = "Fase de hipertrofia com foco em peitoral e dorsais.",
+    val isDarkMode: Boolean = true
 )

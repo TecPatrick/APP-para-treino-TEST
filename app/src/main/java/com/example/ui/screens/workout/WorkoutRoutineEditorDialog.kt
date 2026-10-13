@@ -160,10 +160,15 @@ fun WorkoutRoutineEditorDialog(
                             )
                         }
 
+                        val durVal = durationText.toIntOrNull()
+                        val isRoutineValid = title.isNotBlank() &&
+                            durVal != null && durVal > 0 &&
+                            exerciseList.isNotEmpty() &&
+                            exerciseList.all { it.sets > 0 && it.repsMin > 0 && it.repsMax >= it.repsMin && it.currentWeightKg >= 0f }
+
                         Button(
                             onClick = {
-                                if (title.isNotBlank()) {
-                                    val dur = durationText.toIntOrNull() ?: 60
+                                if (isRoutineValid) {
                                     onSave(
                                         existingRoutine?.id,
                                         splitType,
@@ -171,11 +176,12 @@ fun WorkoutRoutineEditorDialog(
                                         title,
                                         dayOfWeek,
                                         muscles,
-                                        dur,
+                                        durVal!!,
                                         exerciseList.toList()
                                     )
                                 }
                             },
+                            enabled = isRoutineValid,
                             colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.testTag("save_full_routine_btn")

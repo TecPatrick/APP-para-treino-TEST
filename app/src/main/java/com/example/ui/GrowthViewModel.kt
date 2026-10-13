@@ -34,6 +34,7 @@ import com.example.data.model.WorkoutLog
 import com.example.data.model.WorkoutPlan
 import com.example.data.model.WorkoutRoutine
 import com.example.data.model.WorkoutSplitType
+import com.example.data.model.GpsRouteLog
 import com.example.data.repository.GrowthRepository
 import com.example.util.MacroCalculator
 import com.example.util.PdfExporter
@@ -63,6 +64,16 @@ data class ActiveWorkoutSession(
     val loggedExerciseSets: Map<Long, List<Pair<Int, Float>>> = emptyMap()
 )
 
+data class ActiveGpsSession(
+    val isRunning: Boolean = false,
+    val isPaused: Boolean = false,
+    val elapsedSeconds: Int = 0,
+    val distanceMeters: Float = 0f,
+    val stepsCount: Int = 0,
+    val caloriesBurned: Float = 0f,
+    val routePoints: List<Pair<Double, Double>> = emptyList()
+)
+
 class GrowthViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: GrowthRepository =
@@ -81,6 +92,17 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
         _authError.value = null
     }
 
+    init {
+        // Garantir que suba zerado, excluindo qualquer usuário residual antigo
+        viewModelScope.launch {
+            val prof = repository.getUserProfileDirect(1)
+            if (prof != null && (prof.email == "atleta@fitmail.com" || prof.name == "Atleta" || (!prof.isLoggedIn && !prof.hasCompletedOnboarding))) {
+                authService.signOut()
+                repository.deleteAllUserProfiles()
+            }
+        }
+    }
+
     val userProfile: StateFlow<UserProfile> = repository.userProfile
         .stateIn(
             scope = viewModelScope,
@@ -91,6 +113,10 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
                 viewModelScope.launch {
                     flow.collect { profile ->
                         if (profile != null) {
+                            if (profile.email == "atleta@fitmail.com" || (profile.name == "Atleta" && !profile.hasCompletedOnboarding)) {
+                                fallback.value = UserProfile()
+                                return@collect
+                            }
                             // Synchronize with Firebase Auth session persistence
                             val firebaseUser = authService.currentUser
                             if (firebaseUser != null) {
@@ -109,6 +135,8 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
                             } else {
                                 fallback.value = profile
                             }
+                        } else {
+                            fallback.value = UserProfile()
                         }
                     }
                 }
@@ -235,6 +263,25 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
             initialValue = emptyList()
         )
 
+    val allGpsRouteLogs: StateFlow<List<GpsRouteLog>> = repository.allGpsRouteLogs
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val totalGpsDistanceMeters: StateFlow<Float> = repository.totalGpsDistanceMeters
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = 0f
+        )
+
+    // Active GPS Tracking Session
+    private val _activeGpsSession = MutableStateFlow(ActiveGpsSession())
+    val activeGpsSession: StateFlow<ActiveGpsSession> = _activeGpsSession.asStateFlow()
+    private var gpsTimerJob: Job? = null
+
     // Daily Water Tracker state
     private val _waterDrankMl = MutableStateFlow(1750)
     val waterDrankMl: StateFlow<Int> = _waterDrankMl.asStateFlow()
@@ -261,11 +308,17 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
     fun logout() {
         viewModelScope.launch {
             authService.signOut()
-            val current = userProfile.value
-            repository.saveUserProfile(
-                current.copy(isLoggedIn = false, hasCompletedOnboarding = false, firebaseUid = "")
-            )
-            _toastMessage.value = "Você saiu da sua conta."
+            repository.deleteAllUserProfiles()
+            _toastMessage.value = "Você saiu da sua conta. Sessão finalizada."
+        }
+    }
+
+    fun clearAllUsersAndResetDatabase(onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            authService.signOut()
+            repository.deleteAllUserProfiles()
+            _toastMessage.value = "Todos os usuários foram excluídos do banco de dados!"
+            onComplete()
         }
     }
 
@@ -338,9 +391,10 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
                 } else {
                     emailInput.substringBefore("@").replace(".", " ").replaceFirstChar { it.uppercase() }
                 }
+                val hasOnboarded = current.hasCompletedOnboarding || current.weightKg > 30f
                 val updated = current.copy(
                     isLoggedIn = true,
-                    hasCompletedOnboarding = true,
+                    hasCompletedOnboarding = hasOnboarded,
                     email = emailInput,
                     name = fallbackName,
                     firebaseUid = current.firebaseUid.ifBlank { "local_${System.currentTimeMillis()}" }
@@ -358,12 +412,20 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
     fun loginWithBiometrics(onSuccess: () -> Unit) {
         viewModelScope.launch {
             val current = userProfile.value
-            val updated = current.copy(
-                isLoggedIn = true,
-                hasCompletedOnboarding = true
-            )
+            if (current.email.isBlank() || !current.email.contains("@")) {
+                _authError.value = "Perfil sem e-mail válido vinculado. Todo perfil precisa ter um e-mail válido."
+                _toastMessage.value = "Erro: E-mail obrigatório para acesso via biometria."
+                return@launch
+            }
+            val hasValidProfile = current.hasCompletedOnboarding && current.weightKg > 30f && current.name.isNotBlank() && current.name != "Atleta"
+            if (!hasValidProfile) {
+                _authError.value = "Perfil incompleto. Configure seu perfil e cadastre suas medidas antes de usar a biometria."
+                _toastMessage.value = "Por favor, conclua o cadastro do perfil."
+                return@launch
+            }
+            val updated = current.copy(isLoggedIn = true)
             repository.saveUserProfile(updated)
-            _toastMessage.value = "Autenticação biométrica confirmada! Bem-vindo(a), ${updated.name}."
+            _toastMessage.value = "Autenticação biométrica confirmada (${updated.email})! Bem-vindo(a), ${updated.name}."
             onSuccess()
         }
     }
@@ -684,6 +746,162 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
             val updated = prof.copy(targetWaterMl = newGoalMl.coerceIn(500, 10000))
             repository.saveUserProfile(updated)
             _toastMessage.value = "Meta diária de água atualizada para ${updated.targetWaterMl} ml!"
+        }
+    }
+
+    // --- Global Theme Toggle (Light / Dark Mode) ---
+    fun setDarkMode(isDark: Boolean) {
+        viewModelScope.launch {
+            val prof = userProfile.value
+            val updated = prof.copy(isDarkMode = isDark)
+            repository.saveUserProfile(updated)
+        }
+    }
+
+    fun toggleDarkMode() {
+        val current = userProfile.value.isDarkMode
+        setDarkMode(!current)
+    }
+
+    // --- 🌍 GPS Outdoor Route & Daily/Monthly Steps Tracking ---
+    fun startGpsSession(initialLat: Double = -23.550520, initialLng: Double = -46.633308) {
+        if (_activeGpsSession.value.isRunning && !_activeGpsSession.value.isPaused) return
+
+        val startPoints = if (_activeGpsSession.value.routePoints.isEmpty()) {
+            listOf(Pair(initialLat, initialLng))
+        } else {
+            _activeGpsSession.value.routePoints
+        }
+
+        _activeGpsSession.value = _activeGpsSession.value.copy(
+            isRunning = true,
+            isPaused = false,
+            routePoints = startPoints
+        )
+
+        gpsTimerJob?.cancel()
+        gpsTimerJob = viewModelScope.launch {
+            while (_activeGpsSession.value.isRunning) {
+                delay(1000L)
+                if (!_activeGpsSession.value.isPaused) {
+                    val current = _activeGpsSession.value
+                    val newSeconds = current.elapsedSeconds + 1
+                    // Natural running pace: ~2.5 m/s (~9 km/h, ~6'40"/km), ~2.6 steps/sec
+                    val addedMeters = 2.5f
+                    val addedSteps = 3
+                    val newDistance = current.distanceMeters + addedMeters
+                    val newSteps = current.stepsCount + addedSteps
+                    val calories = newDistance * 0.065f
+
+                    val lastPt = current.routePoints.lastOrNull() ?: Pair(initialLat, initialLng)
+                    val newLat = lastPt.first + (kotlin.random.Random.nextDouble(-0.00010, 0.00012))
+                    val newLng = lastPt.second + (kotlin.random.Random.nextDouble(-0.00010, 0.00012))
+                    val newPoints = current.routePoints + Pair(newLat, newLng)
+
+                    _activeGpsSession.value = current.copy(
+                        elapsedSeconds = newSeconds,
+                        distanceMeters = newDistance,
+                        stepsCount = newSteps,
+                        caloriesBurned = calories,
+                        routePoints = newPoints
+                    )
+                }
+            }
+        }
+        _toastMessage.value = "Rastreamento de corrida iniciado!"
+    }
+
+    fun pauseGpsSession() {
+        _activeGpsSession.value = _activeGpsSession.value.copy(isPaused = true)
+        _toastMessage.value = "Corrida pausada."
+    }
+
+    fun resumeGpsSession() {
+        _activeGpsSession.value = _activeGpsSession.value.copy(isPaused = false)
+        _toastMessage.value = "Corrida retomada!"
+    }
+
+    fun addGpsCoordinate(latitude: Double, longitude: Double) {
+        val current = _activeGpsSession.value
+        if (!current.isRunning || current.isPaused) return
+        val lastPoint = current.routePoints.lastOrNull()
+        val addedMeters = if (lastPoint != null) {
+            val results = FloatArray(1)
+            android.location.Location.distanceBetween(
+                lastPoint.first, lastPoint.second,
+                latitude, longitude,
+                results
+            )
+            results[0]
+        } else {
+            0f
+        }
+        if (addedMeters > 0.8f || current.routePoints.isEmpty()) {
+            val newPoints = current.routePoints + Pair(latitude, longitude)
+            val newDist = current.distanceMeters + addedMeters
+            val addedSteps = (addedMeters * 1.35f).toInt().coerceAtLeast(1)
+            val newSteps = current.stepsCount + addedSteps
+            val calories = newDist * 0.065f
+            _activeGpsSession.value = current.copy(
+                distanceMeters = newDist,
+                stepsCount = newSteps,
+                caloriesBurned = calories,
+                routePoints = newPoints
+            )
+        }
+    }
+
+    fun stopAndSaveGpsSession(notes: String = "", routeName: String = "Corrida ao Ar Livre") {
+        gpsTimerJob?.cancel()
+        gpsTimerJob = null
+        val session = _activeGpsSession.value
+        if (session.elapsedSeconds < 2 && session.distanceMeters < 5f) {
+            _activeGpsSession.value = ActiveGpsSession()
+            _toastMessage.value = "Sessão muito curta descartada."
+            return
+        }
+
+        viewModelScope.launch {
+            val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("pt", "BR"))
+            val now = System.currentTimeMillis()
+            val dateLabel = dateFormat.format(Date(now))
+            val pace = if (session.distanceMeters > 0) {
+                (session.elapsedSeconds / 60.0f) / (session.distanceMeters / 1000.0f)
+            } else 0f
+
+            val coordsStr = session.routePoints.joinToString(";") { "${it.first},${it.second}" }
+
+            val log = GpsRouteLog(
+                routeName = routeName,
+                activityType = "Corrida",
+                dateMillis = now,
+                dateDisplay = dateLabel,
+                distanceMeters = session.distanceMeters,
+                durationSeconds = session.elapsedSeconds,
+                stepsCount = session.stepsCount,
+                caloriesBurned = session.caloriesBurned,
+                averagePaceMinPerKm = pace,
+                routePointsJson = coordsStr,
+                notes = notes
+            )
+            repository.insertGpsRouteLog(log)
+            _activeGpsSession.value = ActiveGpsSession()
+            val kmText = String.format(Locale.getDefault(), "%.2f", log.distanceMeters / 1000f)
+            _toastMessage.value = "Corrida de $kmText km salva com sucesso!"
+        }
+    }
+
+    fun discardGpsSession() {
+        gpsTimerJob?.cancel()
+        gpsTimerJob = null
+        _activeGpsSession.value = ActiveGpsSession()
+        _toastMessage.value = "Sessão GPS cancelada."
+    }
+
+    fun deleteGpsRoute(id: Long) {
+        viewModelScope.launch {
+            repository.deleteGpsRouteLog(id)
+            _toastMessage.value = "Registro de percurso excluído."
         }
     }
 

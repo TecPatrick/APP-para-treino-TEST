@@ -105,7 +105,7 @@ fun AnalyticsScreen(viewModel: GrowthViewModel) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(CarbonDark)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             GrowthHeader(

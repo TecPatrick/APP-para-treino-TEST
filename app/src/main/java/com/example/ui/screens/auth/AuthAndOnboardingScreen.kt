@@ -323,18 +323,27 @@ fun AuthAndOnboardingScreen(
                             val context = LocalContext.current
                             val coroutineScope = rememberCoroutineScope()
                             val credentialManager = remember { CredentialManager.create(context) }
+                            val userProfile by viewModel.userProfile.collectAsStateWithLifecycle()
 
                             // Biometric Sign In Option (Fingerprint / Face Unlock)
                             if (!isRegisterMode) {
                                 val fragmentActivity = context as? FragmentActivity
+                                val hasConfiguredEmail = userProfile.email.isNotBlank() && userProfile.email.contains("@") && userProfile.email.contains(".")
+                                val hasConfiguredProfile = userProfile.hasCompletedOnboarding && userProfile.weightKg > 30f && userProfile.name.isNotBlank() && userProfile.name != "Atleta"
+                                val isBiometricsReady = hasConfiguredEmail && hasConfiguredProfile
+
                                 Button(
                                     onClick = {
+                                        if (!isBiometricsReady) {
+                                            viewModel.showToast("Nenhum perfil configurado com e-mail válido. Cadastre-se ou entre com seu e-mail primeiro.")
+                                            return@Button
+                                        }
                                         if (fragmentActivity != null) {
                                             BiometricAuthHelper.promptBiometricAuth(
                                                 activity = fragmentActivity,
                                                 title = "Login com Biometria",
-                                                subtitle = "Victus Dieta & Treino",
-                                                description = "Confirme sua digital ou Face para entrar rapidamente no seu plano.",
+                                                subtitle = "Perfil: ${userProfile.email}",
+                                                description = "Confirme sua digital ou Face para entrar no seu plano.",
                                                 onSuccess = {
                                                     viewModel.loginWithBiometrics(onSuccess = onAuthSuccess)
                                                 },
@@ -352,7 +361,7 @@ fun AuthAndOnboardingScreen(
                                         .testTag("biometric_login_btn"),
                                     shape = RoundedCornerShape(10.dp),
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = GrowthOrange,
+                                        containerColor = if (isBiometricsReady) GrowthOrange else CarbonCardElevated,
                                         contentColor = Color.White
                                     )
                                 ) {
@@ -363,14 +372,14 @@ fun AuthAndOnboardingScreen(
                                         Icon(
                                             imageVector = Icons.Default.Fingerprint,
                                             contentDescription = "Biometria",
-                                            tint = Color.White,
+                                            tint = if (isBiometricsReady) Color.White else GrowthOrange,
                                             modifier = Modifier.size(20.dp)
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = "Entrar com Biometria (Digital / Face)",
+                                            text = if (isBiometricsReady) "Entrar com Biometria (${userProfile.email})" else "Entrar com Biometria (Requer Perfil com E-mail)",
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp
+                                            fontSize = 12.sp
                                         )
                                     }
                                 }
@@ -398,19 +407,27 @@ fun AuthAndOnboardingScreen(
                                             } catch (_: GetCredentialCancellationException) {
                                                 // user cancelled
                                             } catch (_: Exception) {
-                                                viewModel.loginWithFirebase(
-                                                    emailInput = email.ifBlank { "atleta@fitmail.com" },
-                                                    passwordInput = password.ifBlank { "Atleta@2026" },
-                                                    onSuccess = onAuthSuccess
-                                                )
+                                                if (email.isNotBlank() && email.contains("@") && email.contains(".")) {
+                                                    viewModel.loginWithFirebase(
+                                                        emailInput = email,
+                                                        passwordInput = password.ifBlank { "Atleta@2026" },
+                                                        onSuccess = onAuthSuccess
+                                                    )
+                                                } else {
+                                                    viewModel.showToast("Informe seu e-mail cadastrado para prosseguir.")
+                                                }
                                             }
                                         }
                                     } else {
-                                        viewModel.loginWithFirebase(
-                                            emailInput = email.ifBlank { "atleta@fitmail.com" },
-                                            passwordInput = password.ifBlank { "Atleta@2026" },
-                                            onSuccess = onAuthSuccess
-                                        )
+                                        if (email.isNotBlank() && email.contains("@") && email.contains(".")) {
+                                            viewModel.loginWithFirebase(
+                                                emailInput = email,
+                                                passwordInput = password.ifBlank { "Atleta@2026" },
+                                                onSuccess = onAuthSuccess
+                                            )
+                                        } else {
+                                            viewModel.showToast("Digite um e-mail válido para entrar.")
+                                        }
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth().height(48.dp).testTag("google_signin_btn"),
@@ -642,10 +659,11 @@ fun AuthAndOnboardingScreen(
                             Spacer(modifier = Modifier.height(16.dp))
 
                             // Submit Button
+                            val isValidEmail = email.contains("@") && email.contains(".") && email.length > 5
                             val isSubmitEnabled = if (isRegisterMode) {
-                                name.isNotBlank() && email.isNotBlank() && strengthScore >= 4 && passwordsMatch && lgpdAccepted && !isAuthLoading
+                                name.isNotBlank() && email.isNotBlank() && isValidEmail && strengthScore >= 4 && passwordsMatch && lgpdAccepted && !isAuthLoading
                             } else {
-                                email.isNotBlank() && password.isNotBlank() && !isAuthLoading
+                                email.isNotBlank() && password.isNotBlank() && isValidEmail && !isAuthLoading
                             }
 
                             Button(

@@ -19,6 +19,7 @@ import com.example.data.model.PurchaseItemLog
 import com.example.data.model.PurchaseReceipt
 import com.example.data.model.ShoppingItem
 import com.example.data.model.UserProfile
+import com.example.data.model.GpsRouteLog
 import com.example.data.model.WeeklyDietPlan
 import com.example.data.model.WorkoutExercise
 import com.example.data.model.WorkoutLog
@@ -64,6 +65,9 @@ interface AppDao {
 
     @Query("DELETE FROM user_profile WHERE id = :id")
     suspend fun deleteUserProfile(id: Int)
+
+    @Query("DELETE FROM user_profile")
+    suspend fun deleteAllUserProfiles()
 
     // =========================================================================
     // 🥗 DietPlan DAO Operations (Planos Gerais de Dieta)
@@ -400,6 +404,24 @@ interface AppDao {
 
     @Query("DELETE FROM purchase_item_logs WHERE receiptId = :receiptId")
     suspend fun deletePurchaseLogsForReceipt(receiptId: Long)
+
+    // =========================================================================
+    // 🌍 GPS Route & Step Tracking DAO Operations
+    // =========================================================================
+    @Query("SELECT * FROM gps_route_logs ORDER BY dateMillis DESC")
+    fun getAllGpsRouteLogs(): Flow<List<GpsRouteLog>>
+
+    @Query("SELECT SUM(distanceMeters) FROM gps_route_logs")
+    fun getTotalGpsDistanceMeters(): Flow<Float?>
+
+    @Query("SELECT SUM(stepsCount) FROM gps_route_logs")
+    fun getTotalGpsSteps(): Flow<Int?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertGpsRouteLog(log: GpsRouteLog): Long
+
+    @Query("DELETE FROM gps_route_logs WHERE id = :id")
+    suspend fun deleteGpsRouteLog(id: Long)
 }
 
 typealias GrowthDao = AppDao
