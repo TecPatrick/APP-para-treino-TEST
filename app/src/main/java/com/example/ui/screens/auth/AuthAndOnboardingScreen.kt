@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,6 +40,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -198,18 +201,19 @@ fun AuthAndOnboardingScreen(
             )
         }
 
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 20.dp),
-            contentPadding = PaddingValues(top = 36.dp, bottom = 40.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 36.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Header Branding
-            item {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                     if (onboardingStep > 0) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -261,35 +265,32 @@ fun AuthAndOnboardingScreen(
                     )
                     Spacer(modifier = Modifier.height(18.dp))
                 }
-            }
 
             // Error banner if any auth error occurs
             if (authError != null && onboardingStep == 0) {
-                item {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = GrowthRed.copy(alpha = 0.15f)),
-                        shape = RoundedCornerShape(12.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, GrowthRed.copy(alpha = 0.5f)),
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = GrowthRed.copy(alpha = 0.15f)),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, GrowthRed.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = GrowthRed, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = authError ?: "",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(
+                            onClick = { viewModel.clearAuthError() },
+                            modifier = Modifier.size(24.dp)
                         ) {
-                            Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = GrowthRed, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = authError ?: "",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onBackground,
-                                modifier = Modifier.weight(1f)
-                            )
-                            IconButton(
-                                onClick = { viewModel.clearAuthError() },
-                                modifier = Modifier.size(24.dp)
-                            ) {
-                                Icon(Icons.Default.Close, contentDescription = "Fechar", tint = GrowthRed, modifier = Modifier.size(16.dp))
-                            }
+                            Icon(Icons.Default.Close, contentDescription = "Fechar", tint = GrowthRed, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
@@ -297,14 +298,13 @@ fun AuthAndOnboardingScreen(
 
             if (onboardingStep == 0) {
                 // Step 0: Firebase Auth Login / Registration
-                item {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = CarbonCard),
-                        shape = RoundedCornerShape(16.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(20.dp)) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CarbonCard),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -377,9 +377,12 @@ fun AuthAndOnboardingScreen(
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = if (isBiometricsReady) "Entrar com Biometria (${userProfile.email})" else "Entrar com Biometria (Requer Perfil com E-mail)",
+                                            text = if (isBiometricsReady) "Entrar com Biometria (${userProfile.email})" else "Entrar com Biometria",
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp
+                                            fontSize = 11.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f)
                                         )
                                     }
                                 }
@@ -430,7 +433,14 @@ fun AuthAndOnboardingScreen(
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Entrar com Conta Google", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text(
+                                        text = "Entrar com Conta Google",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
                                 }
                             }
 
@@ -722,17 +732,15 @@ fun AuthAndOnboardingScreen(
                             }
                         }
                     }
-                }
             } else if (onboardingStep == 1) {
                 // Step 1: Body Metrics (Altura, Peso, Idade, Gênero)
-                item {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = CarbonCard),
-                        shape = RoundedCornerShape(16.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(20.dp)) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CarbonCard),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
                             Text(
                                 text = "PASSO 1 DE 3: DADOS BIOMÉTRICOS",
                                 fontSize = 11.sp,
@@ -831,17 +839,15 @@ fun AuthAndOnboardingScreen(
                             }
                         }
                     }
-                }
             } else if (onboardingStep == 2) {
                 // Step 2: Biotype Guide & Selection (Ectomorfo, Mesomorfo, Endomorfo)
-                item {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = CarbonCard),
-                        shape = RoundedCornerShape(16.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CarbonCard),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 text = "PASSO 2 DE 3: SEU BIOTIPO CORPORAL",
                                 fontSize = 11.sp,
@@ -948,17 +954,15 @@ fun AuthAndOnboardingScreen(
                             }
                         }
                     }
-                }
             } else {
                 // Step 3: Training frequency & Goal & Firebase Creation
-                item {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = CarbonCard),
-                        shape = RoundedCornerShape(16.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(20.dp)) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CarbonCard),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(20.dp)) {
                             Text(
                                 text = "PASSO 3 DE 3: FREQUÊNCIA & METAS",
                                 fontSize = 11.sp,
@@ -1078,7 +1082,6 @@ fun AuthAndOnboardingScreen(
                             }
                         }
                     }
-                }
             }
         }
 

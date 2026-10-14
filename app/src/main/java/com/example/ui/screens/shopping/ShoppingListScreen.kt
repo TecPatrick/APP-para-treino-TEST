@@ -60,6 +60,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,6 +80,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.FoodCategory
 import com.example.data.model.ShoppingItem
+import com.example.ui.ShoppingListViewModel
 import com.example.ui.VirtusViewModel
 import com.example.ui.components.GrowthHeader
 import com.example.ui.theme.CarbonBorder
@@ -95,12 +97,23 @@ import com.example.ui.theme.GrowthYellow
 @Composable
 fun ShoppingListScreen(
     viewModel: VirtusViewModel,
+    shoppingListViewModel: ShoppingListViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     onNavigateToReceipts: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
-    val shoppingList by viewModel.shoppingList.collectAsStateWithLifecycle()
-    var selectedPeriodDays by remember { mutableStateOf(30) }
+    val shoppingList by shoppingListViewModel.shoppingList.collectAsStateWithLifecycle()
+    val categorizedItems by shoppingListViewModel.categorizedItems.collectAsStateWithLifecycle()
+    val selectedPeriodDays by shoppingListViewModel.selectedPeriodDays.collectAsStateWithLifecycle()
+    val uiMessage by shoppingListViewModel.uiMessage.collectAsStateWithLifecycle()
+
+    LaunchedEffect(uiMessage) {
+        uiMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            shoppingListViewModel.clearUiMessage()
+        }
+    }
+
     var showAddItemDialog by remember { mutableStateOf(false) }
 
     var showExportCodeDialog by remember { mutableStateOf(false) }
@@ -144,7 +157,7 @@ fun ShoppingListScreen(
                         // Export Code Button
                         IconButton(
                             onClick = {
-                                viewModel.exportShoppingCode(profile.name) { code ->
+                                shoppingListViewModel.exportShoppingCode(profile.name) { code ->
                                     generatedExportCode = code
                                     showExportCodeDialog = true
                                 }
@@ -164,7 +177,7 @@ fun ShoppingListScreen(
 
                         if (completedItems > 0) {
                             IconButton(
-                                onClick = { viewModel.clearCheckedShoppingItems() },
+                                onClick = { shoppingListViewModel.clearCheckedShoppingItems() },
                                 modifier = Modifier.testTag("clear_checked_shopping_btn")
                             ) {
                                 Icon(Icons.Default.DeleteSweep, contentDescription = "Limpar Comprados", tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -224,7 +237,7 @@ fun ShoppingListScreen(
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.clickable { viewModel.unlinkPartnerShopping() }
+                                            modifier = Modifier.clickable { shoppingListViewModel.unlinkPartnerShopping() }
                                         )
                                     }
 
@@ -372,7 +385,7 @@ fun ShoppingListScreen(
                             ) {
                                 FilterChip(
                                     selected = selectedPeriodDays == 7,
-                                    onClick = { selectedPeriodDays = 7 },
+                                    onClick = { shoppingListViewModel.setPeriodDays(7) },
                                     label = { Text("7 Dias (Semanal)", fontSize = 11.sp) },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = GrowthOrange,
@@ -382,7 +395,7 @@ fun ShoppingListScreen(
                                 )
                                 FilterChip(
                                     selected = selectedPeriodDays == 15,
-                                    onClick = { selectedPeriodDays = 15 },
+                                    onClick = { shoppingListViewModel.setPeriodDays(15) },
                                     label = { Text("15 Dias", fontSize = 11.sp) },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = GrowthOrange,
@@ -392,7 +405,7 @@ fun ShoppingListScreen(
                                 )
                                 FilterChip(
                                     selected = selectedPeriodDays == 30,
-                                    onClick = { selectedPeriodDays = 30 },
+                                    onClick = { shoppingListViewModel.setPeriodDays(30) },
                                     label = { Text("30 Dias (Mensal)", fontSize = 11.sp) },
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = GrowthOrange,
@@ -405,7 +418,7 @@ fun ShoppingListScreen(
                             Spacer(modifier = Modifier.height(10.dp))
 
                             Button(
-                                onClick = { viewModel.generateShoppingList(selectedPeriodDays) },
+                                onClick = { shoppingListViewModel.parseDietPlanAndGenerateShoppingList(selectedPeriodDays) },
                                 colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier
@@ -560,7 +573,7 @@ fun ShoppingListScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 3.dp)
-                                    .clickable { viewModel.toggleShoppingItem(item) }
+                                    .clickable { shoppingListViewModel.toggleShoppingItem(item) }
                                     .testTag("shopping_item_${item.id}")
                             ) {
                                 Row(
@@ -672,7 +685,7 @@ fun ShoppingListScreen(
         AddManualShoppingItemDialog(
             onDismiss = { showAddItemDialog = false },
             onConfirm = { name, cat, qty, unit, price ->
-                viewModel.addManualShoppingItem(name, cat, qty, unit, price)
+                shoppingListViewModel.addExtraProduct(name, cat, qty, unit, price)
                 showAddItemDialog = false
             }
         )
@@ -689,7 +702,7 @@ fun ShoppingListScreen(
         ImportPartnerShoppingDialog(
             onDismiss = { showImportCodeDialog = false },
             onImport = { code, name ->
-                viewModel.importAndMergePartnerShopping(code, name)
+                shoppingListViewModel.importAndMergePartnerShopping(code, name)
                 showImportCodeDialog = false
             }
         )

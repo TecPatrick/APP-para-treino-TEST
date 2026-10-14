@@ -60,6 +60,14 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Satellite
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import com.example.ui.WorkoutTrackerViewModel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -104,21 +112,45 @@ import java.util.Locale
 @Composable
 fun GpsTrackerScreen(
     viewModel: VirtusViewModel,
+    workoutTrackerViewModel: WorkoutTrackerViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     onNavigateBack: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val activeSession by viewModel.activeGpsSession.collectAsStateWithLifecycle()
     val allLogs by viewModel.allGpsRouteLogs.collectAsStateWithLifecycle()
+    val workoutTrackerState by workoutTrackerViewModel.uiState.collectAsStateWithLifecycle()
     
     val ttsManager = remember { TextToSpeechManager(context) }
-    var lastAnnouncedDistance by remember { mutableFloatStateOf(0f) }
+    var ttsIntervalMeters by remember { mutableFloatStateOf(1000f) }
+    var lastAnnouncedDistanceMeters by remember { mutableFloatStateOf(0f) }
+    var isTtsVoiceCoachEnabled by remember { mutableStateOf(true) }
+    var lastSpokenMessage by remember { mutableStateOf<String?>(null) }
 
-    // TTS Announcements
-    LaunchedEffect(activeSession.distanceMeters) {
-        val currentKm = activeSession.distanceMeters / 1000f
-        if (currentKm >= lastAnnouncedDistance + 1f) {
-            lastAnnouncedDistance = currentKm.toInt().toFloat()
-            ttsManager.speak("Você percorreu ${lastAnnouncedDistance.toInt()} quilômetros.")
+    // TTS Announcements: Real-time narration of Distance, Elapsed Time, and Pace (Ritmo)
+    LaunchedEffect(activeSession.distanceMeters, isTtsVoiceCoachEnabled, ttsIntervalMeters) {
+        if (!isTtsVoiceCoachEnabled) return@LaunchedEffect
+        val currentMeters = activeSession.distanceMeters
+        if (currentMeters >= lastAnnouncedDistanceMeters + ttsIntervalMeters && currentMeters >= ttsIntervalMeters) {
+            val milestoneIndex = (currentMeters / ttsIntervalMeters).toInt()
+            lastAnnouncedDistanceMeters = milestoneIndex * ttsIntervalMeters
+            val paceSec = if (activeSession.distanceMeters > 20f && activeSession.elapsedSeconds > 0) {
+                (activeSession.elapsedSeconds / (activeSession.distanceMeters / 1000f)).toLong().coerceIn(60, 3600)
+            } else 0L
+            val announcement = if (ttsIntervalMeters >= 1000f && (lastAnnouncedDistanceMeters % 1000f == 0f)) {
+                ttsManager.service.formatMilestoneSpeech(
+                    kmNumber = (lastAnnouncedDistanceMeters / 1000f).toInt(),
+                    elapsedSeconds = activeSession.elapsedSeconds.toLong(),
+                    paceSecondsPerKm = paceSec
+                )
+            } else {
+                ttsManager.service.formatDistanceMilestoneSpeech(
+                    distanceMeters = lastAnnouncedDistanceMeters,
+                    elapsedSeconds = activeSession.elapsedSeconds.toLong(),
+                    paceSecondsPerKm = paceSec
+                )
+            }
+            lastSpokenMessage = announcement
+            ttsManager.speak(announcement)
         }
     }
 
@@ -711,6 +743,177 @@ fun GpsTrackerScreen(
                         )
                     }
 
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Text-to-Speech (TTS) Voice Coach Card: Distance, Time and Pace Real-time Narration
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("tts_voice_coach_card"),
+                        colors = CardDefaults.cardColors(containerColor = CarbonDark),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, if (isTtsVoiceCoachEnabled) GrowthGreen.copy(alpha = 0.5f) else CarbonBorder)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Surface(
+                                        color = if (isTtsVoiceCoachEnabled) GrowthGreen.copy(alpha = 0.18f) else CarbonCard,
+                                        shape = CircleShape,
+                                        modifier = Modifier.size(34.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = if (isTtsVoiceCoachEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                                                contentDescription = "Voz do Treinador",
+                                                tint = if (isTtsVoiceCoachEnabled) GrowthGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                    Column {
+                                        Text(
+                                            text = "TREINADOR POR VOZ (TTS)",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isTtsVoiceCoachEnabled) GrowthGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            letterSpacing = 0.5.sp
+                                        )
+                                        Text(
+                                            text = if (isTtsVoiceCoachEnabled) "Narra distância, tempo e ritmo (pace) ao vivo" else "Voz desativada",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                Switch(
+                                    checked = isTtsVoiceCoachEnabled,
+                                    onCheckedChange = { enabled ->
+                                        isTtsVoiceCoachEnabled = enabled
+                                        workoutTrackerViewModel.setTtsEnabled(enabled)
+                                        if (enabled) {
+                                            ttsManager.speak("Treinador por voz ativado.")
+                                        } else {
+                                            ttsManager.stop()
+                                        }
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = GrowthGreen,
+                                        uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        uncheckedTrackColor = CarbonCard
+                                    ),
+                                    modifier = Modifier.testTag("tts_toggle_switch")
+                                )
+                            }
+
+                            if (isTtsVoiceCoachEnabled) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            val paceSec = if (activeSession.distanceMeters > 20f && activeSession.elapsedSeconds > 0) {
+                                                (activeSession.elapsedSeconds / (activeSession.distanceMeters / 1000f)).toLong().coerceIn(60, 3600)
+                                            } else 0L
+                                            val message = ttsManager.service.formatFullWorkoutSpeech(
+                                                distanceMeters = activeSession.distanceMeters,
+                                                elapsedSeconds = activeSession.elapsedSeconds.toLong(),
+                                                paceSecondsPerKm = paceSec
+                                            )
+                                            lastSpokenMessage = message
+                                            ttsManager.speak(message)
+                                        },
+                                        border = BorderStroke(1.dp, GrowthGreen.copy(alpha = 0.8f)),
+                                        shape = RoundedCornerShape(8.dp),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                        modifier = Modifier.testTag("speak_metrics_now_btn")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.RecordVoiceOver,
+                                            contentDescription = "Ouvir Métricas",
+                                            tint = GrowthGreen,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "OUVIR MÉTRICAS AGORA",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = GrowthGreen
+                                        )
+                                    }
+
+                                    if (activeSession.isRunning) {
+                                        Text(
+                                            text = "Auto split: ${(ttsIntervalMeters / 1000f).let { if (it >= 1f) "${it.toInt()} km" else "${ttsIntervalMeters.toInt()}m" }}",
+                                            fontSize = 10.sp,
+                                            color = GrowthCyan,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Avisar por voz a cada:",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        listOf(500f to "500m", 1000f to "1 km", 2000f to "2 km").forEach { (dist, label) ->
+                                            Surface(
+                                                color = if (ttsIntervalMeters == dist) GrowthCyan else CarbonCardElevated,
+                                                shape = RoundedCornerShape(6.dp),
+                                                modifier = Modifier
+                                                    .clickable {
+                                                        ttsIntervalMeters = dist
+                                                        workoutTrackerViewModel.setNarrationIntervalMeters(dist)
+                                                    }
+                                            ) {
+                                                Text(
+                                                    text = label,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = if (ttsIntervalMeters == dist) FontWeight.Black else FontWeight.Normal,
+                                                    color = if (ttsIntervalMeters == dist) Color.Black else Color.White,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (lastSpokenMessage != null) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "\"$lastSpokenMessage\"",
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(14.dp))
 
                     // Session Controls (Start / Pause / Resume / Stop)
@@ -731,6 +934,10 @@ fun GpsTrackerScreen(
                                     }
                                     val startPos = currentGpsLocation ?: Pair(-23.550520, -46.633308)
                                     viewModel.startGpsSession(startPos.first, startPos.second)
+                                    workoutTrackerViewModel.startWorkout(startPos.first, startPos.second)
+                                    if (isTtsVoiceCoachEnabled) {
+                                        ttsManager.speak("Treino de corrida iniciado. Boa corrida!")
+                                    }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
                                 shape = RoundedCornerShape(10.dp),
@@ -746,7 +953,13 @@ fun GpsTrackerScreen(
                         } else {
                             if (!activeSession.isPaused) {
                                 OutlinedButton(
-                                    onClick = { viewModel.pauseGpsSession() },
+                                    onClick = {
+                                        viewModel.pauseGpsSession()
+                                        workoutTrackerViewModel.pauseWorkout()
+                                        if (isTtsVoiceCoachEnabled) {
+                                            ttsManager.speak("Treino pausado.")
+                                        }
+                                    },
                                     border = BorderStroke(1.dp, GrowthYellow),
                                     shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier
@@ -760,7 +973,13 @@ fun GpsTrackerScreen(
                                 }
                             } else {
                                 Button(
-                                    onClick = { viewModel.resumeGpsSession() },
+                                    onClick = {
+                                        viewModel.resumeGpsSession()
+                                        workoutTrackerViewModel.resumeWorkout()
+                                        if (isTtsVoiceCoachEnabled) {
+                                            ttsManager.speak("Treino retomado. Vamos lá!")
+                                        }
+                                    },
                                     colors = ButtonDefaults.buttonColors(containerColor = GrowthGreen),
                                     shape = RoundedCornerShape(10.dp),
                                     modifier = Modifier
@@ -775,7 +994,10 @@ fun GpsTrackerScreen(
                             }
 
                             Button(
-                                onClick = { showFinishDialog = true },
+                                onClick = {
+                                    showFinishDialog = true
+                                    workoutTrackerViewModel.stopWorkout()
+                                },
                                 colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
                                 shape = RoundedCornerShape(10.dp),
                                 modifier = Modifier

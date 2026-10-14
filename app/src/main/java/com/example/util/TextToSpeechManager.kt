@@ -1,24 +1,32 @@
 package com.example.util
 
 import android.content.Context
-import android.speech.tts.TextToSpeech
-import java.util.Locale
+import com.example.service.WorkoutTtsService
 
-class TextToSpeechManager(context: Context) : TextToSpeech.OnInitListener {
-    private var tts: TextToSpeech? = TextToSpeech(context, this)
-
-    override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            tts?.language = Locale("pt", "BR")
-        }
-    }
+/**
+ * TextToSpeechManager delegating to WorkoutTtsService for full TTS features
+ * and workout metric narration (Distance, Time, Pace).
+ */
+class TextToSpeechManager(context: Context) {
+    val service = WorkoutTtsService(context)
 
     fun speak(text: String) {
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+        service.speak(text)
+    }
+
+    fun narrateWorkoutMetrics(distanceMeters: Float, elapsedSeconds: Long, paceSecondsPerKm: Long) {
+        service.narrateMetrics(distanceMeters, elapsedSeconds, paceSecondsPerKm)
+    }
+
+    fun narrateMilestone(kmNumber: Int, elapsedSeconds: Long, paceSecondsPerKm: Long) {
+        service.narrateMilestone(kmNumber, elapsedSeconds, paceSecondsPerKm)
+    }
+
+    fun stop() {
+        service.stop()
     }
 
     fun shutdown() {
-        tts?.stop()
-        tts?.shutdown()
+        service.shutdown()
     }
 }
