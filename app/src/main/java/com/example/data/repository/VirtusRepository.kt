@@ -22,6 +22,10 @@ import com.example.data.model.WorkoutExercise
 import com.example.data.model.WorkoutLog
 import com.example.data.model.WorkoutPlan
 import com.example.data.model.WorkoutRoutine
+import com.example.data.model.DietaryProfile
+import com.example.data.model.Macro
+import com.example.data.model.WorkoutSchedule
+import com.example.data.model.CardioLog
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
@@ -34,7 +38,7 @@ import java.util.Locale
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
-class GrowthRepository(private val dao: AppDao) {
+class VirtusRepository(private val dao: AppDao) {
 
     val userProfile: Flow<UserProfile?> = dao.getUserProfile()
     val allUserProfiles: Flow<List<UserProfile>> = dao.getAllUserProfiles()
@@ -56,10 +60,14 @@ class GrowthRepository(private val dao: AppDao) {
     val allGpsRouteLogs: Flow<List<GpsRouteLog>> = dao.getAllGpsRouteLogs()
     val totalGpsDistanceMeters: Flow<Float> = dao.getTotalGpsDistanceMeters().map { it ?: 0f }
     val totalGpsSteps: Flow<Int> = dao.getTotalGpsSteps().map { it ?: 0 }
+    val allCardioLogs: Flow<List<CardioLog>> = dao.getAllCardioLogs()
 
     suspend fun insertGpsRouteLog(log: GpsRouteLog): Long = dao.insertGpsRouteLog(log)
     suspend fun saveGpsRouteLog(log: GpsRouteLog): Long = dao.insertGpsRouteLog(log)
     suspend fun deleteGpsRouteLog(id: Long) = dao.deleteGpsRouteLog(id)
+    
+    suspend fun addCardioLog(log: CardioLog): Long = dao.insertCardioLog(log)
+    suspend fun deleteCardioLog(id: Long) = dao.deleteCardioLog(id)
 
     fun searchFoods(query: String): Flow<List<FoodItem>> = dao.searchFoods(query)
 
@@ -105,8 +113,11 @@ class GrowthRepository(private val dao: AppDao) {
     suspend fun deleteDietPlan(id: Long) = dao.deleteDietPlan(id)
 
     suspend fun addFoodItem(food: FoodItem): Long = dao.insertFood(food)
+    suspend fun insertFoods(foods: List<FoodItem>) = dao.insertFoods(foods)
+    suspend fun getFoodsCount(): Int = dao.getFoodsCount()
 
     suspend fun addMealPlanItem(item: MealPlanItem): Long = dao.insertMealPlanItem(item)
+    suspend fun insertMealPlanItems(items: List<MealPlanItem>) = dao.insertMealPlanItems(items)
 
     suspend fun updateMealPlanItem(item: MealPlanItem) = dao.updateMealPlanItem(item)
 
@@ -490,6 +501,9 @@ class GrowthRepository(private val dao: AppDao) {
     suspend fun addWeeklyDietPlan(plan: WeeklyDietPlan): Long =
         dao.insertWeeklyDietPlan(plan)
 
+    suspend fun insertWeeklyDietPlans(plans: List<WeeklyDietPlan>) =
+        dao.insertWeeklyDietPlans(plans)
+
     suspend fun updateWeeklyDietPlan(plan: WeeklyDietPlan) =
         dao.updateWeeklyDietPlan(plan)
 
@@ -515,4 +529,14 @@ class GrowthRepository(private val dao: AppDao) {
     // --- Gestão de Perfis Adicionais ---
     suspend fun deleteUserProfile(id: Int) =
         dao.deleteUserProfile(id)
+
+    // --- Dietary Profiles, Saved Macros, and Workout Schedules (Local Room) ---
+    val dietaryProfile: Flow<DietaryProfile?> = dao.getDietaryProfile()
+    suspend fun saveDietaryProfile(profile: DietaryProfile) = dao.insertDietaryProfile(profile)
+
+    fun getMacrosByDate(date: Long): Flow<Macro?> = dao.getMacrosByDate(date)
+    suspend fun saveMacro(macro: Macro) = dao.insertMacro(macro)
+
+    val allWorkoutSchedules: Flow<List<WorkoutSchedule>> = dao.getAllWorkoutSchedules()
+    suspend fun saveWorkoutSchedule(schedule: WorkoutSchedule) = dao.insertWorkoutSchedule(schedule)
 }

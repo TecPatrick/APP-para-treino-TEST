@@ -103,7 +103,7 @@ import com.example.data.model.WorkoutExercise
 import com.example.data.model.WorkoutLog
 import com.example.data.model.WorkoutRoutine
 import com.example.data.model.WorkoutSplitType
-import com.example.ui.GrowthViewModel
+import com.example.ui.VirtusViewModel
 import com.example.ui.components.GrowthHeader
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
@@ -131,7 +131,7 @@ enum class WorkoutDivisionFilter(val label: String, val splitType: WorkoutSplitT
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WorkoutScreen(viewModel: GrowthViewModel) {
+fun WorkoutScreen(viewModel: VirtusViewModel) {
     val context = LocalContext.current
     val allRoutines by viewModel.workoutRoutines.collectAsStateWithLifecycle()
     val allExercises by viewModel.allExercises.collectAsStateWithLifecycle()

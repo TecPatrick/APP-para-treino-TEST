@@ -60,7 +60,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.ActivityLevel
 import com.example.data.model.FitnessGoal
 import com.example.data.model.Gender
-import com.example.ui.GrowthViewModel
+import com.example.ui.VirtusViewModel
 import com.example.ui.components.GrowthHeader
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
@@ -76,7 +76,7 @@ import com.example.util.MacroCalculator
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MacroCalculatorScreen(
-    viewModel: GrowthViewModel,
+    viewModel: VirtusViewModel,
     onNavigateBack: () -> Unit
 ) {
     val currentProfile by viewModel.userProfile.collectAsStateWithLifecycle()
@@ -197,9 +197,15 @@ fun MacroCalculatorScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("TMB: ${calculatedPlan.bmr} kcal | GET: ${calculatedPlan.tdee} kcal", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("TMB (Parado sem treino): ${calculatedPlan.bmr} kcal", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = GrowthOrangeLight)
                         Text("Água: ${calculatedPlan.waterMl} ml/dia", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = GrowthCyan)
                     }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "ℹ️ Regra do App: Em dias sem treino, seu gasto permanece no valor basal do TMB (${calculatedPlan.bmr} kcal). O gasto calórico adicional só é somado após realizar o treino no dia.",
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }

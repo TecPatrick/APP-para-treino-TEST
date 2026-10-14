@@ -67,6 +67,7 @@ class FirebaseAuthService(
             Result.success(result.user)
         } catch (e: Exception) {
             val fullMsg = "${e.message} ${e.cause?.message} ${e.toString()}"
+            android.util.Log.e("FirebaseAuthService", "Login failed: $fullMsg")
             if (isEmailPasswordDisabledError(fullMsg)) {
                 // Email/Password provider disabled or blocked by Recaptcha: fallback to local authentication
                 Result.success(null)
@@ -116,49 +117,41 @@ class FirebaseAuthService(
             val lower = msg.lowercase()
             return lower.contains("operation is not allowed") ||
                     lower.contains("disabled") ||
-                    lower.contains("error_operation_not_allowed") ||
-                    lower.contains("sign_in_provider_disabled") ||
-                    lower.contains("admin_restricted_operation")
+                    lower.contains("recaptcha") ||
+                    lower.contains("credential is incorrect") ||
+                    lower.contains("malformed") ||
+                    lower.contains("expired") ||
+                    lower.contains("invalid credential") ||
+                    lower.contains("sign_in_provider_disabled")
         }
 
         fun translateAuthError(e: Exception): String {
+            val msg = e.message.orEmpty().lowercase()
             return when (e) {
                 is FirebaseAuthWeakPasswordException ->
-                    "Senha muito fraca. De acordo com as diretrizes de segurança, utilize ao menos 8 dígitos com letras maiúsculas, minúsculas, números e símbolos."
+                    "Senha muito fraca. Utilize ao menos 8 dígitos com letras e números."
                 is FirebaseAuthInvalidCredentialsException ->
-                    "Credenciais inválidas. Verifique se o e-mail está correto e se a senha confere."
+                    "Credenciais inválidas. Verifique e-mail e senha."
                 is FirebaseAuthUserCollisionException ->
-                    "Este e-mail já está cadastrado em nosso sistema. Faça login ou solicite a recuperação de senha."
+                    "Este e-mail já está cadastrado. Faça login ou recupere a senha."
                 is FirebaseAuthInvalidUserException ->
-                    "Conta não encontrada ou desativada. Verifique o e-mail digitado ou realize um novo cadastro."
+                    "Conta não encontrada ou desativada."
                 is FirebaseAuthException -> {
                     when (e.errorCode) {
-                        "ERROR_INVALID_EMAIL" -> "O formato do e-mail inserido é inválido."
-                        "ERROR_WRONG_PASSWORD" -> "Senha incorreta. Tente novamente."
-                        "ERROR_USER_NOT_FOUND" -> "Nenhum atleta cadastrado com este e-mail."
-                        "ERROR_TOO_MANY_REQUESTS" -> "Muitas tentativas sem sucesso. Por segurança e proteção de dados (LGPD), aguarde alguns instantes."
-                        "ERROR_NETWORK_REQUEST_FAILED" -> "Falha de conexão com a rede. Verifique seu Wi-Fi/dados móveis."
-                        "ERROR_OPERATION_NOT_ALLOWED" -> "Autenticação via Google Sign-In disponível. Use o botão Entrar com Google."
-                        else -> {
-                            val msg = e.message.orEmpty()
-                            if (msg.contains("credential", ignoreCase = true) || msg.contains("incorrect", ignoreCase = true) || msg.contains("expired", ignoreCase = true) || msg.contains("malformed", ignoreCase = true)) {
-                                "Credenciais inválidas. Verifique se o e-mail está correto e se a senha confere."
-                            } else {
-                                e.localizedMessage ?: "Erro na autenticação. Verifique os dados e tente novamente."
-                            }
-                        }
+                        "ERROR_INVALID_EMAIL" -> "Formato de e-mail inválido."
+                        "ERROR_WRONG_PASSWORD" -> "Senha incorreta."
+                        "ERROR_USER_NOT_FOUND" -> "Nenhum atleta cadastrado."
+                        "ERROR_TOO_MANY_REQUESTS" -> "Muitas tentativas. Aguarde um instante."
+                        else -> "Erro na autenticação: ${e.message}"
                     }
                 }
                 else -> {
-                    val msg = e.message.orEmpty()
-                    if (msg.contains("network", ignoreCase = true) || msg.contains("connection", ignoreCase = true)) {
-                        "Sem conexão com a internet. Verifique sua rede para autenticar no Firebase."
-                    } else if (msg.contains("operation is not allowed", ignoreCase = true)) {
-                        "Autenticação via Google Sign-In disponível. Use o botão Entrar com Google."
-                    } else if (msg.contains("credential", ignoreCase = true) || msg.contains("incorrect", ignoreCase = true) || msg.contains("expired", ignoreCase = true) || msg.contains("malformed", ignoreCase = true) || msg.contains("signinwithpassword", ignoreCase = true)) {
-                        "Credenciais inválidas. Verifique se o e-mail está correto e se a senha confere."
+                    if (msg.contains("recaptcha")) {
+                        "Problema na verificação de segurança (reCAPTCHA). Tente novamente."
+                    } else if (msg.contains("credential") || msg.contains("incorrect") || msg.contains("expired") || msg.contains("malformed")) {
+                        "Credenciais inválidas. Verifique os dados."
                     } else {
-                        msg.ifBlank { "Erro inesperado ao processar autenticação. Tente novamente." }
+                        "Erro inesperado: ${e.message ?: "Tente novamente."}"
                     }
                 }
             }

@@ -97,7 +97,7 @@ import com.example.data.model.ActivityLevel
 import com.example.data.model.BodyType
 import com.example.data.model.FitnessGoal
 import com.example.data.model.Gender
-import com.example.ui.GrowthViewModel
+import com.example.ui.VirtusViewModel
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
 import com.example.ui.theme.CarbonCardElevated
@@ -117,7 +117,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthAndOnboardingScreen(
-    viewModel: GrowthViewModel,
+    viewModel: VirtusViewModel,
     onAuthSuccess: () -> Unit
 ) {
     var isRegisterMode by remember { mutableStateOf(false) }
@@ -406,28 +406,12 @@ fun AuthAndOnboardingScreen(
                                                 }
                                             } catch (_: GetCredentialCancellationException) {
                                                 // user cancelled
-                                            } catch (_: Exception) {
-                                                if (email.isNotBlank() && email.contains("@") && email.contains(".")) {
-                                                    viewModel.loginWithFirebase(
-                                                        emailInput = email,
-                                                        passwordInput = password.ifBlank { "Atleta@2026" },
-                                                        onSuccess = onAuthSuccess
-                                                    )
-                                                } else {
-                                                    viewModel.showToast("Informe seu e-mail cadastrado para prosseguir.")
-                                                }
+                                            } catch (e: Exception) {
+                                                viewModel.showToast("Google Sign-In indisponível. Utilize seu e-mail/senha ou o Acesso Rápido abaixo.")
                                             }
                                         }
                                     } else {
-                                        if (email.isNotBlank() && email.contains("@") && email.contains(".")) {
-                                            viewModel.loginWithFirebase(
-                                                emailInput = email,
-                                                passwordInput = password.ifBlank { "Atleta@2026" },
-                                                onSuccess = onAuthSuccess
-                                            )
-                                        } else {
-                                            viewModel.showToast("Digite um e-mail válido para entrar.")
-                                        }
+                                        viewModel.showToast("Google Sign-In não configurado. Utilize seu e-mail/senha ou o Acesso Rápido abaixo.")
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth().height(48.dp).testTag("google_signin_btn"),
@@ -716,6 +700,25 @@ fun AuthAndOnboardingScreen(
                                     fontSize = 12.sp,
                                     textAlign = TextAlign.Center
                                 )
+                            }
+
+                            if (!isRegisterMode) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                OutlinedButton(
+                                    onClick = { viewModel.enterAsGuest(onSuccess = onAuthSuccess) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(44.dp)
+                                        .testTag("guest_login_btn"),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        containerColor = Color.Transparent,
+                                        contentColor = Color.LightGray
+                                    ),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder)
+                                ) {
+                                    Text("ACESSO RÁPIDO (MODO LOCAL OFFLINE)", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                }
                             }
                         }
                     }

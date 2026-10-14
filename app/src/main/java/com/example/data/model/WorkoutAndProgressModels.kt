@@ -124,3 +124,22 @@ data class ProgressLog(
     val notes: String = "",
     val photoUri: String = ""
 )
+
+enum class CardioType(val title: String, val iconName: String) {
+    TREADMILL("Esteira", "directions_run"),
+    STATIONARY_BIKE("Bicicleta Ergométrica", "pedal_bike")
+}
+
+@Entity(
+    tableName = "cardio_logs",
+    indices = [Index(value = ["dateMillis"])]
+)
+data class CardioLog(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val type: CardioType,
+    val durationMinutes: Int,
+    val caloriesBurned: Int,
+    val distanceKm: Float? = null,
+    val dateMillis: Long = System.currentTimeMillis(),
+    val notes: String = ""
+)

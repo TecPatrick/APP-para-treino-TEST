@@ -53,6 +53,13 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Satellite
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -77,7 +84,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.GpsRouteLog
-import com.example.ui.GrowthViewModel
+import com.example.ui.VirtusViewModel
 import com.example.ui.components.GrowthHeader
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
@@ -88,22 +95,43 @@ import com.example.ui.theme.GrowthGreen
 import com.example.ui.theme.GrowthOrange
 import com.example.ui.theme.GrowthOrangeLight
 import com.example.ui.theme.GrowthYellow
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableFloatStateOf
+import com.example.util.TextToSpeechManager
 import java.util.Calendar
 import java.util.Locale
 
 @Composable
 fun GpsTrackerScreen(
-    viewModel: GrowthViewModel,
+    viewModel: VirtusViewModel,
     onNavigateBack: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val activeSession by viewModel.activeGpsSession.collectAsStateWithLifecycle()
     val allLogs by viewModel.allGpsRouteLogs.collectAsStateWithLifecycle()
+    
+    val ttsManager = remember { TextToSpeechManager(context) }
+    var lastAnnouncedDistance by remember { mutableFloatStateOf(0f) }
+
+    // TTS Announcements
+    LaunchedEffect(activeSession.distanceMeters) {
+        val currentKm = activeSession.distanceMeters / 1000f
+        if (currentKm >= lastAnnouncedDistance + 1f) {
+            lastAnnouncedDistance = currentKm.toInt().toFloat()
+            ttsManager.speak("Você percorreu ${lastAnnouncedDistance.toInt()} quilômetros.")
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { ttsManager.shutdown() }
+    }
 
     var showFinishDialog by remember { mutableStateOf(false) }
     var routeNameInput by remember { mutableStateOf("Corrida ao Ar Livre") }
     var routeNotesInput by remember { mutableStateOf("") }
     var selectedLogForDetails by remember { mutableStateOf<GpsRouteLog?>(null) }
+    var currentGpsLocation by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    var useInteractiveMap by remember { mutableStateOf(true) }
 
     // Check location permissions
     var hasLocationPermission by remember {
@@ -130,6 +158,23 @@ fun GpsTrackerScreen(
         }
     }
 
+    // Pre-fetch last known location as soon as permission is granted
+    DisposableEffect(hasLocationPermission) {
+        if (hasLocationPermission) {
+            try {
+                val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+                val locGps = lm?.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                val locNet = lm?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+                val best = locGps ?: locNet
+                if (best != null) {
+                    currentGpsLocation = Pair(best.latitude, best.longitude)
+                }
+            } catch (_: SecurityException) {
+            } catch (_: Exception) {}
+        }
+        onDispose {}
+    }
+
     // Android LocationManager GPS hook during active tracking
     DisposableEffect(activeSession.isRunning, activeSession.isPaused, hasLocationPermission) {
         var locationManager: LocationManager? = null
@@ -140,6 +185,7 @@ fun GpsTrackerScreen(
                 locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
                 locationListener = object : LocationListener {
                     override fun onLocationChanged(loc: Location) {
+                        currentGpsLocation = Pair(loc.latitude, loc.longitude)
                         viewModel.addGpsCoordinate(loc.latitude, loc.longitude)
                     }
                     @Deprecated("Deprecated in Java")
@@ -429,6 +475,10 @@ fun GpsTrackerScreen(
                 border = BorderStroke(1.dp, CarbonBorder)
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
+                    val displayPoints = if (activeSession.isRunning) activeSession.routePoints else selectedLogForDetails?.let { log ->
+                        parseCoordinates(log.routePointsJson)
+                    } ?: emptyList()
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -450,6 +500,7 @@ fun GpsTrackerScreen(
                                 letterSpacing = 1.sp
                             )
                         }
+
                         if (activeSession.isRunning) {
                             Surface(
                                 color = if (activeSession.isPaused) GrowthYellow.copy(alpha = 0.2f) else GrowthGreen.copy(alpha = 0.2f),
@@ -476,22 +527,144 @@ fun GpsTrackerScreen(
                                     )
                                 }
                             }
+                        } else if (currentGpsLocation != null) {
+                            Surface(
+                                color = GrowthCyan.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text(
+                                    text = "SINAL GPS OK",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GrowthCyan,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Map Mode Selector (Interactive Real Map vs Vector Grid)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Surface(
+                                modifier = Modifier
+                                    .clickable { useInteractiveMap = true }
+                                    .testTag("toggle_interactive_map_btn"),
+                                color = if (useInteractiveMap) GrowthOrange.copy(alpha = 0.22f) else CarbonDark,
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, if (useInteractiveMap) GrowthOrange else CarbonBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Map,
+                                        contentDescription = null,
+                                        tint = if (useInteractiveMap) GrowthOrangeLight else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Mapa Real (OSM)",
+                                        fontSize = 10.sp,
+                                        fontWeight = if (useInteractiveMap) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (useInteractiveMap) GrowthOrangeLight else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                modifier = Modifier
+                                    .clickable { useInteractiveMap = false }
+                                    .testTag("toggle_vector_grid_btn"),
+                                color = if (!useInteractiveMap) GrowthCyan.copy(alpha = 0.22f) else CarbonDark,
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, if (!useInteractiveMap) GrowthCyan else CarbonBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.GridOn,
+                                        contentDescription = null,
+                                        tint = if (!useInteractiveMap) GrowthCyan else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "Grade Vetorial",
+                                        fontSize = 10.sp,
+                                        fontWeight = if (!useInteractiveMap) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (!useInteractiveMap) GrowthCyan else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
+                        // Google Maps Direct Shortcut
+                        val activeCoord = currentGpsLocation ?: displayPoints.lastOrNull()
+                        if (activeCoord != null) {
+                            Surface(
+                                modifier = Modifier
+                                    .clickable {
+                                        openInGoogleMaps(context, activeCoord.first, activeCoord.second)
+                                    }
+                                    .testTag("open_google_maps_top_btn"),
+                                color = CarbonDark,
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, CarbonBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.OpenInNew,
+                                        contentDescription = "Abrir Google Maps",
+                                        tint = GrowthOrangeLight,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = "Google Maps",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = GrowthOrangeLight
+                                    )
+                                }
+                            }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Route Drawing Canvas
-                    RoutePathCanvas(
-                        points = if (activeSession.isRunning) activeSession.routePoints else selectedLogForDetails?.let { log ->
-                            parseCoordinates(log.routePointsJson)
-                        } ?: emptyList(),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(230.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(CarbonDark)
-                    )
+                    // Map Container: Real OpenStreetMap Leaflet View OR High-Tech Vector Canvas
+                    if (useInteractiveMap) {
+                        GpsInteractiveMapView(
+                            points = displayPoints,
+                            currentLocation = currentGpsLocation,
+                            isTracking = activeSession.isRunning && !activeSession.isPaused,
+                            modifier = Modifier.fillMaxWidth(),
+                            heightDp = 260
+                        )
+                    } else {
+                        RoutePathCanvas(
+                            points = displayPoints,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(230.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(CarbonDark)
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(12.dp))
 
@@ -550,13 +723,14 @@ fun GpsTrackerScreen(
                                 onClick = {
                                     if (!hasLocationPermission) {
                                         permissionLauncher.launch(
-                                            arrayOf(
-                                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                                Manifest.permission.ACCESS_COARSE_LOCATION
-                                            )
-                                        )
+                                             arrayOf(
+                                                 Manifest.permission.ACCESS_FINE_LOCATION,
+                                                 Manifest.permission.ACCESS_COARSE_LOCATION
+                                             )
+                                         )
                                     }
-                                    viewModel.startGpsSession()
+                                    val startPos = currentGpsLocation ?: Pair(-23.550520, -46.633308)
+                                    viewModel.startGpsSession(startPos.first, startPos.second)
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
                                 shape = RoundedCornerShape(10.dp),
@@ -1017,23 +1191,62 @@ fun GpsRouteLogCard(
             }
 
             if (isSelected) {
+                val context = LocalContext.current
                 Spacer(modifier = Modifier.height(10.dp))
                 val coords = parseCoordinates(log.routePointsJson)
                 if (coords.isNotEmpty()) {
-                    Text(
-                        text = "Visualização do Trajeto (${coords.size} pontos de GPS):",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Trajeto (${coords.size} pontos GPS):",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Medium
+                        )
+
+                        val firstPt = coords.firstOrNull()
+                        if (firstPt != null) {
+                            Surface(
+                                modifier = Modifier
+                                    .clickable { openInGoogleMaps(context, firstPt.first, firstPt.second) }
+                                    .testTag("open_log_in_gmaps_${log.id}"),
+                                color = CarbonDark,
+                                shape = RoundedCornerShape(6.dp),
+                                border = BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.4f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.OpenInNew,
+                                        contentDescription = null,
+                                        tint = GrowthOrangeLight,
+                                        modifier = Modifier.size(11.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = "Google Maps",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = GrowthOrangeLight
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(6.dp))
-                    RoutePathCanvas(
+
+                    GpsInteractiveMapView(
                         points = coords,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(140.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(CarbonDark)
+                        currentLocation = null,
+                        isTracking = false,
+                        modifier = Modifier.fillMaxWidth(),
+                        heightDp = 180
                     )
                 }
                 if (log.notes.isNotBlank()) {

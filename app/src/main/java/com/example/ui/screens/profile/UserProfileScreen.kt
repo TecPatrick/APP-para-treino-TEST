@@ -84,7 +84,7 @@ import com.example.data.model.ActivityLevel
 import com.example.data.model.BodyType
 import com.example.data.model.FitnessGoal
 import com.example.data.model.Gender
-import com.example.ui.GrowthViewModel
+import com.example.ui.VirtusViewModel
 import com.example.ui.components.GrowthHeader
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
@@ -102,7 +102,7 @@ import kotlin.math.roundToInt
 
 @Composable
 fun UserProfileScreen(
-    viewModel: GrowthViewModel,
+    viewModel: VirtusViewModel,
     onNavigateBack: () -> Unit = {}
 ) {
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
@@ -321,14 +321,15 @@ fun UserProfileScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
-                                        text = "• Taxa Metabólica (TMB): $liveBmr kcal",
+                                        text = "• TMB (Parado sem treino): $liveBmr kcal",
                                         fontSize = 10.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        fontWeight = FontWeight.Bold,
+                                        color = GrowthOrangeLight
                                     )
                                     Text(
-                                        text = "• Gasto Total (GET): $liveTdee kcal",
+                                        text = "• Treino: soma gasto dinamicamente",
                                         fontSize = 10.sp,
-                                        color = GrowthOrangeLight
+                                        color = GrowthCyan
                                     )
                                 }
 

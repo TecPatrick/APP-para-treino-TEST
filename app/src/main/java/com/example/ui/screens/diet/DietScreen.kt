@@ -54,6 +54,9 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
@@ -80,7 +83,7 @@ import com.example.data.model.FoodCategory
 import com.example.data.model.FoodItem
 import com.example.data.model.MealPlanItem
 import com.example.data.model.MealType
-import com.example.ui.GrowthViewModel
+import com.example.ui.VirtusViewModel
 import com.example.ui.components.GrowthHeader
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
@@ -95,18 +98,19 @@ import com.example.ui.theme.GrowthYellow
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DietScreen(
-    viewModel: GrowthViewModel,
+    viewModel: VirtusViewModel,
     onNavigateToShopping: () -> Unit
 ) {
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
     val mealPlans by viewModel.mealPlanItems.collectAsStateWithLifecycle()
     val allFoods by viewModel.allFoods.collectAsStateWithLifecycle()
+    val dailyEnergy by viewModel.dailyEnergyExpenditure.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var showAddFoodDialog by remember { mutableStateOf(false) }
     var selectedMealTypeForAdd by remember { mutableStateOf(MealType.BREAKFAST) }
     var showCustomFoodDialog by remember { mutableStateOf(false) }
-    var selectedTab by remember { mutableStateOf(0) } // 0: Refeições Diárias, 1: Dieta Mensal, 2: Configuração Mensal
+    var selectedTab by remember { mutableStateOf(0) } // 0: Refeições Diárias, 1: Base de Alimentos, 2: Dieta Mensal, 3: Configuração
 
     val totalPlanCalories = mealPlans.sumOf { it.calories.toDouble() }.toFloat()
     val totalPlanProtein = mealPlans.sumOf { it.protein.toDouble() }.toFloat()
@@ -161,15 +165,18 @@ fun DietScreen(
                 }
             )
 
-            TabRow(
+            ScrollableTabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = CarbonCard,
                 contentColor = GrowthOrange,
+                edgePadding = 12.dp,
                 indicator = { tabPositions ->
-                    TabRowDefaults.SecondaryIndicator(
-                        Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                        color = GrowthOrange
-                    )
+                    if (selectedTab < tabPositions.size) {
+                        TabRowDefaults.SecondaryIndicator(
+                            Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                            color = GrowthOrange
+                        )
+                    }
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -188,11 +195,28 @@ fun DietScreen(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
                     text = {
-                        Text(
-                            "Dieta Mensal",
-                            fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selectedTab == 1) GrowthOrange else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "Base de Alimentos",
+                                fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selectedTab == 1) GrowthOrange else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (allFoods.isNotEmpty()) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Surface(
+                                    color = if (selectedTab == 1) GrowthOrange else CarbonDark,
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        text = "${allFoods.size}",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (selectedTab == 1) Color.White else GrowthOrangeLight,
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 )
                 Tab(
@@ -200,9 +224,20 @@ fun DietScreen(
                     onClick = { selectedTab = 2 },
                     text = {
                         Text(
-                            "Configuração",
+                            "Dieta Mensal",
                             fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal,
                             color = if (selectedTab == 2) GrowthOrange else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                )
+                Tab(
+                    selected = selectedTab == 3,
+                    onClick = { selectedTab = 3 },
+                    text = {
+                        Text(
+                            "Configuração",
+                            fontWeight = if (selectedTab == 3) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selectedTab == 3) GrowthOrange else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 )
@@ -215,6 +250,172 @@ fun DietScreen(
                         .padding(horizontal = 16.dp),
                     contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp)
                 ) {
+                    // Gasto Calórico Diário & TMB Card (Regra: Parado = TMB; Treino soma gasto)
+                    item {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = CarbonCard),
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 10.dp)
+                                .testTag("diet_daily_energy_card")
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Bolt,
+                                            contentDescription = null,
+                                            tint = GrowthOrange,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "GASTO ENERGÉTICO & TMB DO DIA",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = GrowthOrangeLight,
+                                            letterSpacing = 1.sp
+                                        )
+                                    }
+
+                                    Surface(
+                                        color = if (dailyEnergy.hasWorkoutToday) GrowthGreen.copy(alpha = 0.2f) else GrowthCyan.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text(
+                                            text = if (dailyEnergy.hasWorkoutToday) "TREINO REGISTRADO" else "PARADO (SEM TREINO)",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (dailyEnergy.hasWorkoutToday) GrowthGreen else GrowthCyan,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Surface(
+                                        modifier = Modifier.weight(1f),
+                                        color = CarbonDark,
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder)
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            Text("TMB (PARADO)", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+                                            Text("${dailyEnergy.bmr} kcal", fontSize = 14.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground)
+                                            Text("Metabolismo basal", fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+
+                                    Surface(
+                                        modifier = Modifier.weight(1f),
+                                        color = CarbonDark,
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder)
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            Text("GASTO TREINO", fontSize = 9.sp, color = if (dailyEnergy.hasWorkoutToday) GrowthOrange else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+                                            Text(if (dailyEnergy.hasWorkoutToday) "+${dailyEnergy.totalWorkoutCalories} kcal" else "0 kcal", fontSize = 14.sp, fontWeight = FontWeight.Black, color = if (dailyEnergy.hasWorkoutToday) GrowthOrangeLight else MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text(if (dailyEnergy.hasWorkoutToday) "${dailyEnergy.gymWorkoutsCount} musc • ${dailyEnergy.runningWorkoutsCount} corr" else "Sem treino hoje", fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+
+                                    Surface(
+                                        modifier = Modifier.weight(1.1f),
+                                        color = CarbonCardElevated,
+                                        shape = RoundedCornerShape(8.dp),
+                                        border = androidx.compose.foundation.BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.5f))
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            Text("GASTO TOTAL", fontSize = 9.sp, color = GrowthOrangeLight, fontWeight = FontWeight.Bold)
+                                            Text("${dailyEnergy.totalExpenditure} kcal", fontSize = 14.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground)
+                                            Text(if (dailyEnergy.hasWorkoutToday) "TMB + Treino" else "Valor TMB parado", fontSize = 8.sp, color = GrowthCyan)
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                Text(
+                                    text = if (dailyEnergy.hasWorkoutToday) {
+                                        "⚡ Treino realizado hoje: o gasto dos treinos (${dailyEnergy.totalWorkoutCalories} kcal) foi somado à sua TMB (${dailyEnergy.bmr} kcal)."
+                                    } else {
+                                        "ℹ️ Nenhum treino realizado hoje: seu gasto calórico permanece estritamente com a sua Taxa Metabólica Basal de repouso (${dailyEnergy.bmr} kcal). O gasto calórico extra só é adicionado ao registrar o treino."
+                                    },
+                                    fontSize = 9.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // Botão de Acesso Rápido à Tabela de Alimentos & Macros
+                    item {
+                        Surface(
+                            onClick = { selectedTab = 1 },
+                            color = CarbonDark,
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.35f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                                .testTag("open_food_database_tab_btn")
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.MenuBook,
+                                        contentDescription = null,
+                                        tint = GrowthOrange,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = "TABELA DE ALIMENTOS & MACROS",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = GrowthOrangeLight
+                                        )
+                                        Text(
+                                            text = "Consultar 117+ alimentos, macros oficiais e suplementos Growth",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                                Surface(
+                                    color = GrowthOrange,
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = "Ver Base",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     // Macro Summary Header Card
                     item {
                         Card(
@@ -408,9 +609,18 @@ fun DietScreen(
                     }
                 }
             } else if (selectedTab == 1) {
+                FoodDatabaseSection(
+                    foods = allFoods,
+                    onAddFoodToMeal = { food, mealType, amount, notes ->
+                        viewModel.addFoodToMeal(mealType, food, amount, notes)
+                    },
+                    onOpenCustomFoodDialog = { showCustomFoodDialog = true },
+                    onReloadDefaults = { viewModel.reloadFoodDatabase() }
+                )
+            } else if (selectedTab == 2) {
                 MonthlyDietOverviewSection(
                     profile = profile,
-                    onNavigateToConfig = { selectedTab = 2 }
+                    onNavigateToConfig = { selectedTab = 3 }
                 )
             } else {
                 // Monthly Diet Configuration Screen
@@ -431,7 +641,7 @@ fun DietScreen(
                             monthlyNotes = notes,
                             dietCycleType = cycleType
                         )
-                        selectedTab = 1
+                        selectedTab = 2
                     }
                 )
             }

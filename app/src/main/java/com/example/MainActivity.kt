@@ -54,7 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.ui.GrowthViewModel
+import com.example.ui.VirtusViewModel
 import com.example.ui.screens.analytics.AnalyticsScreen
 import com.example.ui.screens.auth.AuthAndOnboardingScreen
 import com.example.ui.screens.calculator.MacroCalculatorScreen
@@ -93,7 +93,7 @@ enum class AppNavigationScreen(
 
 class MainActivity : FragmentActivity() {
 
-    private val viewModel: GrowthViewModel by viewModels()
+    private val viewModel: VirtusViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -107,7 +107,7 @@ class MainActivity : FragmentActivity() {
 }
 
 @Composable
-fun MainAppScreen(viewModel: GrowthViewModel) {
+fun MainAppScreen(viewModel: VirtusViewModel) {
     val context = LocalContext.current
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
     var currentScreen by remember { mutableStateOf(AppNavigationScreen.DASHBOARD) }
@@ -141,7 +141,7 @@ fun MainAppScreen(viewModel: GrowthViewModel) {
         }
     }
 
-    val showBottomBar = currentScreen != AppNavigationScreen.CALCULATOR && currentScreen != AppNavigationScreen.AUTH && currentScreen != AppNavigationScreen.PROFILE && currentScreen != AppNavigationScreen.GPS
+    val showBottomBar = currentScreen != AppNavigationScreen.CALCULATOR && currentScreen != AppNavigationScreen.AUTH && currentScreen != AppNavigationScreen.PROFILE
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),

@@ -25,6 +25,10 @@ import com.example.data.model.WorkoutExercise
 import com.example.data.model.WorkoutLog
 import com.example.data.model.WorkoutPlan
 import com.example.data.model.WorkoutRoutine
+import com.example.data.model.DietaryProfile
+import com.example.data.model.Macro
+import com.example.data.model.WorkoutSchedule
+import com.example.data.model.CardioLog
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -164,6 +168,9 @@ interface AppDao {
     // =========================================================================
     @Query("SELECT * FROM food_items ORDER BY isGrowthProduct DESC, name ASC")
     fun getAllFoods(): Flow<List<FoodItem>>
+
+    @Query("SELECT COUNT(*) FROM food_items")
+    suspend fun getFoodsCount(): Int
 
     @Query("SELECT * FROM food_items WHERE name LIKE '%' || :query || '%' ORDER BY isGrowthProduct DESC, name ASC")
     fun searchFoods(query: String): Flow<List<FoodItem>>
@@ -422,6 +429,38 @@ interface AppDao {
 
     @Query("DELETE FROM gps_route_logs WHERE id = :id")
     suspend fun deleteGpsRouteLog(id: Long)
+
+    // =========================================================================
+    // 🏃 Cardio DAO Operations
+    // =========================================================================
+    @Query("SELECT * FROM cardio_logs ORDER BY dateMillis DESC")
+    fun getAllCardioLogs(): Flow<List<CardioLog>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCardioLog(log: CardioLog): Long
+
+    @Query("DELETE FROM cardio_logs WHERE id = :id")
+    suspend fun deleteCardioLog(id: Long)
+    // =========================================================================
+    // 🥗 Dietary Profile, Macros, and Workout Schedule DAO Operations
+    // =========================================================================
+    @Query("SELECT * FROM dietary_profiles LIMIT 1")
+    fun getDietaryProfile(): Flow<DietaryProfile?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDietaryProfile(profile: DietaryProfile)
+
+    @Query("SELECT * FROM macros WHERE date = :date")
+    fun getMacrosByDate(date: Long): Flow<Macro?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMacro(macro: Macro)
+
+    @Query("SELECT * FROM workout_schedules")
+    fun getAllWorkoutSchedules(): Flow<List<WorkoutSchedule>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertWorkoutSchedule(schedule: WorkoutSchedule)
 }
 
 typealias GrowthDao = AppDao

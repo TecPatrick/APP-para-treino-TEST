@@ -1,41 +1,36 @@
-# Implementation Plan - Global Theme Toggle (Light & Dark Mode)
+# Plano de Refatoração e Melhorias (Layout, GPS e Áudio)
 
-## User Review Required
-> [!IMPORTANT]
-> The theme toggle will allow switching between Dark Mode and Light Mode seamlessly across the entire app, with persistent state in the user profile and switches accessible both from the Top App Bar and the User Profile screen.
+## Objetivo
+Resolver problemas de layout em dispositivos como o S21 FE e adicionar funcionalidades de GPS e Feedback por Áudio.
 
-- **Theme Persistence**: Saved in `UserProfile` state model and saved locally.
-- **UI Changes**: 
-  - Add a sun/moon icon toggle button in the Top App Bar of key screens.
-  - Add a dedicated Light/Dark Mode toggle setting in the User Profile screen.
-  - Update `MyApplicationTheme` in `Theme.kt` and `MainActivity.kt` to dynamically respond to the user's selected theme state.
+## Estratégia Técnica
+1.  **Layout Responsivo**:
+    *   Substituir larguras fixas por `Modifier.fillMaxWidth()` ou `Modifier.weight()`.
+    *   Utilizar `Modifier.widthIn(max = ...)` para limitar a expansão.
+    *   Revisar `PaddingValues` e espaçamentos (`Spacer`) para valores proporcionais.
+2.  **GPS & Mapa**:
+    *   Refinar a interatividade da `GpsInteractiveMapView`.
+3.  **Feedback por Áudio (TTS)**:
+    *   Implementar `TextToSpeechManager` para fornecer telemetria em tempo real (km, ritmo, tempo).
 
-## Proposed Changes
+## Escopo por Tela
 
-### Data & State Model
-#### [GrowthViewModel.kt](app/src/main/java/com/example/GrowthViewModel.kt)
-- Add `isDarkMode: Boolean` to `UserProfile` (defaulting to `true` for the app's sleek dark theme).
-- Add a method `toggleTheme()` or `setDarkMode(isDark: Boolean)` to update the preference.
+### 1. DashboardScreen
+*   Revisar o espaçamento dos cards essenciais.
+*   Garantir que a `LazyColumn` não force larguras excessivas.
 
-### Theming & UI Components
-#### [Theme.kt](app/src/main/java/com/example/ui/theme/Theme.kt)
-- Update `MyApplicationTheme` parameter `darkTheme: Boolean` to be dynamic (observed from ViewModel).
-- Ensure all Material 3 color schemes (`DarkColorScheme` and `LightColorScheme`) render properly with high contrast and accessibility.
+### 2. WorkoutScreen
+*   Revisar alinhamento de ícones e `FilterChip`.
 
-#### [MainActivity.kt](app/src/main/java/com/example/MainActivity.kt)
-- Observe `profile.isDarkMode` in `MainAppScreen`.
-- Pass `darkTheme = profile.isDarkMode` into `MyApplicationTheme`.
-- Add a theme toggle IconButton in the Top App Bar for quick access.
+### 3. GpsTrackerScreen (Revisada)
+*   Refinar a `GpsInteractiveMapView` para melhor interatividade.
+*   Integrar `TextToSpeechManager` para anunciar telemetria (km, ritmo, tempo) durante o treino.
+*   Ajustar a altura dos componentes de mapa (`GpsInteractiveMapView` e `RoutePathCanvas`) para serem dinâmicos.
+*   Revisar `MetricBox` para ocupar espaço proporcionalmente.
 
-#### [UserProfileScreen.kt](app/src/main/java/com/example/UserProfileScreen.kt)
-- Add a Light/Dark mode toggle switch card in the Profile settings view.
+### 4. ShoppingListScreen
+*   Revisar layout dos itens da lista de compras para evitar colisão.
 
-## Verification Plan
-
-### Automated Tests
-- Run `gradle :app:testDebugUnitTest` to verify compilation and basic unit tests.
-
-### Manual Verification
-- Verify theme switches instantly when toggled from the Top App Bar.
-- Verify theme switches instantly when toggled from the User Profile screen.
-- Verify theme preference persists across app navigation and state updates.
+## Verificação
+*   Compilação do APK para validação.
+*   Testes funcionais de áudio e interatividade no mapa.

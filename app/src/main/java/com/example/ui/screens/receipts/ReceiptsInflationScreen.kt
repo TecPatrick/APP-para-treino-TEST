@@ -70,7 +70,7 @@ import com.example.data.model.FoodCategory
 import com.example.data.model.ItemPriceInflationStat
 import com.example.data.model.PurchaseItemLog
 import com.example.data.model.PurchaseReceipt
-import com.example.ui.GrowthViewModel
+import com.example.ui.VirtusViewModel
 import com.example.ui.components.GrowthHeader
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
@@ -86,7 +86,7 @@ import com.example.ui.theme.GrowthYellow
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReceiptsInflationScreen(
-    viewModel: GrowthViewModel,
+    viewModel: VirtusViewModel,
     onNavigateBack: () -> Unit = {}
 ) {
     val receipts by viewModel.allReceipts.collectAsStateWithLifecycle()

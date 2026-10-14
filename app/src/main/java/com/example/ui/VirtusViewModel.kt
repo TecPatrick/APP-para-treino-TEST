@@ -8,13 +8,16 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.GrowthApplication
+import com.example.VirtusApplication
 import com.example.data.auth.FirebaseAuthService
 import com.example.data.firestore.FirestoreSyncManager
 import com.example.data.model.ActivityLevel
 import com.example.data.model.BodyType
 import com.example.data.model.DietCycleType
 import com.example.data.model.DietPlan
+import com.example.data.model.DietaryProfile
+import com.example.data.model.Macro
+import com.example.data.model.WorkoutSchedule
 import com.example.data.model.FitnessGoal
 import com.example.data.model.FoodCategory
 import com.example.data.model.FoodItem
@@ -35,7 +38,8 @@ import com.example.data.model.WorkoutPlan
 import com.example.data.model.WorkoutRoutine
 import com.example.data.model.WorkoutSplitType
 import com.example.data.model.GpsRouteLog
-import com.example.data.repository.GrowthRepository
+import com.example.data.model.CardioLog
+import com.example.data.repository.VirtusRepository
 import com.example.util.MacroCalculator
 import com.example.util.PdfExporter
 import kotlinx.coroutines.Job
@@ -44,13 +48,30 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.example.data.ai.GeminiRepository
 import java.io.File
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+
+data class DailyEnergyExpenditure(
+    val bmr: Int,                       // TMB em repouso (parado sem treino no dia)
+    val gymWorkoutCalories: Int,        // Gasto adicional dos treinos de musculação hoje
+    val runningWorkoutCalories: Int,    // Gasto adicional da corrida GPS hoje
+    val cardioWorkoutCalories: Int,     // Gasto adicional de cardios manuais hoje
+    val totalWorkoutCalories: Int,      // Total gasto com treinos realizados hoje
+    val totalExpenditure: Int,          // Gasto diário total (TMB se parado; TMB + Treinos se treinou)
+    val hasWorkoutToday: Boolean,       // Indica se houve treino no dia
+    val gymWorkoutsCount: Int,
+    val runningWorkoutsCount: Int,
+    val cardioWorkoutsCount: Int
+)
 
 data class ActiveWorkoutSession(
     val routine: WorkoutRoutine? = null,
@@ -74,10 +95,10 @@ data class ActiveGpsSession(
     val routePoints: List<Pair<Double, Double>> = emptyList()
 )
 
-class GrowthViewModel(application: Application) : AndroidViewModel(application) {
+class VirtusViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val repository: GrowthRepository =
-        (application as GrowthApplication).repository
+    private val repository: VirtusRepository =
+        (application as VirtusApplication).repository
 
     val authService: FirebaseAuthService = FirebaseAuthService()
     val firestoreSync: FirestoreSyncManager = FirestoreSyncManager(application)
@@ -92,6 +113,22 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
         _authError.value = null
     }
 
+
+    
+    private val _aiAdvice = MutableStateFlow<String?>(null)
+    val aiAdvice: StateFlow<String?> = _aiAdvice.asStateFlow()
+
+    fun getWorkoutAdvice(prompt: String) {
+        viewModelScope.launch {
+            _aiAdvice.value = "Consultando treinador IA..."
+            _aiAdvice.value = GeminiRepository.getWorkoutAdvice(prompt)
+        }
+    }
+    
+    fun clearAdvice() {
+        _aiAdvice.value = null
+    }
+
     init {
         // Garantir que suba zerado, excluindo qualquer usuário residual antigo
         viewModelScope.launch {
@@ -99,6 +136,35 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
             if (prof != null && (prof.email == "atleta@fitmail.com" || prof.name == "Atleta" || (!prof.isLoggedIn && !prof.hasCompletedOnboarding))) {
                 authService.signOut()
                 repository.deleteAllUserProfiles()
+            }
+            // Inicializar base de dados alimentar com macronutrientes caso a tabela esteja vazia ou incompleta
+            try {
+                if (repository.getFoodsCount() < com.example.data.local.PrepopulatedData.defaultFoods.size) {
+                    repository.insertFoods(com.example.data.local.PrepopulatedData.defaultFoods)
+                }
+                val activeDiet = repository.activeDietPlan.firstOrNull()
+                if (activeDiet == null) {
+                    repository.addDietPlan(com.example.data.local.PrepopulatedData.defaultDietPlan)
+                    repository.insertWeeklyDietPlans(com.example.data.local.PrepopulatedData.defaultWeeklyDietPlans)
+                }
+                val currentMeals = repository.mealPlanItems.firstOrNull() ?: emptyList()
+                if (currentMeals.isEmpty()) {
+                    repository.insertMealPlanItems(com.example.data.local.PrepopulatedData.defaultMealPlan)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun reloadFoodDatabase() {
+        viewModelScope.launch {
+            try {
+                repository.insertFoods(com.example.data.local.PrepopulatedData.defaultFoods)
+                _toastMessage.value = "Tabela nutricional sincronizada com ${com.example.data.local.PrepopulatedData.defaultFoods.size} alimentos!"
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _toastMessage.value = "Erro ao restaurar base alimentar: ${e.message}"
             }
         }
     }
@@ -270,6 +336,13 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
             initialValue = emptyList()
         )
 
+    val allCardioLogs: StateFlow<List<CardioLog>> = repository.allCardioLogs
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
     val totalGpsDistanceMeters: StateFlow<Float> = repository.totalGpsDistanceMeters
         .stateIn(
             scope = viewModelScope,
@@ -277,10 +350,97 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
             initialValue = 0f
         )
 
+    val roomDietaryProfile: StateFlow<DietaryProfile?> = repository.dietaryProfile
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
+
+    val allWorkoutSchedules: StateFlow<List<WorkoutSchedule>> = repository.allWorkoutSchedules
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
     // Active GPS Tracking Session
     private val _activeGpsSession = MutableStateFlow(ActiveGpsSession())
     val activeGpsSession: StateFlow<ActiveGpsSession> = _activeGpsSession.asStateFlow()
     private var gpsTimerJob: Job? = null
+
+    // Cálculo Dinâmico de Gasto Calórico Diário & TMB:
+    // Sem o treino no dia, o valor permanece com o TMB de repouso (parado).
+    // O gasto só é somado após realizar o treino (musculação ou corrida).
+    val dailyEnergyExpenditure: StateFlow<DailyEnergyExpenditure> = combine(
+        userProfile,
+        workoutLogs,
+        allGpsRouteLogs,
+        allCardioLogs,
+        _activeGpsSession
+    ) { profile, gymLogs, gpsLogs, cardioLogs, activeGps ->
+        val weight = if (profile.weightKg > 20f) profile.weightKg else 78.5f
+        val height = if (profile.heightCm > 50f) profile.heightCm else 178f
+        val age = if (profile.age > 10) profile.age else 26
+        val bmr = MacroCalculator.calculateBMR(weight, height, age, profile.gender)
+
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val todayStart = cal.timeInMillis
+
+        // Treinos de musculação realizados hoje
+        val todayGym = gymLogs.filter { it.dateMillis >= todayStart }
+        val gymCals = todayGym.sumOf { log ->
+            val duration = log.durationMinutes.coerceAtLeast(1)
+            (duration * (weight * 0.08f)).toInt().coerceIn(80, 800)
+        }
+
+        // Treinos de corrida / cardio GPS realizados hoje
+        val todayRuns = gpsLogs.filter { it.dateMillis >= todayStart }
+        val runsCals = todayRuns.sumOf { it.caloriesBurned.toInt() } + activeGps.caloriesBurned.toInt()
+
+        // Cardios manuais realizados hoje
+        val todayCardio = cardioLogs.filter { it.dateMillis >= todayStart }
+        val manualCardioCals = todayCardio.sumOf { it.caloriesBurned }
+
+        val totalWorkoutBurned = gymCals + runsCals + manualCardioCals
+        val hasWorkoutToday = totalWorkoutBurned > 0 || todayGym.isNotEmpty() || todayRuns.isNotEmpty() || todayCardio.isNotEmpty() || activeGps.isRunning
+
+        // REGRA: Sem treino, TMB de parado. Com treino, TMB + calorias gastas no treino.
+        val totalDailyExp = if (hasWorkoutToday) bmr + totalWorkoutBurned else bmr
+
+        DailyEnergyExpenditure(
+            bmr = bmr,
+            gymWorkoutCalories = gymCals,
+            runningWorkoutCalories = runsCals,
+            cardioWorkoutCalories = manualCardioCals,
+            totalWorkoutCalories = totalWorkoutBurned,
+            totalExpenditure = totalDailyExp,
+            hasWorkoutToday = hasWorkoutToday,
+            gymWorkoutsCount = todayGym.size,
+            runningWorkoutsCount = todayRuns.size + if (activeGps.isRunning) 1 else 0,
+            cardioWorkoutsCount = todayCardio.size
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = DailyEnergyExpenditure(
+            bmr = 1800,
+            gymWorkoutCalories = 0,
+            runningWorkoutCalories = 0,
+            cardioWorkoutCalories = 0,
+            totalWorkoutCalories = 0,
+            totalExpenditure = 1800,
+            hasWorkoutToday = false,
+            gymWorkoutsCount = 0,
+            runningWorkoutsCount = 0,
+            cardioWorkoutsCount = 0
+        )
+    )
 
     // Daily Water Tracker state
     private val _waterDrankMl = MutableStateFlow(1750)
@@ -403,6 +563,67 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
                 _toastMessage.value = "Login realizado com sucesso! Bem-vindo, ${updated.name}."
                 onSuccess()
             }
+        }
+    }
+
+    fun enterAsGuest(onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            val current = userProfile.value
+            val hasOnboarded = current.hasCompletedOnboarding || current.weightKg > 30f
+            val updated = current.copy(
+                isLoggedIn = true,
+                hasCompletedOnboarding = hasOnboarded,
+                email = if (current.email.isNotBlank() && current.email.contains("@")) current.email else "atleta@growth.local",
+                name = if (current.name.isNotBlank() && current.name != "Atleta") current.name else "Atleta Growth",
+                firebaseUid = current.firebaseUid.ifBlank { "guest_${System.currentTimeMillis()}" }
+            )
+            repository.saveUserProfile(updated)
+            _toastMessage.value = "Bem-vindo! Modo local ativado."
+            onSuccess()
+        }
+    }
+
+    fun saveRoomDietaryProfile(name: String, calories: Int, protein: Int, carbs: Int, fat: Int) {
+        viewModelScope.launch {
+            repository.saveDietaryProfile(
+                DietaryProfile(
+                    name = name,
+                    targetCalories = calories,
+                    proteinGoal = protein,
+                    carbGoal = carbs,
+                    fatGoal = fat
+                )
+            )
+            _toastMessage.value = "Perfil dietético salvo no Room!"
+        }
+    }
+
+    fun saveRoomMacro(date: Long, calories: Int, protein: Int, carbs: Int, fat: Int) {
+        viewModelScope.launch {
+            repository.saveMacro(
+                Macro(
+                    date = date,
+                    calories = calories,
+                    protein = protein,
+                    carbs = carbs,
+                    fat = fat
+                )
+            )
+            _toastMessage.value = "Macros salvos com sucesso!"
+        }
+    }
+
+    fun saveRoomWorkoutSchedule(dayOfWeek: String, activityType: String, durationMinutes: Int, intensity: String) {
+        viewModelScope.launch {
+            repository.saveWorkoutSchedule(
+                WorkoutSchedule(
+                    dayOfWeek = dayOfWeek,
+                    activityType = activityType,
+                    durationMinutes = durationMinutes,
+                    intensity = intensity
+                )
+            )
+            _toastMessage.value = "Cronograma de treino agendado no Room!"
         }
     }
 
@@ -645,7 +866,26 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
             )
 
             repository.saveUserProfile(updated)
-            _toastMessage.value = "Metas de macros e perfil atualizados com sucesso!"
+            repository.saveDietaryProfile(
+                DietaryProfile(
+                    id = 1,
+                    name = name.ifBlank { "Dieta Principal" },
+                    targetCalories = plan.targetCalories,
+                    proteinGoal = plan.proteinGrams,
+                    carbGoal = plan.carbsGrams,
+                    fatGoal = plan.fatGrams
+                )
+            )
+            repository.saveMacro(
+                Macro(
+                    date = System.currentTimeMillis(),
+                    calories = plan.targetCalories,
+                    protein = plan.proteinGrams,
+                    carbs = plan.carbsGrams,
+                    fat = plan.fatGrams
+                )
+            )
+            _toastMessage.value = "Metas de macros e perfil atualizados e salvos localmente!"
         }
     }
 
@@ -731,7 +971,15 @@ class GrowthViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun addCardioLog(log: CardioLog) {
+        viewModelScope.launch {
+            repository.addCardioLog(log)
+            _toastMessage.value = "Log de cardio salvo com sucesso!"
+        }
+    }
+
     // --- Water Tracker ---
+
     fun addWater(amountMl: Int) {
         _waterDrankMl.value = (_waterDrankMl.value + amountMl).coerceIn(0, 10000)
     }
