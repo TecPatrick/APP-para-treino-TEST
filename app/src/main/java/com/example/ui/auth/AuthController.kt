@@ -6,6 +6,7 @@ import com.example.data.model.*
 import com.example.data.repository.VirtusRepository
 import com.example.util.MacroCalculator
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -25,15 +26,31 @@ class AuthController(
     val authError = _authError.asStateFlow()
     fun clearAuthError() { _authError.value = null }
 
+    private fun launchAuth(block: suspend CoroutineScope.() -> Unit) {
+        if (!_isAuthLoading.compareAndSet(false, true)) return
+        scope.launch {
+            try {
+                _authError.value = null
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val message = "Não foi possível concluir a operação. Tente novamente."
+                _authError.value = message
+                showMessage(message)
+            } finally {
+                _isAuthLoading.value = false
+            }
+        }
+    }
+
     fun loginWithGoogleCredential(
         credential: com.google.firebase.auth.AuthCredential,
         onSuccess: () -> Unit
     ) {
-        scope.launch {
-            _isAuthLoading.value = true
+        launchAuth {
             _authError.value = null
             val result = authService.signInWithGoogle(credential)
-            _isAuthLoading.value = false
 
             result.onSuccess { user ->
                 val current = profile()
@@ -62,11 +79,9 @@ class AuthController(
         passwordInput: String,
         onSuccess: () -> Unit
     ) {
-        scope.launch {
-            _isAuthLoading.value = true
+        launchAuth {
             _authError.value = null
             val result = authService.login(emailInput, passwordInput)
-            _isAuthLoading.value = false
             
             result.onSuccess { user ->
                 val current = profile()
@@ -96,7 +111,7 @@ class AuthController(
     }
 
     fun enterAsGuest(onSuccess: () -> Unit) {
-        scope.launch {
+        launchAuth {
             authService.signOut()
             val current = profile()
             val hasOnboarded = current.hasCompletedOnboarding || current.weightKg > 30f
@@ -115,22 +130,22 @@ class AuthController(
     }
 
     fun loginWithBiometrics(onSuccess: () -> Unit) {
-        scope.launch {
+        launchAuth {
             val current = profile()
             if (!current.firebaseUid.startsWith("guest_") && authService.currentUser?.uid != current.firebaseUid) {
                 _authError.value = "Entre com sua conta antes de usar a biometria."
-                return@launch
+                return@launchAuth
             }
             if (current.email.isBlank() || !current.email.contains("@")) {
                 _authError.value = "Perfil sem e-mail válido vinculado. Todo perfil precisa ter um e-mail válido."
                 showMessage("Erro: E-mail obrigatório para acesso via biometria.")
-                return@launch
+                return@launchAuth
             }
             val hasValidProfile = current.hasCompletedOnboarding && current.weightKg > 30f && current.name.isNotBlank() && current.name != "Atleta"
             if (!hasValidProfile) {
                 _authError.value = "Perfil incompleto. Configure seu perfil e cadastre suas medidas antes de usar a biometria."
                 showMessage("Por favor, conclua o cadastro do perfil.")
-                return@launch
+                return@launchAuth
             }
             val updated = current.copy(isLoggedIn = true)
             repository.saveUserProfile(updated)
@@ -154,17 +169,15 @@ class AuthController(
         isAthlete: Boolean = true,
         onSuccess: () -> Unit
     ) {
-        scope.launch {
-            _isAuthLoading.value = true
+        launchAuth {
             _authError.value = null
             val result = authService.register(email, password, name)
-            _isAuthLoading.value = false
 
             val user = result.getOrElse { error ->
                 val message = error.message ?: "Não foi possível criar a conta."
                 _authError.value = message
                 showMessage(message)
-                return@launch
+                return@launchAuth
             }
             val plan = MacroCalculator.computeFullPlan(
                 weightKg = weightKg,
@@ -213,10 +226,8 @@ class AuthController(
     }
 
     fun sendPasswordResetEmail(email: String, onComplete: (Boolean, String) -> Unit) {
-        scope.launch {
-            _isAuthLoading.value = true
+        launchAuth {
             val result = authService.sendPasswordReset(email)
-            _isAuthLoading.value = false
             result.onSuccess {
                 val msg = "E-mail de recuperação enviado com sucesso para $email!"
                 showMessage(msg)
