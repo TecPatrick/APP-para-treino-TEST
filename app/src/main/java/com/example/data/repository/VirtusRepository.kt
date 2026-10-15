@@ -75,7 +75,7 @@ class VirtusRepository(private val dao: AppDao) {
         dao.getExercisesForRoutine(routineId)
 
     suspend fun saveUserProfile(profile: UserProfile) {
-        dao.insertOrUpdateProfile(profile)
+        dao.insertOrUpdateProfile(profile.copy(passwordHash = ""))
     }
 
     suspend fun deleteAllUserProfiles() {
@@ -544,3 +544,4 @@ class VirtusRepository(private val dao: AppDao) {
     val allWorkoutSchedules: Flow<List<WorkoutSchedule>> = dao.getAllWorkoutSchedules()
     suspend fun saveWorkoutSchedule(schedule: WorkoutSchedule) = dao.insertWorkoutSchedule(schedule)
 }
+

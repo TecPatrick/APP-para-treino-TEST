@@ -15,6 +15,9 @@ open class MainApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        if (com.google.firebase.FirebaseApp.initializeApp(this) != null) {
+            AppCheckInitializer.initialize()
+        }
         try {
             com.example.util.ExerciseGifMapper.init(this)
         } catch (e: Exception) {
@@ -24,3 +27,4 @@ open class MainApplication : Application() {
 }
 
 typealias VirtusApplication = MainApplication
+

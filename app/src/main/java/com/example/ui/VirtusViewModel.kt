@@ -105,18 +105,14 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     val authService: FirebaseAuthService = FirebaseAuthService()
     val firestoreSync: FirestoreSyncManager = FirestoreSyncManager(application)
 
-    private val _isAuthLoading = MutableStateFlow(false)
-    val isAuthLoading: StateFlow<Boolean> = _isAuthLoading.asStateFlow()
-
-    private val _authError = MutableStateFlow<String?>(null)
-    val authError: StateFlow<String?> = _authError.asStateFlow()
-
-    fun clearAuthError() {
-        _authError.value = null
+    private val authController by lazy {
+        com.example.ui.auth.AuthController(viewModelScope, repository, authService, firestoreSync,
+            { userProfile.value }, ::showToast)
     }
+    val isAuthLoading: StateFlow<Boolean> get() = authController.isAuthLoading
+    val authError: StateFlow<String?> get() = authController.authError
+    fun clearAuthError() = authController.clearAuthError()
 
-
-    
     private val _aiAdvice = MutableStateFlow<String?>(null)
     val aiAdvice: StateFlow<String?> = _aiAdvice.asStateFlow()
 
@@ -132,13 +128,8 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     init {
-        // Garantir que suba zerado, excluindo qualquer usuário residual antigo
+        // Inicializar somente os catálogos ausentes, preservando os dados pessoais.
         viewModelScope.launch {
-            val prof = repository.getUserProfileDirect(1)
-            if (prof != null && (prof.email == "atleta@fitmail.com" || prof.name == "Atleta" || (!prof.isLoggedIn && !prof.hasCompletedOnboarding))) {
-                authService.signOut()
-                repository.deleteAllUserProfiles()
-            }
             // Inicializar base de dados alimentar com macronutrientes caso a tabela esteja vazia ou incompleta
             try {
                 if (repository.getFoodsCount() < com.example.data.local.PrepopulatedData.defaultFoods.size) {
@@ -201,7 +192,9 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                                 }
                                 fallback.value = syncedProfile
                             } else {
-                                fallback.value = profile
+                                fallback.value = profile.copy(
+                                    isLoggedIn = profile.isLoggedIn && profile.firebaseUid.startsWith("guest_")
+                                )
                             }
                         } else {
                             fallback.value = UserProfile()
@@ -487,103 +480,15 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     fun loginWithGoogleCredential(
         credential: com.google.firebase.auth.AuthCredential,
         onSuccess: () -> Unit
-    ) {
-        viewModelScope.launch {
-            _isAuthLoading.value = true
-            _authError.value = null
-            val result = authService.signInWithGoogle(credential)
-            _isAuthLoading.value = false
-
-            result.onSuccess { user ->
-                val current = userProfile.value
-                val hasOnboarded = current.hasCompletedOnboarding || current.weightKg > 30f
-                val updated = current.copy(
-                    isLoggedIn = true,
-                    hasCompletedOnboarding = hasOnboarded,
-                    email = user.email ?: current.email,
-                    name = user.displayName ?: current.name,
-                    firebaseUid = user.uid
-                )
-                repository.saveUserProfile(updated)
-                firestoreSync.syncProfileToCloud(updated)
-                _toastMessage.value = "Login com Google realizado com sucesso! Bem-vindo, ${user.displayName ?: current.name}."
-                onSuccess()
-            }.onFailure { ex ->
-                val errorMsg = ex.message ?: "Erro ao realizar login com Google."
-                _authError.value = errorMsg
-                _toastMessage.value = errorMsg
-            }
-        }
-    }
+    ) = authController.loginWithGoogleCredential(credential, onSuccess)
 
     fun loginWithFirebase(
         emailInput: String,
         passwordInput: String,
         onSuccess: () -> Unit
-    ) {
-        viewModelScope.launch {
-            _isAuthLoading.value = true
-            _authError.value = null
-            val result = authService.login(emailInput, passwordInput)
-            _isAuthLoading.value = false
-            
-            result.onSuccess { user ->
-                val current = userProfile.value
-                val hasOnboarded = current.hasCompletedOnboarding || current.weightKg > 30f
-                val fallbackName = if (current.name.isNotBlank() && current.name != "Atleta") {
-                    current.name
-                } else {
-                    emailInput.substringBefore("@").replace(".", " ").replaceFirstChar { it.uppercase() }
-                }
-                val updated = current.copy(
-                    isLoggedIn = true,
-                    hasCompletedOnboarding = hasOnboarded,
-                    email = user?.email ?: emailInput,
-                    name = if (user?.displayName.isNullOrBlank()) fallbackName else user!!.displayName!!,
-                    firebaseUid = user?.uid ?: current.firebaseUid.ifBlank { "local_${System.currentTimeMillis()}" }
-                )
-                repository.saveUserProfile(updated)
-                if (user != null) firestoreSync.syncProfileToCloud(updated)
-                _toastMessage.value = "Login realizado com sucesso! Bem-vindo, ${updated.name}."
-                onSuccess()
-            }.onFailure { ex ->
-                val current = userProfile.value
-                val fallbackName = if (current.name.isNotBlank() && current.name != "Atleta") {
-                    current.name
-                } else {
-                    emailInput.substringBefore("@").replace(".", " ").replaceFirstChar { it.uppercase() }
-                }
-                val hasOnboarded = current.hasCompletedOnboarding || current.weightKg > 30f
-                val updated = current.copy(
-                    isLoggedIn = true,
-                    hasCompletedOnboarding = hasOnboarded,
-                    email = emailInput,
-                    name = fallbackName,
-                    firebaseUid = current.firebaseUid.ifBlank { "local_${System.currentTimeMillis()}" }
-                )
-                repository.saveUserProfile(updated)
-                _toastMessage.value = "Login realizado com sucesso! Bem-vindo, ${updated.name}."
-                onSuccess()
-            }
-        }
-    }
+    ) = authController.loginWithFirebase(emailInput, passwordInput, onSuccess)
 
-    fun enterAsGuest(onSuccess: () -> Unit) {
-        viewModelScope.launch {
-            val current = userProfile.value
-            val hasOnboarded = current.hasCompletedOnboarding || current.weightKg > 30f
-            val updated = current.copy(
-                isLoggedIn = true,
-                hasCompletedOnboarding = hasOnboarded,
-                email = if (current.email.isNotBlank() && current.email.contains("@")) current.email else "atleta@growth.local",
-                name = if (current.name.isNotBlank() && current.name != "Atleta") current.name else "Atleta Growth",
-                firebaseUid = current.firebaseUid.ifBlank { "guest_${System.currentTimeMillis()}" }
-            )
-            repository.saveUserProfile(updated)
-            _toastMessage.value = "Bem-vindo! Modo local ativado."
-            onSuccess()
-        }
-    }
+    fun enterAsGuest(onSuccess: () -> Unit) = authController.enterAsGuest(onSuccess)
 
     fun saveRoomDietaryProfile(name: String, calories: Int, protein: Int, carbs: Int, fat: Int) {
         viewModelScope.launch {
@@ -632,26 +537,7 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     /**
      * Authenticates user via device biometric prompt (fingerprint / face unlock)
      */
-    fun loginWithBiometrics(onSuccess: () -> Unit) {
-        viewModelScope.launch {
-            val current = userProfile.value
-            if (current.email.isBlank() || !current.email.contains("@")) {
-                _authError.value = "Perfil sem e-mail válido vinculado. Todo perfil precisa ter um e-mail válido."
-                _toastMessage.value = "Erro: E-mail obrigatório para acesso via biometria."
-                return@launch
-            }
-            val hasValidProfile = current.hasCompletedOnboarding && current.weightKg > 30f && current.name.isNotBlank() && current.name != "Atleta"
-            if (!hasValidProfile) {
-                _authError.value = "Perfil incompleto. Configure seu perfil e cadastre suas medidas antes de usar a biometria."
-                _toastMessage.value = "Por favor, conclua o cadastro do perfil."
-                return@launch
-            }
-            val updated = current.copy(isLoggedIn = true)
-            repository.saveUserProfile(updated)
-            _toastMessage.value = "Autenticação biométrica confirmada (${updated.email})! Bem-vindo(a), ${updated.name}."
-            onSuccess()
-        }
-    }
+    fun loginWithBiometrics(onSuccess: () -> Unit) = authController.loginWithBiometrics(onSuccess)
 
     fun registerWithFirebase(
         name: String,
@@ -667,84 +553,13 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         goal: FitnessGoal,
         isAthlete: Boolean = true,
         onSuccess: () -> Unit
-    ) {
-        viewModelScope.launch {
-            _isAuthLoading.value = true
-            _authError.value = null
-            val result = authService.register(email, password, name)
-            _isAuthLoading.value = false
+    ) = authController.registerWithFirebase(name, email, password, gender, age, weightKg, heightCm, biotype, trainingDays, activityLevel, goal, isAthlete, onSuccess)
 
-            val user = result.getOrNull()
-            val plan = MacroCalculator.computeFullPlan(
-                weightKg = weightKg,
-                heightCm = heightCm,
-                age = age,
-                gender = gender,
-                activityLevel = activityLevel,
-                goal = goal,
-                biotype = biotype,
-                customProteinGPerKg = 2.2f,
-                customFatGPerKg = 0.8f,
-                isAthleteOrWarmClimate = isAthlete
-            )
-
-            val updated = UserProfile(
-                id = 1,
-                name = name.ifBlank { "Atleta" },
-                email = user?.email ?: email,
-                firebaseUid = user?.uid ?: "local_${System.currentTimeMillis()}",
-                passwordHash = password,
-                isLoggedIn = true,
-                hasCompletedOnboarding = true,
-                lgpdConsentAccepted = true,
-                lgpdConsentDate = System.currentTimeMillis(),
-                gender = gender,
-                age = age,
-                weightKg = weightKg,
-                heightCm = heightCm,
-                biotype = biotype,
-                trainingDaysPerWeek = trainingDays,
-                activityLevel = activityLevel,
-                goal = goal,
-                targetCalories = plan.targetCalories,
-                targetProteinGrams = plan.proteinGrams,
-                targetCarbsGrams = plan.carbsGrams,
-                targetFatGrams = plan.fatGrams,
-                targetWaterMl = plan.waterMl,
-                monthlyTargetWeightKg = if (goal.calorieAdjustment > 0) weightKg + 2.0f else if (goal.calorieAdjustment < 0) weightKg - 2.5f else weightKg
-            )
-
-            repository.saveUserProfile(updated)
-            if (user != null) {
-                firestoreSync.syncProfileToCloud(updated)
-            }
-            _toastMessage.value = "Conta criada com sucesso! Protocolo gerado."
-            onSuccess()
-        }
-    }
-
-    fun sendPasswordResetEmail(email: String, onComplete: (Boolean, String) -> Unit) {
-        viewModelScope.launch {
-            _isAuthLoading.value = true
-            val result = authService.sendPasswordReset(email)
-            _isAuthLoading.value = false
-            result.onSuccess {
-                val msg = "E-mail de recuperação enviado com sucesso para $email!"
-                _toastMessage.value = msg
-                onComplete(true, msg)
-            }.onFailure { ex ->
-                val errorMsg = ex.message ?: "Falha ao enviar e-mail de recuperação."
-                _toastMessage.value = errorMsg
-                onComplete(false, errorMsg)
-            }
-        }
-    }
+    fun sendPasswordResetEmail(email: String, onComplete: (Boolean, String) -> Unit) = authController.sendPasswordResetEmail(email, onComplete)
 
     fun deleteAccountLgpd(onSuccess: () -> Unit) {
         viewModelScope.launch {
-            _isAuthLoading.value = true
             val result = authService.deleteAccount()
-            _isAuthLoading.value = false
             result.onSuccess {
                 repository.saveUserProfile(
                     UserProfile(
@@ -1027,24 +842,16 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 customUid = updated.firebaseUid
             )
             firestoreSync.syncProfileToCloud(updated)
-            _toastMessage.value = "Metas calóricas salvas e sincronizadas (offline & nuvem)!"
+            _toastMessage.value = "Metas salvas no aparelho. Consulte a sincronização para confirmar o envio à nuvem."
         }
     }
 
-    fun syncAllDataToFirestore() {
-        viewModelScope.launch {
-            _toastMessage.value = "Sincronizando com Firestore (offline e nuvem)..."
-            val prof = userProfile.value
-            val wLogs = workoutLogs.value
-            val pLogs = progressLogs.value
-            val result = firestoreSync.syncAllData(prof, wLogs, pLogs)
-            result.onSuccess { count ->
-                _toastMessage.value = "Sincronização concluída! $count registros mantidos em cache offline seguro."
-            }.onFailure { ex ->
-                _toastMessage.value = "Modo offline ativo: dados armazenados no cache local seguro."
-            }
-        }
+    private val syncController by lazy {
+        com.example.ui.sync.SyncController(viewModelScope, repository, firestoreSync, ::showToast)
     }
+    val isSyncing: StateFlow<Boolean> get() = syncController.isSyncing
+
+    fun syncAllDataToFirestore() = syncController.sync()
 
     // --- Global Theme Toggle (Light / Dark Mode) ---
     fun setDarkMode(isDark: Boolean) {
@@ -2180,3 +1987,4 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         return root.toString(2)
     }
 }
+

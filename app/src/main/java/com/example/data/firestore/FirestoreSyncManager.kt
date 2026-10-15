@@ -23,6 +23,9 @@ import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withTimeoutOrNull
+import com.google.android.gms.tasks.Task
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
@@ -65,6 +68,8 @@ class FirestoreSyncManager(private val context: Context) {
                 .build()
             fs.firestoreSettings = settings
             Log.d("FirestoreSync", "Firestore inicializado com persistência offline ativa.")
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w("FirestoreSync", "Configuração do Firestore já aplicada ou aviso: ${e.message}")
         }
@@ -78,7 +83,16 @@ class FirestoreSyncManager(private val context: Context) {
         get() = auth.currentUser?.uid
 
     private fun resolveUserId(customUid: String? = null): String? {
-        return customUid?.takeIf { it.isNotBlank() } ?: currentUserId
+        val authenticatedUid = currentUserId ?: return null
+        return authenticatedUid.takeIf { customUid.isNullOrBlank() || customUid == it }
+    }
+
+    private suspend fun awaitCloudWrite(task: Task<Void>) {
+        val confirmed = withTimeoutOrNull(5_000L) {
+            task.await()
+            true
+        } ?: false
+        if (!confirmed) throw PendingCloudWriteException()
     }
 
     // =========================================================================
@@ -117,9 +131,11 @@ class FirestoreSyncManager(private val context: Context) {
                 "monthlyNotes" to profile.monthlyNotes,
                 "updatedAt" to FieldValue.serverTimestamp()
             )
-            userDoc.set(data, SetOptions.merge()).await()
+            awaitCloudWrite(userDoc.set(data, SetOptions.merge()))
             Log.d("FirestoreSync", "Perfil do usuário $uid salvo com sucesso (offline/online).")
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e("FirestoreSync", "Erro ao salvar perfil no Firestore: ${e.message}", e)
             Result.failure(e)
@@ -141,6 +157,8 @@ class FirestoreSyncManager(private val context: Context) {
             val data = snapshot.data ?: return Result.success(null)
             val profile = parseUserProfile(data, uid)
             Result.success(profile)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e("FirestoreSync", "Erro ao buscar perfil da nuvem: ${e.message}", e)
             Result.failure(e)
@@ -236,8 +254,6 @@ class FirestoreSyncManager(private val context: Context) {
                 "updatedAt" to FieldValue.serverTimestamp()
             )
 
-            // Grava documento na subcoleção de metas calóricas
-            goalRef.set(goalData, SetOptions.merge()).await()
 
             // Atualiza resumo no documento do perfil
             val summaryData = mapOf(
@@ -248,10 +264,16 @@ class FirestoreSyncManager(private val context: Context) {
                 "targetWaterMl" to targetWaterMl,
                 "updatedAt" to FieldValue.serverTimestamp()
             )
-            userRef.set(summaryData, SetOptions.merge()).await()
+            // Enqueue both documents atomically, even while offline.
+            awaitCloudWrite(firestore.batch()
+                .set(goalRef, goalData, SetOptions.merge())
+                .set(userRef, summaryData, SetOptions.merge())
+                .commit())
 
             Log.d("FirestoreSync", "Metas calóricas sincronizadas no Firestore (offline/online).")
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e("FirestoreSync", "Erro ao salvar metas calóricas: ${e.message}", e)
             Result.failure(e)
@@ -281,6 +303,8 @@ class FirestoreSyncManager(private val context: Context) {
                 targetWaterMl = (d["targetWaterMl"] as? Number)?.toInt() ?: 3000
             )
             Result.success(result)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e("FirestoreSync", "Erro ao buscar meta calórica: ${e.message}", e)
             Result.failure(e)
@@ -352,9 +376,11 @@ class FirestoreSyncManager(private val context: Context) {
                 "notes" to log.notes,
                 "updatedAt" to FieldValue.serverTimestamp()
             )
-            docRef.set(data, SetOptions.merge()).await()
+            awaitCloudWrite(docRef.set(data, SetOptions.merge()))
             Log.d("FirestoreSync", "WorkoutLog $docId sincronizado com sucesso no Firestore.")
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e("FirestoreSync", "Erro ao salvar WorkoutLog no Firestore: ${e.message}", e)
             Result.failure(e)
@@ -369,10 +395,11 @@ class FirestoreSyncManager(private val context: Context) {
             ?: return Result.failure(Exception("Usuário não autenticado"))
 
         return try {
-            firestore.collection("users").document(uid)
-                .collection("workoutLogs").document(logId.toString())
-                .delete().await()
+            awaitCloudWrite(firestore.collection("users").document(uid)
+                .collection("workoutLogs").document(logId.toString()).delete())
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e("FirestoreSync", "Erro ao excluir WorkoutLog do Firestore: ${e.message}", e)
             Result.failure(e)
@@ -408,6 +435,8 @@ class FirestoreSyncManager(private val context: Context) {
                 )
             }
             Result.success(logs)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e("FirestoreSync", "Erro ao buscar logs de treino: ${e.message}", e)
             Result.failure(e)
@@ -479,12 +508,15 @@ class FirestoreSyncManager(private val context: Context) {
                 "stepsCount" to log.stepsCount,
                 "caloriesBurned" to log.caloriesBurned.toDouble(),
                 "averagePaceMinPerKm" to log.averagePaceMinPerKm.toDouble(),
+                "routePointsJson" to log.routePointsJson,
                 "notes" to log.notes,
                 "updatedAt" to FieldValue.serverTimestamp()
             )
-            docRef.set(data, SetOptions.merge()).await()
+            awaitCloudWrite(docRef.set(data, SetOptions.merge()))
             Log.d("FirestoreSync", "GpsRouteLog $docId sincronizado no Firestore.")
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e("FirestoreSync", "Erro ao salvar GpsRouteLog no Firestore: ${e.message}", e)
             Result.failure(e)
@@ -512,8 +544,10 @@ class FirestoreSyncManager(private val context: Context) {
                 "isCompletedToday" to mealPlan.isCompletedToday,
                 "updatedAt" to FieldValue.serverTimestamp()
             )
-            doc.set(data, SetOptions.merge()).await()
+            awaitCloudWrite(doc.set(data, SetOptions.merge()))
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e("FirestoreSync", "Erro ao sincronizar refeição: ${e.message}", e)
             Result.failure(e)
@@ -535,8 +569,10 @@ class FirestoreSyncManager(private val context: Context) {
                 "isBought" to item.isChecked,
                 "updatedAt" to FieldValue.serverTimestamp()
             )
-            doc.set(data, SetOptions.merge()).await()
+            awaitCloudWrite(doc.set(data, SetOptions.merge()))
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e("FirestoreSync", "Erro ao sincronizar item de compra: ${e.message}", e)
             Result.failure(e)
@@ -556,8 +592,10 @@ class FirestoreSyncManager(private val context: Context) {
                 "notes" to log.notes,
                 "updatedAt" to FieldValue.serverTimestamp()
             )
-            doc.set(data, SetOptions.merge()).await()
+            awaitCloudWrite(doc.set(data, SetOptions.merge()))
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e("FirestoreSync", "Erro ao sincronizar progresso: ${e.message}", e)
             Result.failure(e)
@@ -575,37 +613,22 @@ class FirestoreSyncManager(private val context: Context) {
     suspend fun syncAllData(
         profile: UserProfile?,
         workoutLogs: List<WorkoutLog>,
-        progressLogs: List<ProgressLog> = emptyList()
-    ): Result<Int> {
-        var count = 0
-        try {
-            if (profile != null) {
-                syncProfileToCloud(profile)
-                syncCaloricGoalsToCloud(
-                    targetCalories = profile.targetCalories,
-                    targetProteinGrams = profile.targetProteinGrams,
-                    targetCarbsGrams = profile.targetCarbsGrams,
-                    targetFatGrams = profile.targetFatGrams,
-                    targetWaterMl = profile.targetWaterMl,
-                    customUid = profile.firebaseUid
-                )
-                count++
+        progressLogs: List<ProgressLog> = emptyList(),
+        gpsLogs: List<GpsRouteLog> = emptyList()
+    ): Result<SyncReport> {
+        val uid = resolveUserId(profile?.firebaseUid)
+            ?: return Result.failure(IllegalStateException("Entre na sua conta para sincronizar. Os dados locais continuam no aparelho."))
+        val operations = mutableListOf<suspend () -> Result<Unit>>()
+        if (profile != null) {
+            operations.add { syncProfileToCloud(profile) }
+            operations.add {
+                syncCaloricGoalsToCloud(profile.targetCalories, profile.targetProteinGrams,
+                    profile.targetCarbsGrams, profile.targetFatGrams, profile.targetWaterMl, uid)
             }
-
-            for (wLog in workoutLogs) {
-                syncWorkoutLogToCloud(wLog, profile?.firebaseUid)
-                count++
-            }
-
-            for (pLog in progressLogs) {
-                syncProgressLogToCloud(pLog)
-                count++
-            }
-
-            return Result.success(count)
-        } catch (e: Exception) {
-            Log.e("FirestoreSync", "Erro no syncAllData: ${e.message}", e)
-            return Result.failure(e)
         }
+        workoutLogs.forEach { log -> operations.add { syncWorkoutLogToCloud(log, uid) } }
+        progressLogs.forEach { log -> operations.add { syncProgressLogToCloud(log) } }
+        gpsLogs.forEach { log -> operations.add { syncGpsRouteLogToCloud(log, uid) } }
+        return Result.success(collectSyncResults(operations))
     }
 }
