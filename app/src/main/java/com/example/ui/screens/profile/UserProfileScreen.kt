@@ -1046,7 +1046,7 @@ fun UserProfileScreen(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Salvar Perfil e Metas (Room & Firestore)",
+                        text = "Salvar Perfil e Metas",
                         color = Color.White,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
@@ -1079,20 +1079,21 @@ fun UserProfileScreen(
                                 modifier = Modifier.size(20.dp)
                             )
                             Text(
-                                text = "Persistência Firestore Offline",
+                                text = "Sincronização na nuvem",
                                 color = GrowthCyan,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                         Text(
-                            text = "Seus perfis, metas calóricas e logs de treino são mantidos permanentemente em cache local e sincronizados na nuvem do Firebase com resiliência a quedas de conexão.",
+                            text = "Seus dados são salvos no aparelho. Com uma conta conectada, os envios pendentes são retomados pelo Firebase ao reconectar. Confira abaixo a confirmação da nuvem.",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp,
                             lineHeight = 15.sp
                         )
                         Button(
                             onClick = { viewModel.syncAllDataToFirestore() },
+                            enabled = !viewModel.isSyncing.collectAsStateWithLifecycle().value,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(44.dp)
@@ -1108,7 +1109,7 @@ fun UserProfileScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Sincronizar Tudo com Firestore",
+                                text = "Sincronizar perfil e históricos",
                                 color = Color.Black,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
@@ -1285,3 +1286,4 @@ private fun BiometricKpiBox(
         }
     }
 }
+

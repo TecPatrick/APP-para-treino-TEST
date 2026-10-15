@@ -10,6 +10,7 @@ import com.google.firebase.auth.FirebaseAuthWeakPasswordException
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.UserProfileChangeRequest
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.CancellationException
 
 class FirebaseAuthService(
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
@@ -26,6 +27,8 @@ class FirebaseAuthService(
             val result = auth.signInWithCredential(credential).await()
             val user = result.user ?: throw Exception("Falha ao autenticar com o Google.")
             Result.success(user)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(Exception(translateAuthError(e)))
         }
@@ -35,45 +38,36 @@ class FirebaseAuthService(
         email: String,
         password: String,
         displayName: String
-    ): Result<FirebaseUser?> {
+    ): Result<FirebaseUser> {
         return try {
             val result = auth.createUserWithEmailAndPassword(email.trim(), password).await()
-            val user = result.user
+            val user = requireNotNull(result.user) { "O Firebase não retornou um usuário autenticado." }
             
-            if (user != null && displayName.isNotBlank()) {
+            if (displayName.isNotBlank()) {
                 val profileUpdates = UserProfileChangeRequest.Builder()
                     .setDisplayName(displayName.trim())
                     .build()
                 user.updateProfile(profileUpdates).await()
             }
             Result.success(user)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            val fullMsg = "${e.message} ${e.cause?.message} ${e.toString()}"
-            if (isEmailPasswordDisabledError(fullMsg)) {
-                // Email/Password provider is disabled in Firebase console, allow seamless local registration
-                Result.success(null)
-            } else {
-                Result.failure(Exception(translateAuthError(e)))
-            }
+            Result.failure(Exception(translateAuthError(e), e))
         }
     }
 
     suspend fun login(
         email: String,
         password: String
-    ): Result<FirebaseUser?> {
+    ): Result<FirebaseUser> {
         return try {
             val result = auth.signInWithEmailAndPassword(email.trim(), password).await()
-            Result.success(result.user)
+            Result.success(requireNotNull(result.user) { "O Firebase não retornou um usuário autenticado." })
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            val fullMsg = "${e.message} ${e.cause?.message} ${e.toString()}"
-            android.util.Log.e("FirebaseAuthService", "Login failed: $fullMsg")
-            if (isEmailPasswordDisabledError(fullMsg)) {
-                // Email/Password provider disabled or blocked by Recaptcha: fallback to local authentication
-                Result.success(null)
-            } else {
-                Result.failure(Exception(translateAuthError(e)))
-            }
+            Result.failure(Exception(translateAuthError(e), e))
         }
     }
 
@@ -84,13 +78,10 @@ class FirebaseAuthService(
             }
             auth.sendPasswordResetEmail(email.trim()).await()
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            val fullMsg = "${e.message} ${e.cause?.message} ${e.toString()}"
-            if (isEmailPasswordDisabledError(fullMsg)) {
-                Result.success(Unit)
-            } else {
-                Result.failure(Exception(translateAuthError(e)))
-            }
+            Result.failure(Exception(translateAuthError(e), e))
         }
     }
 
@@ -101,6 +92,8 @@ class FirebaseAuthService(
                 user.delete().await()
             }
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(Exception(translateAuthError(e)))
         }
@@ -113,18 +106,6 @@ class FirebaseAuthService(
     }
 
     companion object {
-        fun isEmailPasswordDisabledError(msg: String): Boolean {
-            val lower = msg.lowercase()
-            return lower.contains("operation is not allowed") ||
-                    lower.contains("disabled") ||
-                    lower.contains("recaptcha") ||
-                    lower.contains("credential is incorrect") ||
-                    lower.contains("malformed") ||
-                    lower.contains("expired") ||
-                    lower.contains("invalid credential") ||
-                    lower.contains("sign_in_provider_disabled")
-        }
-
         fun translateAuthError(e: Exception): String {
             val msg = e.message.orEmpty().lowercase()
             return when (e) {
@@ -158,3 +139,4 @@ class FirebaseAuthService(
         }
     }
 }
+
