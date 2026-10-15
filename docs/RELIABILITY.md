@@ -20,16 +20,15 @@ Room remains the local store. Firestore's existing persistent write queue handle
 
 The sync summary is a snapshot of that attempt, not a live count of every outstanding write. Re-run synchronization to refresh confirmation. It includes profile, goals, workout history, progress and GPS logs, not all application tables. Goals and their profile summary use one atomic batch. Local data is read directly from Room rather than possibly uncollected screen StateFlows. Simultaneous sync button presses are blocked. Guest sessions cannot upload data.
 
-## Firebase configuration required before release
+## Firebase configuration
 
-1. Configure Firebase AI Logic with the Gemini Developer API in the Firebase console. This app now uses the Firebase AI SDK, not a Gemini REST key.
-2. Provide the Android Firebase configuration (`app/google-services.json`) for the existing application ID.
-3. Register debug App Check tokens only for development. Release builds use Play Integrity; register the release signing certificate and configure the appropriate attestation policy for your distribution channel.
-4. Enforce App Check for AI Logic and configure quotas/usage monitoring. Client integration alone does not enforce server-side protection.
-5. If a real Gemini key was shipped in an old APK, revoke/rotate it in the provider console. Removing the code does not revoke old keys.
-6. Keep Email/Password and intended sign-in providers enabled in Firebase Authentication.
+Firebase AI Logic with the Gemini Developer API, Email/Password and Google Sign-In are enabled in project `gen-lang-client-0338831300`. The Android configuration for `com.aistudio.growthdiet.kxmfzq` is stored at `app/google-services.json`. The app uses the current no-Blaze model `gemini-3.8-flash`.
 
-No Firebase console settings or credentials were changed by this PR.
+Before a release build:
+
+1. Register debug App Check tokens only for local development. Release builds use Play Integrity; register the release signing certificate and configure the appropriate attestation policy for the distribution channel.
+2. Confirm App Check enforcement and configure quotas/usage monitoring for AI Logic in the Firebase console.
+3. If a real Gemini key was shipped in an old APK, revoke/rotate it in the provider console. Removing the code does not revoke old keys.
 
 References:
 - https://firebase.google.com/docs/ai-logic/get-started?platform=android

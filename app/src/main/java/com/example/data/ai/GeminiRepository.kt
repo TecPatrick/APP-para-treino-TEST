@@ -9,7 +9,7 @@ import kotlinx.coroutines.CancellationException
 object GeminiRepository {
     private val model by lazy {
         Firebase.ai(backend = GenerativeBackend.googleAI())
-            .generativeModel("gemini-3.5-flash")
+            .generativeModel("gemini-3.8-flash")
     }
 
     suspend fun getWorkoutAdvice(prompt: String): String {
