@@ -62,6 +62,49 @@
         "notes": { "type": "string", "required": false },
         "updatedAt": { "type": "timestamp", "required": false }
       }
+    },
+    "CalorieGoal": {
+      "collection": "users/{userId}/calorieGoals",
+      "fields": {
+        "userId": { "type": "string", "required": true },
+        "targetCalories": { "type": "number", "required": true },
+        "targetProteinGrams": { "type": "number", "required": true },
+        "targetCarbsGrams": { "type": "number", "required": true },
+        "targetFatGrams": { "type": "number", "required": true },
+        "targetWaterMl": { "type": "number", "required": true },
+        "updatedAt": { "type": "timestamp", "required": false }
+      }
+    },
+    "WorkoutLog": {
+      "collection": "users/{userId}/workoutLogs",
+      "fields": {
+        "userId": { "type": "string", "required": true },
+        "routineId": { "type": "number", "required": true },
+        "routineName": { "type": "string", "required": true },
+        "dateMillis": { "type": "number", "required": true },
+        "durationMinutes": { "type": "number", "required": true },
+        "totalVolumeKg": { "type": "number", "required": true },
+        "totalSetsCompleted": { "type": "number", "required": true },
+        "perceivedExertion": { "type": "number", "required": false },
+        "notes": { "type": "string", "required": false },
+        "updatedAt": { "type": "timestamp", "required": false }
+      }
+    },
+    "GpsRouteLog": {
+      "collection": "users/{userId}/gpsRouteLogs",
+      "fields": {
+        "userId": { "type": "string", "required": true },
+        "routeName": { "type": "string", "required": true },
+        "activityType": { "type": "string", "required": true },
+        "dateMillis": { "type": "number", "required": true },
+        "durationSeconds": { "type": "number", "required": true },
+        "distanceMeters": { "type": "number", "required": true },
+        "stepsCount": { "type": "number", "required": true },
+        "caloriesBurned": { "type": "number", "required": true },
+        "averagePaceMinPerKm": { "type": "number", "required": true },
+        "notes": { "type": "string", "required": false },
+        "updatedAt": { "type": "timestamp", "required": false }
+      }
     }
   }
 }

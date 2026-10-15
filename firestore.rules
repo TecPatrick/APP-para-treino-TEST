@@ -88,6 +88,14 @@ service cloud.firestore {
       match /workoutLogs/{workoutLogId} {
         allow read, write: if isOwner(userId);
       }
+
+      match /calorieGoals/{goalId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /gpsRouteLogs/{logId} {
+        allow read, write: if isOwner(userId);
+      }
     }
   }
 }

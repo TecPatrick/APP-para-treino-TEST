@@ -15,7 +15,11 @@ open class MainApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        com.example.util.ExerciseGifMapper.init(this)
+        try {
+            com.example.util.ExerciseGifMapper.init(this)
+        } catch (e: Exception) {
+            android.util.Log.e("MainApplication", "Error initializing ExerciseGifMapper", e)
+        }
     }
 }
 

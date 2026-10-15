@@ -92,6 +92,8 @@ data class ActiveGpsSession(
     val distanceMeters: Float = 0f,
     val stepsCount: Int = 0,
     val caloriesBurned: Float = 0f,
+    val currentSpeedKmh: Float = 0f,
+    val paceSecondsPerKm: Long = 0L,
     val routePoints: List<Pair<Double, Double>> = emptyList()
 )
 
@@ -993,7 +995,54 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
             val prof = userProfile.value
             val updated = prof.copy(targetWaterMl = newGoalMl.coerceIn(500, 10000))
             repository.saveUserProfile(updated)
+            firestoreSync.syncCaloricGoalsToCloud(
+                targetCalories = updated.targetCalories,
+                targetProteinGrams = updated.targetProteinGrams,
+                targetCarbsGrams = updated.targetCarbsGrams,
+                targetFatGrams = updated.targetFatGrams,
+                targetWaterMl = updated.targetWaterMl,
+                customUid = updated.firebaseUid
+            )
             _toastMessage.value = "Meta diária de água atualizada para ${updated.targetWaterMl} ml!"
+        }
+    }
+
+    fun updateCaloricGoals(calories: Int, protein: Int, carbs: Int, fat: Int, water: Int) {
+        viewModelScope.launch {
+            val prof = userProfile.value
+            val updated = prof.copy(
+                targetCalories = calories,
+                targetProteinGrams = protein,
+                targetCarbsGrams = carbs,
+                targetFatGrams = fat,
+                targetWaterMl = water
+            )
+            repository.saveUserProfile(updated)
+            firestoreSync.syncCaloricGoalsToCloud(
+                targetCalories = calories,
+                targetProteinGrams = protein,
+                targetCarbsGrams = carbs,
+                targetFatGrams = fat,
+                targetWaterMl = water,
+                customUid = updated.firebaseUid
+            )
+            firestoreSync.syncProfileToCloud(updated)
+            _toastMessage.value = "Metas calóricas salvas e sincronizadas (offline & nuvem)!"
+        }
+    }
+
+    fun syncAllDataToFirestore() {
+        viewModelScope.launch {
+            _toastMessage.value = "Sincronizando com Firestore (offline e nuvem)..."
+            val prof = userProfile.value
+            val wLogs = workoutLogs.value
+            val pLogs = progressLogs.value
+            val result = firestoreSync.syncAllData(prof, wLogs, pLogs)
+            result.onSuccess { count ->
+                _toastMessage.value = "Sincronização concluída! $count registros mantidos em cache offline seguro."
+            }.onFailure { ex ->
+                _toastMessage.value = "Modo offline ativo: dados armazenados no cache local seguro."
+            }
         }
     }
 
@@ -1012,18 +1061,24 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     // --- 🌍 GPS Outdoor Route & Daily/Monthly Steps Tracking ---
-    fun startGpsSession(initialLat: Double = -23.550520, initialLng: Double = -46.633308) {
+    fun startGpsSession(initialLat: Double? = null, initialLng: Double? = null) {
         if (_activeGpsSession.value.isRunning && !_activeGpsSession.value.isPaused) return
 
-        val startPoints = if (_activeGpsSession.value.routePoints.isEmpty()) {
+        val startPoints = if (initialLat != null && initialLng != null) {
             listOf(Pair(initialLat, initialLng))
         } else {
-            _activeGpsSession.value.routePoints
+            emptyList()
         }
 
-        _activeGpsSession.value = _activeGpsSession.value.copy(
+        _activeGpsSession.value = ActiveGpsSession(
             isRunning = true,
             isPaused = false,
+            elapsedSeconds = 0,
+            distanceMeters = 0f,
+            stepsCount = 0,
+            caloriesBurned = 0f,
+            currentSpeedKmh = 0f,
+            paceSecondsPerKm = 0L,
             routePoints = startPoints
         )
 
@@ -1034,24 +1089,17 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 if (!_activeGpsSession.value.isPaused) {
                     val current = _activeGpsSession.value
                     val newSeconds = current.elapsedSeconds + 1
-                    // Natural running pace: ~2.5 m/s (~9 km/h, ~6'40"/km), ~2.6 steps/sec
-                    val addedMeters = 2.5f
-                    val addedSteps = 3
-                    val newDistance = current.distanceMeters + addedMeters
-                    val newSteps = current.stepsCount + addedSteps
-                    val calories = newDistance * 0.065f
-
-                    val lastPt = current.routePoints.lastOrNull() ?: Pair(initialLat, initialLng)
-                    val newLat = lastPt.first + (kotlin.random.Random.nextDouble(-0.00010, 0.00012))
-                    val newLng = lastPt.second + (kotlin.random.Random.nextDouble(-0.00010, 0.00012))
-                    val newPoints = current.routePoints + Pair(newLat, newLng)
+                    val paceSeconds = if (current.distanceMeters > 20f && newSeconds > 0) {
+                        ((newSeconds.toDouble() / (current.distanceMeters / 1000.0)).toLong()).coerceIn(60, 3600)
+                    } else 0L
+                    val speed = if (newSeconds > 0 && current.distanceMeters > 0) {
+                        ((current.distanceMeters / 1000f) / (newSeconds / 3600f)).coerceIn(0f, 60f)
+                    } else 0f
 
                     _activeGpsSession.value = current.copy(
                         elapsedSeconds = newSeconds,
-                        distanceMeters = newDistance,
-                        stepsCount = newSteps,
-                        caloriesBurned = calories,
-                        routePoints = newPoints
+                        paceSecondsPerKm = paceSeconds,
+                        currentSpeedKmh = speed
                     )
                 }
             }
@@ -1084,16 +1132,26 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         } else {
             0f
         }
-        if (addedMeters > 0.8f || current.routePoints.isEmpty()) {
+        // Only accept real movement (> 1.5m) to avoid stationary GPS jitter
+        if (addedMeters > 1.5f || current.routePoints.isEmpty()) {
             val newPoints = current.routePoints + Pair(latitude, longitude)
             val newDist = current.distanceMeters + addedMeters
-            val addedSteps = (addedMeters * 1.35f).toInt().coerceAtLeast(1)
+            val addedSteps = (addedMeters * 1.35f).toInt().coerceAtLeast(0)
             val newSteps = current.stepsCount + addedSteps
             val calories = newDist * 0.065f
+            val paceSeconds = if (newDist > 20f && current.elapsedSeconds > 0) {
+                ((current.elapsedSeconds.toDouble() / (newDist / 1000.0)).toLong()).coerceIn(60, 3600)
+            } else 0L
+            val speed = if (current.elapsedSeconds > 0 && newDist > 0) {
+                ((newDist / 1000f) / (current.elapsedSeconds / 3600f)).coerceIn(0f, 60f)
+            } else 0f
+
             _activeGpsSession.value = current.copy(
                 distanceMeters = newDist,
                 stepsCount = newSteps,
                 caloriesBurned = calories,
+                currentSpeedKmh = speed,
+                paceSecondsPerKm = paceSeconds,
                 routePoints = newPoints
             )
         }
@@ -1132,7 +1190,8 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 routePointsJson = coordsStr,
                 notes = notes
             )
-            repository.insertGpsRouteLog(log)
+            val insertedId = repository.insertGpsRouteLog(log)
+            firestoreSync.syncGpsRouteLogToCloud(log.copy(id = insertedId), userProfile.value.firebaseUid)
             _activeGpsSession.value = ActiveGpsSession()
             val kmText = String.format(Locale.getDefault(), "%.2f", log.distanceMeters / 1000f)
             _toastMessage.value = "Corrida de $kmText km salva com sucesso!"
@@ -1764,7 +1823,7 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         val durationMinutes = (current.elapsedSeconds / 60).coerceAtLeast(1)
 
         viewModelScope.launch {
-            repository.logCompletedWorkout(
+            val insertedId = repository.logCompletedWorkout(
                 routineId = routine.id,
                 routineName = "Treino ${routine.letter} - ${routine.title}",
                 durationMinutes = durationMinutes,
@@ -1774,10 +1833,24 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 notes = notes
             )
 
+            // Sincroniza log de treino no Firestore (persistido no cache local imediatamente)
+            val wLog = WorkoutLog(
+                id = insertedId,
+                routineId = routine.id,
+                routineName = "Treino ${routine.letter} - ${routine.title}",
+                dateMillis = System.currentTimeMillis(),
+                durationMinutes = durationMinutes,
+                totalVolumeKg = totalVolume,
+                totalSetsCompleted = current.completedSetsCount.coerceAtLeast(current.exercises.sumOf { it.sets }),
+                perceivedExertion = perceivedExertion,
+                notes = notes
+            )
+            firestoreSync.syncWorkoutLogToCloud(wLog, userProfile.value.firebaseUid)
+
             workoutTimerJob?.cancel()
             restTimerJob?.cancel()
             _activeWorkout.value = ActiveWorkoutSession()
-            _toastMessage.value = "Treino finalizado! Volume total: ${totalVolume.toInt()} kg"
+            _toastMessage.value = "Treino finalizado! Volume total: ${totalVolume.toInt()} kg (salvo offline)"
         }
     }
 
@@ -1914,6 +1987,7 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     fun deleteWorkoutLog(id: Long) {
         viewModelScope.launch {
             repository.deleteWorkoutLog(id)
+            firestoreSync.deleteWorkoutLogFromCloud(id, userProfile.value.firebaseUid)
             _toastMessage.value = "Registro de treino excluído do histórico."
         }
     }

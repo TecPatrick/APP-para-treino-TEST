@@ -3,7 +3,8 @@ package com.example
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
-import com.example.data.local.GrowthDatabase
+import com.example.data.local.AppDatabase
+import com.example.data.local.AppDao
 import com.example.data.model.ActivityLevel
 import com.example.data.model.DietPlan
 import com.example.data.model.FitnessGoal
@@ -32,12 +33,12 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34])
 class ExampleRobolectricTest {
 
-  private lateinit var db: GrowthDatabase
+  private lateinit var db: AppDatabase
 
   @Before
   fun createDb() {
     val context = ApplicationProvider.getApplicationContext<Context>()
-    db = Room.inMemoryDatabaseBuilder(context, GrowthDatabase::class.java)
+    db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
       .allowMainThreadQueries()
       .build()
   }
@@ -51,7 +52,7 @@ class ExampleRobolectricTest {
   fun `read string from context`() {
     val context = ApplicationProvider.getApplicationContext<Context>()
     val appName = context.getString(R.string.app_name)
-    assertEquals("Dieta & Treino", appName)
+    assertEquals("Virtus", appName)
   }
 
   @Test
@@ -75,7 +76,7 @@ class ExampleRobolectricTest {
 
   @Test
   fun `test room dao stores diet plan and workout routines`() = runBlocking {
-    val dao = db.growthDao()
+    val dao = db.appDao()
 
     // 1. Insert and retrieve meal plan item
     val meal = MealPlanItem(
@@ -127,7 +128,7 @@ class ExampleRobolectricTest {
 
   @Test
   fun `test room dao stores and updates user profile biometrics`() = runBlocking {
-    val dao = db.userProfileDao()
+    val dao = db.appDao()
 
     val profile = UserProfile(
       id = 1,
@@ -163,7 +164,7 @@ class ExampleRobolectricTest {
 
   @Test
   fun `test room dao updates biometrics like weight height age and activity level`() = runBlocking {
-    val dao = db.userProfileDao()
+    val dao = db.appDao()
 
     val initialProfile = UserProfile(
       id = 1,
@@ -202,7 +203,7 @@ class ExampleRobolectricTest {
 
   @Test
   fun `test room dao stores and queries diet plans`() = runBlocking {
-    val dao = db.dietPlanDao()
+    val dao = db.appDao()
 
     val dietPlan = DietPlan(
       name = "Protocolo Hipertrofia",
@@ -229,7 +230,7 @@ class ExampleRobolectricTest {
 
   @Test
   fun `test room dao workout routine management`() = runBlocking {
-    val dao = db.workoutRoutineDao()
+    val dao = db.appDao()
 
     val routine = WorkoutRoutine(
       splitType = WorkoutSplitType.ABCDE,
@@ -259,7 +260,7 @@ class ExampleRobolectricTest {
 
   @Test
   fun `test room stores and queries workout logs with volume metrics`() = runBlocking {
-    val dao = db.growthDao()
+    val dao = db.appDao()
 
     val log1 = WorkoutLog(
       routineId = 101L,
@@ -305,7 +306,7 @@ class ExampleRobolectricTest {
 
   @Test
   fun `test room updates dietary goals and switches active diet plans`() = runBlocking {
-    val dao = db.growthDao()
+    val dao = db.appDao()
 
     // 1. Initial user profile
     dao.insertOrUpdateProfile(
@@ -350,7 +351,7 @@ class ExampleRobolectricTest {
 
   @Test
   fun `test offline persistence for food records daily journal`() = runBlocking {
-    val dao = db.growthDao()
+    val dao = db.appDao()
 
     val record1 = com.example.data.model.FoodRecord(
       dateString = "2026-10-11",
@@ -402,7 +403,7 @@ class ExampleRobolectricTest {
 
   @Test
   fun `test offline persistence for weekly diet plans`() = runBlocking {
-    val dao = db.growthDao()
+    val dao = db.appDao()
 
     val weeklyPlanMonday = com.example.data.model.WeeklyDietPlan(
       dietPlanId = 1L,
@@ -443,7 +444,7 @@ class ExampleRobolectricTest {
 
   @Test
   fun `test offline persistence for workout programs and switching active plan`() = runBlocking {
-    val dao = db.growthDao()
+    val dao = db.appDao()
 
     val program1 = com.example.data.model.WorkoutPlan(
       name = "Plano Hipertrofia ABCDE",

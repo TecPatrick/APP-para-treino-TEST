@@ -5,6 +5,10 @@ import android.app.Application
 import android.os.Looper
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.firestore.FirestoreSyncManager
+import com.example.data.local.AppDatabase
+import com.example.data.model.GpsRouteLog
+import com.example.data.repository.VirtusRepository
 import com.example.service.WorkoutTtsService
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
@@ -18,6 +22,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -49,6 +55,11 @@ class WorkoutTrackerViewModel(application: Application) : AndroidViewModel(appli
     val uiState: StateFlow<ActiveWorkoutGpsState> = _uiState.asStateFlow()
 
     private val ttsService = WorkoutTtsService(application)
+    private val firestoreSync = FirestoreSyncManager(application)
+    private val repository by lazy {
+        val db = AppDatabase.getDatabase(application)
+        VirtusRepository(db.appDao())
+    }
 
     private val fusedLocationClient: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(application)
@@ -134,6 +145,37 @@ class WorkoutTrackerViewModel(application: Application) : AndroidViewModel(appli
             val time = ttsService.formatTimeSpeech(finishedState.elapsedSeconds)
             val pace = ttsService.formatPaceSpeech(finishedState.paceSecondsPerKm)
             ttsService.speak("Treino finalizado! Você percorreu $dist em $time, com $pace. Parabéns pelo esforço!")
+        }
+
+        // Salva e persiste os logs de treino localmente (Room) e no Firestore (com cache offline)
+        if (finishedState.distanceMeters >= 5f && finishedState.elapsedSeconds >= 2L) {
+            viewModelScope.launch {
+                try {
+                    val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("pt", "BR"))
+                    val now = System.currentTimeMillis()
+                    val paceMinKm = if (finishedState.distanceMeters > 0) {
+                        (finishedState.elapsedSeconds / 60f) / (finishedState.distanceMeters / 1000f)
+                    } else 0f
+                    val coordsStr = finishedState.routePoints.joinToString(";") { "${it.first},${it.second}" }
+                    val log = GpsRouteLog(
+                        routeName = "Corrida ao Ar Livre",
+                        activityType = "Corrida",
+                        dateMillis = now,
+                        dateDisplay = dateFormat.format(Date(now)),
+                        distanceMeters = finishedState.distanceMeters,
+                        durationSeconds = finishedState.elapsedSeconds.toInt(),
+                        stepsCount = finishedState.stepsCount,
+                        caloriesBurned = finishedState.caloriesBurned,
+                        averagePaceMinPerKm = paceMinKm,
+                        routePointsJson = coordsStr,
+                        notes = "Monitorado via GPS com áudio treinador TTS"
+                    )
+                    val insertedId = repository.insertGpsRouteLog(log)
+                    firestoreSync.syncGpsRouteLogToCloud(log.copy(id = insertedId))
+                } catch (e: Exception) {
+                    android.util.Log.e("WorkoutTrackerVM", "Erro ao salvar log de treino GPS: ${e.message}", e)
+                }
+            }
         }
 
         _uiState.value = ActiveWorkoutGpsState(isTtsEnabled = finishedState.isTtsEnabled)

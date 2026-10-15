@@ -27,9 +27,13 @@ import com.example.data.model.*
     Macro::class,
     WorkoutSchedule::class,
     CardioLog::class
-], version = 1, exportSchema = false)
+], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun appDao(): AppDao
+    fun growthDao(): AppDao = appDao()
+    fun userProfileDao(): AppDao = appDao()
+    fun dietPlanDao(): AppDao = appDao()
+    fun workoutRoutineDao(): AppDao = appDao()
 
     companion object {
         @Volatile
@@ -41,10 +45,14 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "app_database"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }
         }
     }
 }
+
+typealias GrowthDatabase = AppDatabase
