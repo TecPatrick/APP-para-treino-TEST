@@ -332,7 +332,11 @@ fun AuthAndOnboardingScreen(
                             // Biometric Sign In Option (Fingerprint / Face Unlock)
                             if (!isRegisterMode) {
                                 val fragmentActivity = context as? FragmentActivity
-                                val hasConfiguredEmail = userProfile.email.isNotBlank() && userProfile.email.contains("@") && userProfile.email.contains(".")
+                                val hasConfiguredEmail = userProfile.email.isNotBlank() &&
+                                    userProfile.email.contains("@") &&
+                                    userProfile.email.contains(".") &&
+                                    !userProfile.email.endsWith("@growth.local") &&
+                                    !userProfile.firebaseUid.startsWith("guest_")
                                 val hasConfiguredProfile = userProfile.hasCompletedOnboarding && userProfile.weightKg > 30f && userProfile.name.isNotBlank() && userProfile.name != "Atleta"
                                 val isBiometricsReady = hasConfiguredEmail && hasConfiguredProfile
 
