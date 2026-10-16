@@ -367,12 +367,11 @@ fun AnalyticsScreen(viewModel: VirtusViewModel) {
                         }
                     }
 
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
                             text = "HISTÓRICO DE MEDIDAS & PESAGENS",
@@ -386,7 +385,7 @@ fun AnalyticsScreen(viewModel: VirtusViewModel) {
                             onClick = { showAddMeasurementDialog = true },
                             shape = RoundedCornerShape(8.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
-                            modifier = Modifier.testTag("add_measurement_btn")
+                            modifier = Modifier.fillMaxWidth().testTag("add_measurement_btn")
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, tint = GrowthCyan, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
