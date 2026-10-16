@@ -3,10 +3,7 @@ package com.example.ui.screens.gps
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.location.Location
-import android.location.LocationListener
-import android.location.LocationManager
-import android.os.Bundle
+import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -59,7 +56,6 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.Satellite
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.RecordVoiceOver
@@ -105,9 +101,14 @@ import com.example.ui.theme.GrowthOrangeLight
 import com.example.ui.theme.GrowthYellow
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
-import com.example.util.TextToSpeechManager
 import java.util.Calendar
 import java.util.Locale
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
 
 @Composable
 fun GpsTrackerScreen(
@@ -118,13 +119,15 @@ fun GpsTrackerScreen(
     val context = LocalContext.current
     val activeSession by viewModel.activeGpsSession.collectAsStateWithLifecycle()
     val allLogs by viewModel.allGpsRouteLogs.collectAsStateWithLifecycle()
-    val workoutTrackerState by workoutTrackerViewModel.uiState.collectAsStateWithLifecycle()
-    
-    val ttsManager = remember { TextToSpeechManager(context) }
-    var ttsIntervalMeters by remember { mutableFloatStateOf(1000f) }
+    val voiceState by workoutTrackerViewModel.uiState.collectAsStateWithLifecycle()
+    val ttsIntervalMeters = voiceState.narrationIntervalMeters
+    val isTtsVoiceCoachEnabled = voiceState.isTtsEnabled
+    val lastSpokenMessage = voiceState.lastNarratedMessage
     var lastAnnouncedDistanceMeters by remember { mutableFloatStateOf(0f) }
-    var isTtsVoiceCoachEnabled by remember { mutableStateOf(true) }
-    var lastSpokenMessage by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(activeSession.isRunning) {
+        if (!activeSession.isRunning) lastAnnouncedDistanceMeters = 0f
+    }
 
     // TTS Announcements: Real-time narration of Distance, Elapsed Time, and Pace (Ritmo)
     LaunchedEffect(activeSession.distanceMeters, isTtsVoiceCoachEnabled, ttsIntervalMeters) {
@@ -137,25 +140,20 @@ fun GpsTrackerScreen(
                 (activeSession.elapsedSeconds / (activeSession.distanceMeters / 1000f)).toLong().coerceIn(60, 3600)
             } else 0L
             val announcement = if (ttsIntervalMeters >= 1000f && (lastAnnouncedDistanceMeters % 1000f == 0f)) {
-                ttsManager.service.formatMilestoneSpeech(
+                workoutTrackerViewModel.formatMilestoneSpeech(
                     kmNumber = (lastAnnouncedDistanceMeters / 1000f).toInt(),
                     elapsedSeconds = activeSession.elapsedSeconds.toLong(),
                     paceSecondsPerKm = paceSec
                 )
             } else {
-                ttsManager.service.formatDistanceMilestoneSpeech(
+                workoutTrackerViewModel.formatDistanceMilestoneSpeech(
                     distanceMeters = lastAnnouncedDistanceMeters,
                     elapsedSeconds = activeSession.elapsedSeconds.toLong(),
                     paceSecondsPerKm = paceSec
                 )
             }
-            lastSpokenMessage = announcement
-            ttsManager.speak(announcement)
+            workoutTrackerViewModel.speak(announcement)
         }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose { ttsManager.shutdown() }
     }
 
     var showFinishDialog by remember { mutableStateOf(false) }
@@ -164,6 +162,8 @@ fun GpsTrackerScreen(
     var selectedLogForDetails by remember { mutableStateOf<GpsRouteLog?>(null) }
     var currentGpsLocation by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     var useInteractiveMap by remember { mutableStateOf(true) }
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    var startAfterPermission by remember { mutableStateOf(false) }
 
     // Check location permissions
     var hasLocationPermission by remember {
@@ -179,6 +179,30 @@ fun GpsTrackerScreen(
         )
     }
 
+    val startGpsWithCurrentLocation: () -> Unit = {
+        val tokenSource = CancellationTokenSource()
+        try {
+            fusedLocationClient
+                .getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, tokenSource.token)
+                .addOnSuccessListener { location ->
+                    if (location == null) {
+                        viewModel.showToast("Não foi possível obter o GPS. Ative a localização e tente novamente.")
+                        return@addOnSuccessListener
+                    }
+                    currentGpsLocation = location.latitude to location.longitude
+                    viewModel.startGpsSession(location.latitude, location.longitude)
+                    if (isTtsVoiceCoachEnabled) {
+                        workoutTrackerViewModel.speak("Treino de corrida iniciado. Boa corrida!")
+                    }
+                }
+                .addOnFailureListener {
+                    viewModel.showToast("Falha ao localizar o aparelho. Verifique o GPS e tente novamente.")
+                }
+        } catch (_: SecurityException) {
+            viewModel.showToast("A permissão de localização foi removida.")
+        }
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -187,19 +211,22 @@ fun GpsTrackerScreen(
         hasLocationPermission = fine || coarse
         if (hasLocationPermission) {
             viewModel.showToast("Permissão de GPS concedida!")
+            if (startAfterPermission) {
+                startAfterPermission = false
+                startGpsWithCurrentLocation()
+            }
+        } else {
+            startAfterPermission = false
+            viewModel.showToast("A corrida precisa da permissão de localização.")
         }
     }
 
-    // Pre-fetch last known location as soon as permission is granted
+    // Pre-fetch the last fused location as soon as permission is granted.
     DisposableEffect(hasLocationPermission) {
         if (hasLocationPermission) {
             try {
-                val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-                val locGps = lm?.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-                val locNet = lm?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-                val best = locGps ?: locNet
-                if (best != null) {
-                    currentGpsLocation = Pair(best.latitude, best.longitude)
+                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                    location?.let { currentGpsLocation = it.latitude to it.longitude }
                 }
             } catch (_: SecurityException) {
             } catch (_: Exception) {}
@@ -207,50 +234,36 @@ fun GpsTrackerScreen(
         onDispose {}
     }
 
-    // Android LocationManager GPS hook during active tracking
+    // One continuous location source for the active session.
     DisposableEffect(activeSession.isRunning, activeSession.isPaused, hasLocationPermission) {
-        var locationManager: LocationManager? = null
-        var locationListener: LocationListener? = null
+        var locationCallback: LocationCallback? = null
 
         if (activeSession.isRunning && !activeSession.isPaused && hasLocationPermission) {
             try {
-                locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-                locationListener = object : LocationListener {
-                    override fun onLocationChanged(loc: Location) {
-                        currentGpsLocation = Pair(loc.latitude, loc.longitude)
-                        viewModel.addGpsCoordinate(loc.latitude, loc.longitude)
+                val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2_000L)
+                    .setMinUpdateIntervalMillis(1_000L)
+                    .setMinUpdateDistanceMeters(2f)
+                    .build()
+                locationCallback = object : LocationCallback() {
+                    override fun onLocationResult(result: LocationResult) {
+                        result.lastLocation?.let { location ->
+                            currentGpsLocation = location.latitude to location.longitude
+                            viewModel.addGpsCoordinate(location.latitude, location.longitude)
+                        }
                     }
-                    @Deprecated("Deprecated in Java")
-                    override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
-                    override fun onProviderEnabled(provider: String) {}
-                    override fun onProviderDisabled(provider: String) {}
                 }
-
-                if (locationManager?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true) {
-                    locationManager.requestLocationUpdates(
-                        LocationManager.GPS_PROVIDER,
-                        2000L,
-                        2.0f,
-                        locationListener
-                    )
-                } else if (locationManager?.isProviderEnabled(LocationManager.NETWORK_PROVIDER) == true) {
-                    locationManager.requestLocationUpdates(
-                        LocationManager.NETWORK_PROVIDER,
-                        2000L,
-                        2.0f,
-                        locationListener
-                    )
-                }
+                fusedLocationClient.requestLocationUpdates(
+                    request,
+                    locationCallback!!,
+                    Looper.getMainLooper()
+                )
             } catch (_: SecurityException) {
+                viewModel.showToast("Sem permissão para atualizar o GPS.")
             } catch (_: Exception) {}
         }
 
         onDispose {
-            if (locationManager != null && locationListener != null) {
-                try {
-                    locationManager.removeUpdates(locationListener)
-                } catch (_: Exception) {}
-            }
+            locationCallback?.let { fusedLocationClient.removeLocationUpdates(it) }
         }
     }
 
@@ -647,7 +660,7 @@ fun GpsTrackerScreen(
                             Surface(
                                 modifier = Modifier
                                     .clickable {
-                                        openInGoogleMaps(context, activeCoord.first, activeCoord.second)
+                                        openInExternalMap(context, activeCoord.first, activeCoord.second)
                                     }
                                     .testTag("open_google_maps_top_btn"),
                                 color = CarbonDark,
@@ -680,7 +693,7 @@ fun GpsTrackerScreen(
 
                     // Map Container: Real OpenStreetMap Leaflet View OR High-Tech Vector Canvas
                     if (useInteractiveMap) {
-                        GpsInteractiveMapView(
+                        NativeGpsMapView(
                             points = displayPoints,
                             currentLocation = currentGpsLocation,
                             isTracking = activeSession.isRunning && !activeSession.isPaused,
@@ -797,13 +810,7 @@ fun GpsTrackerScreen(
                                 Switch(
                                     checked = isTtsVoiceCoachEnabled,
                                     onCheckedChange = { enabled ->
-                                        isTtsVoiceCoachEnabled = enabled
                                         workoutTrackerViewModel.setTtsEnabled(enabled)
-                                        if (enabled) {
-                                            ttsManager.speak("Treinador por voz ativado.")
-                                        } else {
-                                            ttsManager.stop()
-                                        }
                                     },
                                     colors = SwitchDefaults.colors(
                                         checkedThumbColor = Color.White,
@@ -827,13 +834,12 @@ fun GpsTrackerScreen(
                                             val paceSec = if (activeSession.distanceMeters > 20f && activeSession.elapsedSeconds > 0) {
                                                 (activeSession.elapsedSeconds / (activeSession.distanceMeters / 1000f)).toLong().coerceIn(60, 3600)
                                             } else 0L
-                                            val message = ttsManager.service.formatFullWorkoutSpeech(
+                                            val message = workoutTrackerViewModel.formatFullWorkoutSpeech(
                                                 distanceMeters = activeSession.distanceMeters,
                                                 elapsedSeconds = activeSession.elapsedSeconds.toLong(),
                                                 paceSecondsPerKm = paceSec
                                             )
-                                            lastSpokenMessage = message
-                                            ttsManager.speak(message)
+                                            workoutTrackerViewModel.speak(message)
                                         },
                                         border = BorderStroke(1.dp, GrowthGreen.copy(alpha = 0.8f)),
                                         shape = RoundedCornerShape(8.dp),
@@ -884,7 +890,6 @@ fun GpsTrackerScreen(
                                                 shape = RoundedCornerShape(6.dp),
                                                 modifier = Modifier
                                                     .clickable {
-                                                        ttsIntervalMeters = dist
                                                         workoutTrackerViewModel.setNarrationIntervalMeters(dist)
                                                     }
                                             ) {
@@ -925,18 +930,15 @@ fun GpsTrackerScreen(
                             Button(
                                 onClick = {
                                     if (!hasLocationPermission) {
+                                        startAfterPermission = true
                                         permissionLauncher.launch(
                                              arrayOf(
                                                  Manifest.permission.ACCESS_FINE_LOCATION,
                                                  Manifest.permission.ACCESS_COARSE_LOCATION
                                              )
                                          )
-                                    }
-                                    val startPos = currentGpsLocation ?: Pair(-23.550520, -46.633308)
-                                    viewModel.startGpsSession(startPos.first, startPos.second)
-                                    workoutTrackerViewModel.startWorkout(startPos.first, startPos.second)
-                                    if (isTtsVoiceCoachEnabled) {
-                                        ttsManager.speak("Treino de corrida iniciado. Boa corrida!")
+                                    } else {
+                                        startGpsWithCurrentLocation()
                                     }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
@@ -955,9 +957,8 @@ fun GpsTrackerScreen(
                                 OutlinedButton(
                                     onClick = {
                                         viewModel.pauseGpsSession()
-                                        workoutTrackerViewModel.pauseWorkout()
                                         if (isTtsVoiceCoachEnabled) {
-                                            ttsManager.speak("Treino pausado.")
+                                            workoutTrackerViewModel.speak("Treino pausado.")
                                         }
                                     },
                                     border = BorderStroke(1.dp, GrowthYellow),
@@ -975,9 +976,8 @@ fun GpsTrackerScreen(
                                 Button(
                                     onClick = {
                                         viewModel.resumeGpsSession()
-                                        workoutTrackerViewModel.resumeWorkout()
                                         if (isTtsVoiceCoachEnabled) {
-                                            ttsManager.speak("Treino retomado. Vamos lá!")
+                                            workoutTrackerViewModel.speak("Treino retomado. Vamos lá!")
                                         }
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = GrowthGreen),
@@ -996,7 +996,6 @@ fun GpsTrackerScreen(
                             Button(
                                 onClick = {
                                     showFinishDialog = true
-                                    workoutTrackerViewModel.stopWorkout()
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
                                 shape = RoundedCornerShape(10.dp),
@@ -1433,7 +1432,7 @@ fun GpsRouteLogCard(
                         if (firstPt != null) {
                             Surface(
                                 modifier = Modifier
-                                    .clickable { openInGoogleMaps(context, firstPt.first, firstPt.second) }
+                                    .clickable { openInExternalMap(context, firstPt.first, firstPt.second) }
                                     .testTag("open_log_in_gmaps_${log.id}"),
                                 color = CarbonDark,
                                 shape = RoundedCornerShape(6.dp),
@@ -1463,7 +1462,7 @@ fun GpsRouteLogCard(
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    GpsInteractiveMapView(
+                    NativeGpsMapView(
                         points = coords,
                         currentLocation = null,
                         isTracking = false,
