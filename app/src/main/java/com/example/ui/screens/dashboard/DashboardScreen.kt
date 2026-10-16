@@ -210,10 +210,10 @@ fun DashboardScreen(
                         letterSpacing = 1.sp
                     )
                     Spacer(modifier = Modifier.height(14.dp))
-                    Row(
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         CircularCalorieGauge(
                             currentCalories = consumedCalories,
@@ -221,8 +221,7 @@ fun DashboardScreen(
                         )
                         Column(
                             modifier = Modifier
-                                .weight(1f)
-                                .padding(start = 16.dp),
+                                .fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             MacroProgressBar("Proteína", consumedProtein, profile.targetProteinGrams.toFloat(), "g", GrowthCyan)
