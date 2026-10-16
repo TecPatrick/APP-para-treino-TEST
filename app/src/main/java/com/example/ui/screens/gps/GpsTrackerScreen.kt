@@ -162,6 +162,7 @@ fun GpsTrackerScreen(
     var selectedLogForDetails by remember { mutableStateOf<GpsRouteLog?>(null) }
     var currentGpsLocation by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     var useInteractiveMap by remember { mutableStateOf(true) }
+    var showMapOptions by remember { mutableStateOf(false) }
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
     var startAfterPermission by remember { mutableStateOf(false) }
 
@@ -529,7 +530,10 @@ fun GpsTrackerScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Route,
                                 contentDescription = null,
@@ -542,9 +546,13 @@ fun GpsTrackerScreen(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (activeSession.isRunning) GrowthOrangeLight else MaterialTheme.colorScheme.onSurfaceVariant,
-                                letterSpacing = 1.sp
+                                letterSpacing = 0.6.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
+
+                        Spacer(modifier = Modifier.width(8.dp))
 
                         if (activeSession.isRunning) {
                             Surface(
@@ -568,7 +576,8 @@ fun GpsTrackerScreen(
                                         text = if (activeSession.isPaused) "PAUSADO" else "GRAVANDO",
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (activeSession.isPaused) GrowthYellow else GrowthGreen
+                                        color = if (activeSession.isPaused) GrowthYellow else GrowthGreen,
+                                        maxLines = 1
                                     )
                                 }
                             }
@@ -590,15 +599,40 @@ fun GpsTrackerScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Map Mode Selector (Interactive Real Map vs Vector Grid)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    // Compact submenu prevents map actions from being squeezed on phones.
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showMapOptions = !showMapOptions }
+                            .testTag("toggle_map_options_btn"),
+                        color = CarbonDark,
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, CarbonBorder)
                     ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Layers, null, tint = GrowthOrangeLight, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("OPÇÕES DO MAPA", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GrowthOrangeLight)
+                            }
+                            Text(if (showMapOptions) "OCULTAR" else "MOSTRAR", fontSize = 9.sp, color = GrowthCyan)
+                        }
+                    }
+
+                    if (showMapOptions) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
                             Surface(
                                 modifier = Modifier
+                                    .weight(1f)
                                     .clickable { useInteractiveMap = true }
                                     .testTag("toggle_interactive_map_btn"),
                                 color = if (useInteractiveMap) GrowthOrange.copy(alpha = 0.22f) else CarbonDark,
@@ -617,7 +651,7 @@ fun GpsTrackerScreen(
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = "Mapa Real (OSM)",
+                                        text = "Mapa de ruas",
                                         fontSize = 10.sp,
                                         fontWeight = if (useInteractiveMap) FontWeight.Bold else FontWeight.Normal,
                                         color = if (useInteractiveMap) GrowthOrangeLight else MaterialTheme.colorScheme.onSurfaceVariant
@@ -627,6 +661,7 @@ fun GpsTrackerScreen(
 
                             Surface(
                                 modifier = Modifier
+                                    .weight(1f)
                                     .clickable { useInteractiveMap = false }
                                     .testTag("toggle_vector_grid_btn"),
                                 color = if (!useInteractiveMap) GrowthCyan.copy(alpha = 0.22f) else CarbonDark,
@@ -645,7 +680,7 @@ fun GpsTrackerScreen(
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = "Grade Vetorial",
+                                        text = "Traçado offline",
                                         fontSize = 10.sp,
                                         fontWeight = if (!useInteractiveMap) FontWeight.Bold else FontWeight.Normal,
                                         color = if (!useInteractiveMap) GrowthCyan else MaterialTheme.colorScheme.onSurfaceVariant
@@ -654,11 +689,11 @@ fun GpsTrackerScreen(
                             }
                         }
 
-                        // Google Maps Direct Shortcut
                         val activeCoord = currentGpsLocation ?: displayPoints.lastOrNull()
                         if (activeCoord != null) {
                             Surface(
                                 modifier = Modifier
+                                    .fillMaxWidth()
                                     .clickable {
                                         openInExternalMap(context, activeCoord.first, activeCoord.second)
                                     }
@@ -668,8 +703,9 @@ fun GpsTrackerScreen(
                                 border = BorderStroke(1.dp, CarbonBorder)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.OpenInNew,
@@ -687,6 +723,7 @@ fun GpsTrackerScreen(
                                 }
                             }
                         }
+                    }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -775,7 +812,8 @@ fun GpsTrackerScreen(
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f)
                                 ) {
                                     Surface(
                                         color = if (isTtsVoiceCoachEnabled) GrowthGreen.copy(alpha = 0.18f) else CarbonCard,
@@ -791,7 +829,7 @@ fun GpsTrackerScreen(
                                             )
                                         }
                                     }
-                                    Column {
+                                    Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = "TREINADOR POR VOZ (TTS)",
                                             fontSize = 11.sp,
@@ -802,10 +840,14 @@ fun GpsTrackerScreen(
                                         Text(
                                             text = if (isTtsVoiceCoachEnabled) "Narra distância, tempo e ritmo (pace) ao vivo" else "Voz desativada",
                                             fontSize = 10.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
                                 }
+
+                                Spacer(modifier = Modifier.width(8.dp))
 
                                 Switch(
                                     checked = isTtsVoiceCoachEnabled,
@@ -824,10 +866,9 @@ fun GpsTrackerScreen(
 
                             if (isTtsVoiceCoachEnabled) {
                                 Spacer(modifier = Modifier.height(10.dp))
-                                Row(
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     OutlinedButton(
                                         onClick = {
@@ -844,7 +885,7 @@ fun GpsTrackerScreen(
                                         border = BorderStroke(1.dp, GrowthGreen.copy(alpha = 0.8f)),
                                         shape = RoundedCornerShape(8.dp),
                                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                        modifier = Modifier.testTag("speak_metrics_now_btn")
+                                        modifier = Modifier.fillMaxWidth().testTag("speak_metrics_now_btn")
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.RecordVoiceOver,
@@ -872,10 +913,9 @@ fun GpsTrackerScreen(
                                 }
 
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Row(
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Text(
                                         text = "Avisar por voz a cada:",
@@ -883,12 +923,16 @@ fun GpsTrackerScreen(
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
                                         listOf(500f to "500m", 1000f to "1 km", 2000f to "2 km").forEach { (dist, label) ->
                                             Surface(
                                                 color = if (ttsIntervalMeters == dist) GrowthCyan else CarbonCardElevated,
                                                 shape = RoundedCornerShape(6.dp),
                                                 modifier = Modifier
+                                                    .weight(1f)
                                                     .clickable {
                                                         workoutTrackerViewModel.setNarrationIntervalMeters(dist)
                                                     }
@@ -898,7 +942,9 @@ fun GpsTrackerScreen(
                                                     fontSize = 10.sp,
                                                     fontWeight = if (ttsIntervalMeters == dist) FontWeight.Black else FontWeight.Normal,
                                                     color = if (ttsIntervalMeters == dist) Color.Black else Color.White,
-                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 7.dp),
+                                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                                    maxLines = 1
                                                 )
                                             }
                                         }
@@ -970,7 +1016,7 @@ fun GpsTrackerScreen(
                                 ) {
                                     Icon(Icons.Default.Pause, contentDescription = null, tint = GrowthYellow)
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("PAUSAR", color = GrowthYellow, fontWeight = FontWeight.Bold)
+                                    Text("PAUSAR", color = GrowthYellow, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
                                 }
                             } else {
                                 Button(
@@ -989,7 +1035,7 @@ fun GpsTrackerScreen(
                                 ) {
                                     Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("RETOMAR", color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text("RETOMAR", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
                                 }
                             }
 
@@ -1006,7 +1052,7 @@ fun GpsTrackerScreen(
                             ) {
                                 Icon(Icons.Default.Stop, contentDescription = null, tint = Color.White)
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("FINALIZAR", color = Color.White, fontWeight = FontWeight.Bold)
+                                Text("FINALIZAR", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
                             }
                         }
                     }
