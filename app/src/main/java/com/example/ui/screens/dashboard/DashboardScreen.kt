@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bolt
@@ -175,12 +174,12 @@ fun DashboardScreen(
                             )
                         }
                         IconButton(
-                            onClick = { viewModel.logout() },
-                            modifier = Modifier.size(44.dp).testTag("logout_btn")
+                            onClick = onNavigateToProfile,
+                            modifier = Modifier.size(44.dp).testTag("profile_btn")
                         ) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ExitToApp,
-                                contentDescription = "Sair da Conta",
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Abrir perfil e conta",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -269,6 +268,34 @@ fun DashboardScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     val waterProgress = (waterDrank.toFloat() / profile.targetWaterMl.coerceAtLeast(1)).coerceIn(0f, 1f)
                     LinearProgressIndicator(progress = { waterProgress }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)), color = GrowthCyan)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilledTonalButton(
+                            onClick = { viewModel.addWater(250) },
+                            modifier = Modifier.weight(1f).testTag("add_water_250_btn")
+                        ) { Text("+250 ml", maxLines = 1) }
+                        FilledTonalButton(
+                            onClick = { viewModel.addWater(500) },
+                            modifier = Modifier.weight(1f).testTag("add_water_500_btn")
+                        ) { Text("+500 ml", maxLines = 1) }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        TextButton(onClick = { viewModel.resetWater() }) {
+                            Text("Zerar hoje")
+                        }
+                        TextButton(onClick = {
+                            newWaterGoalInput = profile.targetWaterMl.toString()
+                            showWaterGoalDialog = true
+                        }) {
+                            Text("Ajustar meta")
+                        }
+                    }
                 }
             }
         }
@@ -307,6 +334,9 @@ fun DashboardScreen(
             },
             text = {
                 Column {
+                    TextButton(onClick = { onNavigateToProfile(); showMoreDialog = false }) {
+                        Text("Perfil, conta e biometria", color = MaterialTheme.colorScheme.onBackground)
+                    }
                     Text(
                         text = "A recomendação ideal para o seu peso atual (${profile.weightKg} kg) é de aproximadamente $recommendedWater ml por dia (35 ml/kg).",
                         fontSize = 12.sp,
