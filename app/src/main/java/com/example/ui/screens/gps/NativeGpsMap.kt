@@ -20,8 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.OpenInNew
@@ -40,7 +38,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -78,9 +75,7 @@ import org.maplibre.geojson.Feature
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
 
-private const val OPEN_FREE_MAP_DARK = "https://tiles.openfreemap.org/styles/dark"
 private const val OPEN_FREE_MAP_STREETS = "https://tiles.openfreemap.org/styles/liberty"
-private const val OPEN_FREE_MAP_LIGHT = "https://tiles.openfreemap.org/styles/positron"
 
 private const val ROUTE_SOURCE = "virtus-route-source"
 private const val ROUTE_HALO_LAYER = "virtus-route-halo"
@@ -89,16 +84,6 @@ private const val START_SOURCE = "virtus-start-source"
 private const val START_LAYER = "virtus-start-point"
 private const val CURRENT_SOURCE = "virtus-current-source"
 private const val CURRENT_LAYER = "virtus-current-point"
-
-private enum class NativeMapLayer(
-    val label: String,
-    val icon: ImageVector,
-    val styleUrl: String
-) {
-    DARK("Escuro", Icons.Default.DarkMode, OPEN_FREE_MAP_DARK),
-    STREETS("Ruas", Icons.Default.Map, OPEN_FREE_MAP_STREETS),
-    LIGHT("Claro", Icons.Default.LightMode, OPEN_FREE_MAP_LIGHT)
-}
 
 /** Native, keyless map powered by MapLibre and OpenFreeMap/OpenStreetMap. */
 @Composable
@@ -111,7 +96,6 @@ fun NativeGpsMapView(
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    var selectedLayer by remember { mutableStateOf(NativeMapLayer.DARK) }
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     val targetPair = currentLocation ?: points.lastOrNull()
 
@@ -148,13 +132,13 @@ fun NativeGpsMapView(
         }
     }
 
-    LaunchedEffect(mapLibreMap, selectedLayer) {
-        mapLibreMap?.setStyle(selectedLayer.styleUrl) { style ->
+    LaunchedEffect(mapLibreMap) {
+        mapLibreMap?.setStyle(OPEN_FREE_MAP_STREETS) { style ->
             renderGpsRoute(style, points, targetPair)
         }
     }
 
-    LaunchedEffect(mapLibreMap, points, targetPair, selectedLayer) {
+    LaunchedEffect(mapLibreMap, points, targetPair) {
         val map = mapLibreMap ?: return@LaunchedEffect
         map.getStyle { style -> renderGpsRoute(style, points, targetPair) }
         targetPair?.let { target ->
@@ -238,28 +222,6 @@ fun NativeGpsMapView(
             )
         }
 
-        Spacer(Modifier.height(8.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            NativeMapLayer.entries.forEach { layer ->
-                val selected = selectedLayer == layer
-                Surface(
-                    modifier = Modifier.weight(1f).clickable { selectedLayer = layer },
-                    color = if (selected) GrowthOrange.copy(alpha = 0.2f) else CarbonCard,
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, if (selected) GrowthOrange else CarbonBorder)
-                ) {
-                    Row(
-                        Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(layer.icon, null, modifier = Modifier.size(13.dp), tint = if (selected) GrowthOrangeLight else MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.width(4.dp))
-                        Text(layer.label, fontSize = 10.sp, maxLines = 1, color = if (selected) GrowthOrangeLight else MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-        }
     }
 }
 
