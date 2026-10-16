@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -171,15 +172,17 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
                                 Icon(
                                     imageVector = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
                                     contentDescription = screen.title,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(22.dp)
                                 )
                             },
                             label = {
                                 Text(
                                     text = screen.title,
-                                    fontSize = 11.sp,
+                                    fontSize = 9.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    maxLines = 1
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    textAlign = TextAlign.Center
                                 )
                             },
                             colors = NavigationBarItemDefaults.colors(
