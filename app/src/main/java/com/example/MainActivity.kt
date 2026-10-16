@@ -136,7 +136,7 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
     }
 
     // Handle back button on sub-screens
-    if (currentScreen != AppNavigationScreen.DASHBOARD && currentScreen != AppNavigationScreen.AUTH) {
+    if (currentScreen != AppNavigationScreen.DASHBOARD) {
         BackHandler {
             currentScreen = AppNavigationScreen.DASHBOARD
         }
@@ -249,7 +249,8 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
                     )
                     AppNavigationScreen.PROFILE -> UserProfileScreen(
                         viewModel = viewModel,
-                        onNavigateBack = { currentScreen = AppNavigationScreen.DASHBOARD }
+                        onNavigateBack = { currentScreen = AppNavigationScreen.DASHBOARD },
+                        onNavigateToAccount = { currentScreen = AppNavigationScreen.AUTH }
                     )
                     AppNavigationScreen.AUTH -> AuthAndOnboardingScreen(
                         viewModel = viewModel,
