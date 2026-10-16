@@ -463,8 +463,9 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     fun logout() {
         viewModelScope.launch {
             authService.signOut()
-            repository.deleteAllUserProfiles()
-            _toastMessage.value = "Você saiu da sua conta. Sessão finalizada."
+            val current = userProfile.value
+            repository.saveUserProfile(current.copy(isLoggedIn = false))
+            _toastMessage.value = "Você saiu da conta. Seu perfil local foi preservado para o próximo login."
         }
     }
 
