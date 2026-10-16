@@ -24,6 +24,8 @@ The sync summary is a snapshot of that attempt, not a live count of every outsta
 
 Firebase AI Logic with the Gemini Developer API, Email/Password and Google Sign-In are enabled in project `gen-lang-client-0338831300`. The Android configuration for `com.aistudio.growthdiet.kxmfzq` is stored at `app/google-services.json`. The app uses the current no-Blaze model `gemini-3.8-flash`.
 
+`firestore.rules` targets the named Enterprise database `ai-studio-android-growthdi-0b40ddf8-1b62-4ba8-827a-1a526890ad8a`. Access is private to the authenticated UID, and create/update operations validate ownership, allowed fields, types, numeric ranges and string sizes for every cloud-synchronized collection.
+
 Before a release build:
 
 1. Register debug App Check tokens only for local development. Release builds use Play Integrity; register the release signing certificate and configure the appropriate attestation policy for the distribution channel.
