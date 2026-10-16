@@ -260,12 +260,11 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
                                 activeWorkout.routine?.let { viewingRoutineDetail = it }
                             }
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Timer, contentDescription = null, tint = GrowthGreen, modifier = Modifier.size(24.dp))
@@ -284,9 +283,10 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
                                 onClick = {
                                     activeWorkout.routine?.let { viewingRoutineDetail = it }
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = GrowthGreen)
+                                colors = ButtonDefaults.buttonColors(containerColor = GrowthGreen),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Abrir Ficha", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text("Abrir", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
                             }
                         }
                     }
@@ -295,11 +295,11 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
 
             // Action Toolbar
             item {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(
                         onClick = {
@@ -311,12 +311,12 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
                         colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
-                            .weight(1f)
+                            .fillMaxWidth()
                             .testTag("add_routine_action_btn")
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Nova Ficha", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
+                        Text("Nova Ficha", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
 
                     Button(
@@ -331,12 +331,12 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
                         colors = ButtonDefaults.buttonColors(containerColor = GrowthGreen),
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
-                            .weight(1f)
+                            .fillMaxWidth()
                             .testTag("free_workout_action_btn")
                     ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Treino Livre", fontWeight = FontWeight.ExtraBold, color = Color.Black, fontSize = 12.sp)
+                        Text("Treino Livre", fontWeight = FontWeight.ExtraBold, color = Color.Black, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
 
                     OutlinedButton(
@@ -344,7 +344,7 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = GrowthCyan),
                         border = BorderStroke(1.dp, CarbonBorder),
                         shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Histórico", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
