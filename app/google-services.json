@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "204365877775-aihro10pc78oe82g7fh781ujofvkt93e.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aistudio.growthdiet.kxmfzq",
+            "certificate_hash": "ac253c68b36d7061497a0447ee931436818c67a6"
+          }
+        },
+        {
           "client_id": "204365877775-k7kdco0hj4m61c41h2fam4seqa617lhs.apps.googleusercontent.com",
           "client_type": 3
         }
