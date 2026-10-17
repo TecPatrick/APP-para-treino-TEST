@@ -418,7 +418,11 @@ fun AuthAndOnboardingScreen(
                                             } catch (_: GetCredentialCancellationException) {
                                                 // user cancelled
                                             } catch (e: Exception) {
-                                                viewModel.showToast("Google Sign-In indisponível. Utilize seu e-mail/senha ou o Acesso Rápido abaixo.")
+                                                val detail = e.message?.take(120)?.takeIf { it.isNotBlank() }
+                                                viewModel.showToast(
+                                                    if (detail != null) "Falha no Google Sign-In: $detail"
+                                                    else "Google Sign-In indisponível. Verifique a configuração Firebase."
+                                                )
                                             }
                                         }
                                     } else {
