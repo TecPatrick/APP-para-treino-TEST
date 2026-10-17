@@ -89,6 +89,7 @@ import com.example.ui.theme.GrowthGreen
 import com.example.ui.theme.GrowthOrange
 import com.example.ui.theme.GrowthOrangeLight
 import com.example.ui.theme.GrowthYellow
+import com.example.util.MacroCalculator
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -246,7 +247,15 @@ fun DashboardScreen(
                     Text("GASTO CALÓRICO & TMB DO DIA", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GrowthOrangeLight, letterSpacing = 1.sp)
                     Spacer(modifier = Modifier.height(12.dp))
                     Text("${dailyEnergy.totalExpenditure} kcal", fontSize = 24.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground)
-                    Text("Total estimado para hoje", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("TMB ${dailyEnergy.bmr} + treino ${dailyEnergy.totalWorkoutCalories} kcal", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    val plannedBalance = profile.targetCalories - dailyEnergy.totalExpenditure
+                    Text(
+                        text = "Meta alimentar: ${profile.targetCalories} kcal  •  Saldo estimado: ${if (plannedBalance > 0) "+" else ""}$plannedBalance kcal",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (plannedBalance <= 0) GrowthGreen else GrowthYellow
+                    )
                 }
             }
         }
@@ -321,7 +330,7 @@ fun DashboardScreen(
     }
 
     if (showWaterGoalDialog) {
-        val recommendedWater = (profile.weightKg * 35f).toInt().coerceAtLeast(2000)
+        val recommendedWater = MacroCalculator.calculateWaterIntakeMl(profile.weightKg, profile.age, profile.isAthleteOrWarmClimate)
         AlertDialog(
             onDismissRequest = { showWaterGoalDialog = false },
             containerColor = CarbonCard,
@@ -338,7 +347,7 @@ fun DashboardScreen(
                         Text("Perfil, conta e biometria", color = MaterialTheme.colorScheme.onBackground)
                     }
                     Text(
-                        text = "A recomendação ideal para o seu peso atual (${profile.weightKg} kg) é de aproximadamente $recommendedWater ml por dia (35 ml/kg).",
+                        text = "Estimativa-base: $recommendedWater ml por dia. Ela usa peso de referência e deve ser ajustada por sede, suor, clima e orientação profissional.",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

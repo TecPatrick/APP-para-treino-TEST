@@ -647,6 +647,7 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         monthlyTargetWeightKg: Float,
         monthlyNotes: String,
         dietCycleType: DietCycleType,
+        targetCalories: Int,
         biotype: BodyType = BodyType.MESOMORPH
     ) {
         viewModelScope.launch {
@@ -660,7 +661,8 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 biotype = biotype,
                 customProteinGPerKg = proteinGPerKg,
                 customFatGPerKg = fatGPerKg,
-                isAthleteOrWarmClimate = true
+                isAthleteOrWarmClimate = true,
+                customTargetCalories = targetCalories
             )
 
             val current = userProfile.value
@@ -738,7 +740,8 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                     biotype = biotype,
                     customProteinGPerKg = 2.2f,
                     customFatGPerKg = 0.8f,
-                    isAthleteOrWarmClimate = true
+                    isAthleteOrWarmClimate = true,
+                    customTargetCalories = current.targetCalories
                 )
                 current.copy(
                     name = name.ifBlank { current.name },

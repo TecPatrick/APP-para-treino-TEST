@@ -85,6 +85,7 @@ import com.example.data.model.MealPlanItem
 import com.example.data.model.MealType
 import com.example.ui.VirtusViewModel
 import com.example.ui.components.GrowthHeader
+import com.example.util.MacroCalculator
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
 import com.example.ui.theme.CarbonCardElevated
@@ -627,6 +628,10 @@ fun DietScreen(
                 MonthlyDietConfigSection(
                     profile = profile,
                     onSave = { cycleType, notes, targetWeight, trainingDays ->
+                        val macroReferenceWeight = MacroCalculator.calculateMacroReferenceWeight(
+                            profile.weightKg,
+                            profile.heightCm
+                        )
                         viewModel.updateProfileAndCalculateMacros(
                             name = profile.name,
                             gender = profile.gender,
@@ -635,11 +640,12 @@ fun DietScreen(
                             heightCm = profile.heightCm,
                             activityLevel = profile.activityLevel,
                             goal = profile.goal,
-                            proteinGPerKg = (profile.targetProteinGrams / profile.weightKg),
-                            fatGPerKg = (profile.targetFatGrams / profile.weightKg),
+                            proteinGPerKg = (profile.targetProteinGrams / macroReferenceWeight),
+                            fatGPerKg = (profile.targetFatGrams / macroReferenceWeight),
                             monthlyTargetWeightKg = targetWeight,
                             monthlyNotes = notes,
-                            dietCycleType = cycleType
+                            dietCycleType = cycleType,
+                            targetCalories = profile.targetCalories
                         )
                         selectedTab = 2
                     }
