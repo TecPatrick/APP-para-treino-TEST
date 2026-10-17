@@ -18,6 +18,8 @@ import com.example.data.model.WorkoutLog
 import com.example.data.model.WorkoutRoutine
 import com.example.data.model.WorkoutSplitType
 import com.example.util.MacroCalculator
+import com.example.util.ExerciseGifMapper
+import com.example.util.ExerciseMuscleClassifier
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -93,6 +95,20 @@ class ExampleRobolectricTest {
     assertTrue(plan.macroReferenceWeightKg < 110f)
     assertTrue(plan.proteinGrams < 220)
     assertTrue(plan.waterMl in 3000..5000)
+  }
+
+  @Test
+  fun `leg press is quadriceps and never deltoid`() {
+    val legPress = ExerciseGifMapper.getGuideForExercise("Leg Press 45°")
+    assertTrue(ExerciseMuscleClassifier.matches(legPress, "Quadríceps"))
+    assertTrue(!ExerciseMuscleClassifier.matches(legPress, "Deltoide"))
+  }
+
+  @Test
+  fun `reverse fly is not classified as chest`() {
+    val reverseFly = ExerciseGifMapper.getGuideForExercise("Crucifixo Inverso com Halteres")
+    assertTrue(ExerciseMuscleClassifier.matches(reverseFly, "Deltoide"))
+    assertTrue(!ExerciseMuscleClassifier.matches(reverseFly, "Peitoral"))
   }
 
   @Test

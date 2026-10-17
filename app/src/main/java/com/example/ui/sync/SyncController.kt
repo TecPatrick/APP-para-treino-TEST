@@ -28,7 +28,10 @@ class SyncController(
                     repository.getUserProfileDirect(1),
                     repository.workoutLogs.first(),
                     repository.progressLogs.first(),
-                    repository.allGpsRouteLogs.first()
+                    repository.allGpsRouteLogs.first(),
+                    repository.allFoodRecords.first(),
+                    repository.allCardioLogs.first(),
+                    repository.recentIntakeHistory.first()
                 )
                 result.onSuccess { showMessage(it.message()) }
                     .onFailure { showMessage(it.message ?: "Falha na sincronização. Tente novamente.") }

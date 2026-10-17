@@ -492,8 +492,16 @@ class VirtusRepository(private val dao: AppDao) {
 
     suspend fun deleteFoodRecord(id: Long) = dao.deleteFoodRecord(id)
 
+    suspend fun deleteLatestMatchingFoodRecord(dateString: String, foodItemId: Long, mealType: MealType) =
+        dao.deleteLatestMatchingFoodRecord(dateString, foodItemId, mealType)
+
     suspend fun deleteFoodRecordsForDate(dateString: String) =
         dao.deleteFoodRecordsForDate(dateString)
+
+    suspend fun saveDailyIntake(intake: DailyIntakeHistory): Long {
+        val existing = dao.getDailyIntakeForDate(intake.dateString)
+        return dao.insertDailyIntake(intake.copy(id = existing?.id ?: intake.id))
+    }
 
     // --- Dietas Semanais (Dia a Dia) ---
     fun getWeeklyDietPlans(dietPlanId: Long = 1L): Flow<List<WeeklyDietPlan>> =

@@ -92,6 +92,7 @@ import com.example.ui.theme.GrowthYellow
 import com.example.util.MacroCalculator
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Calendar
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -110,6 +111,7 @@ fun DashboardScreen(
     val context = LocalContext.current
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
     val mealPlans by viewModel.mealPlanItems.collectAsStateWithLifecycle()
+    val foodRecords by viewModel.allFoodRecords.collectAsStateWithLifecycle()
     val workoutRoutines by viewModel.workoutRoutines.collectAsStateWithLifecycle()
     val allExercises by viewModel.allExercises.collectAsStateWithLifecycle()
     val progressLogs by viewModel.progressLogs.collectAsStateWithLifecycle()
@@ -119,33 +121,18 @@ fun DashboardScreen(
     var showMoreDialog by remember { mutableStateOf(false) }
     var newWaterGoalInput by remember { mutableStateOf("") }
 
-    // Daily Macro Consumption calculations
-    val totalPlannedCalories = mealPlans.sumOf { it.calories.toDouble() }.toFloat()
-    val totalPlannedProtein = mealPlans.sumOf { it.protein.toDouble() }.toFloat()
-    val totalPlannedCarbs = mealPlans.sumOf { it.carbs.toDouble() }.toFloat()
-    val totalPlannedFat = mealPlans.sumOf { it.fat.toDouble() }.toFloat()
-
-    val completedMeals = mealPlans.filter { it.isCompletedToday }
-    val consumedCalories = if (completedMeals.isNotEmpty()) {
-        completedMeals.sumOf { it.calories.toDouble() }.toFloat()
-    } else {
-        totalPlannedCalories
+    // Only food actually checked/recorded today counts as consumed.
+    val todayStart = remember {
+        Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
     }
-    val consumedProtein = if (completedMeals.isNotEmpty()) {
-        completedMeals.sumOf { it.protein.toDouble() }.toFloat()
-    } else {
-        totalPlannedProtein
-    }
-    val consumedCarbs = if (completedMeals.isNotEmpty()) {
-        completedMeals.sumOf { it.carbs.toDouble() }.toFloat()
-    } else {
-        totalPlannedCarbs
-    }
-    val consumedFat = if (completedMeals.isNotEmpty()) {
-        completedMeals.sumOf { it.fat.toDouble() }.toFloat()
-    } else {
-        totalPlannedFat
-    }
+    val todayFood = foodRecords.filter { it.dateMillis >= todayStart }
+    val consumedCalories = todayFood.sumOf { it.calories.toDouble() }.toFloat()
+    val consumedProtein = todayFood.sumOf { it.protein.toDouble() }.toFloat()
+    val consumedCarbs = todayFood.sumOf { it.carbs.toDouble() }.toFloat()
+    val consumedFat = todayFood.sumOf { it.fat.toDouble() }.toFloat()
 
     val todayRoutine = workoutRoutines.firstOrNull()
 

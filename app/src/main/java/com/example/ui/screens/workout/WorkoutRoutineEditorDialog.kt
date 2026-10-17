@@ -87,6 +87,7 @@ import com.example.ui.theme.GrowthOrange
 import com.example.ui.theme.GrowthOrangeLight
 import com.example.ui.theme.GrowthRed
 import com.example.util.ExerciseGifMapper
+import com.example.util.ExerciseMuscleClassifier
 import com.example.util.ExerciseVisualGuide
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -592,23 +593,7 @@ fun MultiExerciseLibraryPickerModal(
     val filteredCatalog = (if (selectedMuscleFilter == "⭐ Populares") favoriteGuides else availableGuides).filter { guide ->
         val matchesSearch = guide.exerciseName.contains(searchQuery, ignoreCase = true) ||
                 guide.muscleGroup.contains(searchQuery, ignoreCase = true)
-        val matchesFilter = when (selectedMuscleFilter) {
-            "⭐ Populares" -> true
-            "Todos" -> true
-            "Tríceps" -> guide.muscleGroup.contains("Tríceps", ignoreCase = true) || guide.muscleGroup.contains("triceps", ignoreCase = true) || guide.exerciseName.contains("Tríceps", ignoreCase = true) || guide.exerciseName.contains("tricep", ignoreCase = true) || guide.exerciseName.contains("pushdown", ignoreCase = true) || guide.exerciseName.contains("skull crusher", ignoreCase = true)
-            "Bíceps" -> guide.muscleGroup.contains("Bíceps", ignoreCase = true) || guide.muscleGroup.contains("biceps", ignoreCase = true) || guide.exerciseName.contains("Rosca", ignoreCase = true) || guide.exerciseName.contains("curl", ignoreCase = true)
-            "Peitoral" -> guide.muscleGroup.contains("Peitoral", ignoreCase = true) || guide.muscleGroup.contains("chest", ignoreCase = true) || guide.exerciseName.contains("Supino", ignoreCase = true) || guide.exerciseName.contains("bench press", ignoreCase = true) || guide.exerciseName.contains("Crucifixo", ignoreCase = true) || guide.exerciseName.contains("fly", ignoreCase = true) || guide.exerciseName.contains("Voador", ignoreCase = true) || guide.exerciseName.contains("Flexão", ignoreCase = true) || guide.exerciseName.contains("push up", ignoreCase = true) || guide.exerciseName.contains("Pullover", ignoreCase = true)
-            "Dorsal" -> guide.muscleGroup.contains("Dorsal", ignoreCase = true) || guide.muscleGroup.contains("Costas", ignoreCase = true) || guide.muscleGroup.contains("back", ignoreCase = true) || guide.exerciseName.contains("Puxada", ignoreCase = true) || guide.exerciseName.contains("pulldown", ignoreCase = true) || guide.exerciseName.contains("Remada", ignoreCase = true) || guide.exerciseName.contains("row", ignoreCase = true) || guide.exerciseName.contains("Barra Fixa", ignoreCase = true) || guide.exerciseName.contains("pull up", ignoreCase = true) || guide.exerciseName.contains("Terra", ignoreCase = true) || guide.exerciseName.contains("deadlift", ignoreCase = true)
-            "Deltoide" -> guide.muscleGroup.contains("Deltoide", ignoreCase = true) || guide.muscleGroup.contains("Ombro", ignoreCase = true) || guide.muscleGroup.contains("shoulder", ignoreCase = true) || guide.exerciseName.contains("Desenvolvimento", ignoreCase = true) || guide.exerciseName.contains("Lateral", ignoreCase = true) || guide.exerciseName.contains("Frontal", ignoreCase = true) || guide.exerciseName.contains("Face Pull", ignoreCase = true) || guide.exerciseName.contains("press", ignoreCase = true)
-            "Quadríceps" -> guide.muscleGroup.contains("Quadríceps", ignoreCase = true) || guide.muscleGroup.contains("leg", ignoreCase = true) || guide.muscleGroup.contains("pernas", ignoreCase = true) || guide.exerciseName.contains("Agachamento", ignoreCase = true) || guide.exerciseName.contains("squat", ignoreCase = true) || guide.exerciseName.contains("Leg Press", ignoreCase = true) || guide.exerciseName.contains("Extensora", ignoreCase = true) || guide.exerciseName.contains("Hack", ignoreCase = true)
-            "Posterior / Glúteos" -> guide.muscleGroup.contains("Isquiotibiais", ignoreCase = true) || guide.muscleGroup.contains("Glúteo", ignoreCase = true) || guide.muscleGroup.contains("leg", ignoreCase = true) || guide.exerciseName.contains("Flexora", ignoreCase = true) || guide.exerciseName.contains("Stiff", ignoreCase = true) || guide.exerciseName.contains("Pélvica", ignoreCase = true) || guide.exerciseName.contains("Afundo", ignoreCase = true) || guide.exerciseName.contains("lunge", ignoreCase = true) || guide.exerciseName.contains("deadlift", ignoreCase = true)
-            "Panturrilha" -> guide.muscleGroup.contains("Panturrilha", ignoreCase = true) || guide.muscleGroup.contains("calf", ignoreCase = true) || guide.muscleGroup.contains("Gastrocnêmio", ignoreCase = true) || guide.exerciseName.contains("Panturrilha", ignoreCase = true) || guide.exerciseName.contains("calf", ignoreCase = true)
-            "Antebraço" -> guide.muscleGroup.contains("Antebraço", ignoreCase = true) || guide.muscleGroup.contains("forearm", ignoreCase = true) || guide.exerciseName.contains("wrist", ignoreCase = true) || guide.exerciseName.contains("antebraço", ignoreCase = true) || guide.exerciseName.contains("punho", ignoreCase = true)
-            "Trapézio" -> guide.muscleGroup.contains("Trapézio", ignoreCase = true) || guide.muscleGroup.contains("trapezius", ignoreCase = true) || guide.exerciseName.contains("Encolhimento", ignoreCase = true) || guide.exerciseName.contains("shrug", ignoreCase = true)
-            "Abdômen" -> guide.muscleGroup.contains("Abdominal", ignoreCase = true) || guide.muscleGroup.contains("Abdômen", ignoreCase = true) || guide.muscleGroup.contains("abs", ignoreCase = true) || guide.exerciseName.contains("Abdominal", ignoreCase = true) || guide.exerciseName.contains("Crunch", ignoreCase = true) || guide.exerciseName.contains("plank", ignoreCase = true)
-            else -> guide.muscleGroup.contains(selectedMuscleFilter, ignoreCase = true) ||
-                    guide.exerciseName.contains(selectedMuscleFilter, ignoreCase = true)
-        }
+        val matchesFilter = ExerciseMuscleClassifier.matches(guide, selectedMuscleFilter)
         matchesSearch && matchesFilter
     }
 
