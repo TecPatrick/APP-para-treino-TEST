@@ -338,10 +338,9 @@ fun UserProfileScreen(
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Text(
                                         text = "Diagnóstico Corporal:",
@@ -359,9 +358,9 @@ fun UserProfileScreen(
 
                                 Spacer(modifier = Modifier.height(6.dp))
 
-                                Row(
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Text(
                                         text = "• TMB (Parado sem treino): $liveBmr kcal",
@@ -378,9 +377,9 @@ fun UserProfileScreen(
 
                                 Spacer(modifier = Modifier.height(4.dp))
 
-                                Row(
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Text(
                                         text = "• Faixa de peso normal: ${idealMinWeight.toInt()} a ${idealMaxWeight.toInt()} kg",

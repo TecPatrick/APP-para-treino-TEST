@@ -12,6 +12,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -150,11 +151,13 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 8.dp
-                ) {
-                    val navItems = listOf(
+                BoxWithConstraints {
+                    val compactNavigation = maxWidth < 400.dp
+                    NavigationBar(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 8.dp
+                    ) {
+                        val navItems = listOf(
                         AppNavigationScreen.DASHBOARD,
                         AppNavigationScreen.DIET,
                         AppNavigationScreen.WORKOUT,
@@ -175,7 +178,7 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
                                     modifier = Modifier.size(22.dp)
                                 )
                             },
-                            label = {
+                            label = if (compactNavigation) null else {
                                 Text(
                                     text = screen.title,
                                     fontSize = 9.sp,
@@ -185,6 +188,7 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
                                     textAlign = TextAlign.Center
                                 )
                             },
+                            alwaysShowLabel = !compactNavigation,
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = GrowthOrange,
                                 selectedTextColor = GrowthOrangeLight,
@@ -195,6 +199,7 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
                             modifier = Modifier.testTag(screen.testTag)
                         )
                     }
+                }
                 }
             }
         }
