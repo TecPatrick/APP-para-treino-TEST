@@ -132,8 +132,9 @@ class AuthController(
     fun loginWithBiometrics(onSuccess: () -> Unit) {
         launchAuth {
             val current = profile()
-            if (!current.firebaseUid.startsWith("guest_") && authService.currentUser?.uid != current.firebaseUid) {
-                _authError.value = "Entre com sua conta antes de usar a biometria."
+            if (current.firebaseUid.startsWith("guest_")) {
+                _authError.value = "Vincule uma conta com e-mail antes de ativar o login biométrico."
+                showMessage("Vincule seu e-mail no Perfil para usar a biometria.")
                 return@launchAuth
             }
             if (current.email.isBlank() || !current.email.contains("@")) {

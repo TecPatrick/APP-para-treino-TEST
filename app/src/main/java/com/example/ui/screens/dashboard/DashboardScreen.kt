@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bolt
@@ -90,8 +89,10 @@ import com.example.ui.theme.GrowthGreen
 import com.example.ui.theme.GrowthOrange
 import com.example.ui.theme.GrowthOrangeLight
 import com.example.ui.theme.GrowthYellow
+import com.example.util.MacroCalculator
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Calendar
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -110,6 +111,7 @@ fun DashboardScreen(
     val context = LocalContext.current
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
     val mealPlans by viewModel.mealPlanItems.collectAsStateWithLifecycle()
+    val foodRecords by viewModel.allFoodRecords.collectAsStateWithLifecycle()
     val workoutRoutines by viewModel.workoutRoutines.collectAsStateWithLifecycle()
     val allExercises by viewModel.allExercises.collectAsStateWithLifecycle()
     val progressLogs by viewModel.progressLogs.collectAsStateWithLifecycle()
@@ -119,33 +121,18 @@ fun DashboardScreen(
     var showMoreDialog by remember { mutableStateOf(false) }
     var newWaterGoalInput by remember { mutableStateOf("") }
 
-    // Daily Macro Consumption calculations
-    val totalPlannedCalories = mealPlans.sumOf { it.calories.toDouble() }.toFloat()
-    val totalPlannedProtein = mealPlans.sumOf { it.protein.toDouble() }.toFloat()
-    val totalPlannedCarbs = mealPlans.sumOf { it.carbs.toDouble() }.toFloat()
-    val totalPlannedFat = mealPlans.sumOf { it.fat.toDouble() }.toFloat()
-
-    val completedMeals = mealPlans.filter { it.isCompletedToday }
-    val consumedCalories = if (completedMeals.isNotEmpty()) {
-        completedMeals.sumOf { it.calories.toDouble() }.toFloat()
-    } else {
-        totalPlannedCalories
+    // Only food actually checked/recorded today counts as consumed.
+    val todayStart = remember {
+        Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
     }
-    val consumedProtein = if (completedMeals.isNotEmpty()) {
-        completedMeals.sumOf { it.protein.toDouble() }.toFloat()
-    } else {
-        totalPlannedProtein
-    }
-    val consumedCarbs = if (completedMeals.isNotEmpty()) {
-        completedMeals.sumOf { it.carbs.toDouble() }.toFloat()
-    } else {
-        totalPlannedCarbs
-    }
-    val consumedFat = if (completedMeals.isNotEmpty()) {
-        completedMeals.sumOf { it.fat.toDouble() }.toFloat()
-    } else {
-        totalPlannedFat
-    }
+    val todayFood = foodRecords.filter { it.dateMillis >= todayStart }
+    val consumedCalories = todayFood.sumOf { it.calories.toDouble() }.toFloat()
+    val consumedProtein = todayFood.sumOf { it.protein.toDouble() }.toFloat()
+    val consumedCarbs = todayFood.sumOf { it.carbs.toDouble() }.toFloat()
+    val consumedFat = todayFood.sumOf { it.fat.toDouble() }.toFloat()
 
     val todayRoutine = workoutRoutines.firstOrNull()
 
@@ -175,12 +162,12 @@ fun DashboardScreen(
                             )
                         }
                         IconButton(
-                            onClick = { viewModel.logout() },
-                            modifier = Modifier.size(44.dp).testTag("logout_btn")
+                            onClick = onNavigateToProfile,
+                            modifier = Modifier.size(44.dp).testTag("profile_btn")
                         ) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ExitToApp,
-                                contentDescription = "Sair da Conta",
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Abrir perfil e conta",
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -247,7 +234,15 @@ fun DashboardScreen(
                     Text("GASTO CALÓRICO & TMB DO DIA", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GrowthOrangeLight, letterSpacing = 1.sp)
                     Spacer(modifier = Modifier.height(12.dp))
                     Text("${dailyEnergy.totalExpenditure} kcal", fontSize = 24.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground)
-                    Text("Total estimado para hoje", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("TMB ${dailyEnergy.bmr} + treino ${dailyEnergy.totalWorkoutCalories} kcal", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    val plannedBalance = profile.targetCalories - dailyEnergy.totalExpenditure
+                    Text(
+                        text = "Meta alimentar: ${profile.targetCalories} kcal  •  Saldo estimado: ${if (plannedBalance > 0) "+" else ""}$plannedBalance kcal",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (plannedBalance <= 0) GrowthGreen else GrowthYellow
+                    )
                 }
             }
         }
@@ -269,6 +264,34 @@ fun DashboardScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     val waterProgress = (waterDrank.toFloat() / profile.targetWaterMl.coerceAtLeast(1)).coerceIn(0f, 1f)
                     LinearProgressIndicator(progress = { waterProgress }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)), color = GrowthCyan)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilledTonalButton(
+                            onClick = { viewModel.addWater(250) },
+                            modifier = Modifier.weight(1f).testTag("add_water_250_btn")
+                        ) { Text("+250 ml", maxLines = 1) }
+                        FilledTonalButton(
+                            onClick = { viewModel.addWater(500) },
+                            modifier = Modifier.weight(1f).testTag("add_water_500_btn")
+                        ) { Text("+500 ml", maxLines = 1) }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        TextButton(onClick = { viewModel.resetWater() }) {
+                            Text("Zerar hoje")
+                        }
+                        TextButton(onClick = {
+                            newWaterGoalInput = profile.targetWaterMl.toString()
+                            showWaterGoalDialog = true
+                        }) {
+                            Text("Ajustar meta")
+                        }
+                    }
                 }
             }
         }
@@ -294,7 +317,7 @@ fun DashboardScreen(
     }
 
     if (showWaterGoalDialog) {
-        val recommendedWater = (profile.weightKg * 35f).toInt().coerceAtLeast(2000)
+        val recommendedWater = MacroCalculator.calculateWaterIntakeMl(profile.weightKg, profile.age, profile.isAthleteOrWarmClimate)
         AlertDialog(
             onDismissRequest = { showWaterGoalDialog = false },
             containerColor = CarbonCard,
@@ -307,8 +330,11 @@ fun DashboardScreen(
             },
             text = {
                 Column {
+                    TextButton(onClick = { onNavigateToProfile(); showMoreDialog = false }) {
+                        Text("Perfil, conta e biometria", color = MaterialTheme.colorScheme.onBackground)
+                    }
                     Text(
-                        text = "A recomendação ideal para o seu peso atual (${profile.weightKg} kg) é de aproximadamente $recommendedWater ml por dia (35 ml/kg).",
+                        text = "Estimativa-base: $recommendedWater ml por dia. Ela usa peso de referência e deve ser ajustada por sede, suor, clima e orientação profissional.",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

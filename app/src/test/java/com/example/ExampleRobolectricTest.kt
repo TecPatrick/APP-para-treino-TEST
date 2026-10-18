@@ -18,6 +18,8 @@ import com.example.data.model.WorkoutLog
 import com.example.data.model.WorkoutRoutine
 import com.example.data.model.WorkoutSplitType
 import com.example.util.MacroCalculator
+import com.example.util.ExerciseGifMapper
+import com.example.util.ExerciseMuscleClassifier
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -68,10 +70,45 @@ class ExampleRobolectricTest {
       customFatGPerKg = 0.8f
     )
 
-    assertTrue("Target calories should be greater than BMR", plan.targetCalories > plan.bmr)
+    assertEquals("Food target uses BMR plus the selected goal, not activity TDEE", plan.bmr + 350, plan.targetCalories)
     assertEquals("Protein grams for 80kg at 2.2g/kg should be 176g", 176, plan.proteinGrams)
     assertEquals("Fat grams for 80kg at 0.8g/kg should be 64g", 64, plan.fatGrams)
     assertTrue("Water intake should be calculated correctly", plan.waterMl >= 2500)
+  }
+
+  @Test
+  fun `high body weight uses adjusted reference for macros and safe hydration`() {
+    val plan = MacroCalculator.computeFullPlan(
+      weightKg = 170f,
+      heightCm = 184f,
+      age = 28,
+      gender = Gender.MASCULINO,
+      activityLevel = ActivityLevel.MODERATE,
+      goal = FitnessGoal.MAINTENANCE,
+      customProteinGPerKg = 2.0f,
+      customFatGPerKg = 0.8f,
+      customTargetCalories = 2500
+    )
+
+    assertEquals(2715, plan.bmr)
+    assertEquals(2500, plan.targetCalories)
+    assertTrue(plan.macroReferenceWeightKg < 110f)
+    assertTrue(plan.proteinGrams < 220)
+    assertTrue(plan.waterMl in 3000..5000)
+  }
+
+  @Test
+  fun `leg press is quadriceps and never deltoid`() {
+    val legPress = ExerciseGifMapper.getGuideForExercise("Leg Press 45°")
+    assertTrue(ExerciseMuscleClassifier.matches(legPress, "Quadríceps"))
+    assertTrue(!ExerciseMuscleClassifier.matches(legPress, "Deltoide"))
+  }
+
+  @Test
+  fun `reverse fly is not classified as chest`() {
+    val reverseFly = ExerciseGifMapper.getGuideForExercise("Crucifixo Inverso com Halteres")
+    assertTrue(ExerciseMuscleClassifier.matches(reverseFly, "Deltoide"))
+    assertTrue(!ExerciseMuscleClassifier.matches(reverseFly, "Peitoral"))
   }
 
   @Test

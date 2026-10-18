@@ -23,17 +23,12 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Generate debug keystore
+      - name: Restore stable debug keystore
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
         run: |
-          keytool -genkeypair -v \
-            -keystore debug.keystore \
-            -storepass android \
-            -alias androiddebugkey \
-            -keypass android \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -dname "CN=Android Debug,O=Android,C=US"
+          test -n "$DEBUG_KEYSTORE_BASE64"
+          printf '%s' "$DEBUG_KEYSTORE_BASE64" | base64 --decode > debug.keystore
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -53,6 +48,26 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
+      - name: Set up Node.js for Firebase CLI
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.head_ref == 'test/maplibre-running-tab'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Distribute APK to Firebase Alpha
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.head_ref == 'test/maplibre-running-tab'
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          test -n "$FIREBASE_SERVICE_ACCOUNT_JSON"
+          CREDENTIAL_FILE="$RUNNER_TEMP/firebase-service-account.json"
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$CREDENTIAL_FILE"
+          chmod 600 "$CREDENTIAL_FILE"
+          GOOGLE_APPLICATION_CREDENTIALS="$CREDENTIAL_FILE" npx -y firebase-tools@15.34.0 appdistribution:distribute             app/build/outputs/apk/debug/app-debug.apk             --app "1:204365877775:android:f77650214127790642497a"             --groups "alpha"             --release-notes "Alpha automático — commit $GITHUB_SHA"
+
+      - name: Remove Firebase credential from runner
+        if: always()
+        run: rm -f "$RUNNER_TEMP/firebase-service-account.json"
 
       - name: Upload test reports and Room schemas
         if: always()

@@ -25,29 +25,39 @@ object MacroCalculator {
     }
 
     /**
-     * Calculates precise water intake based on exact age rules & physical activity:
-     * - Jovens até 17 anos: 40 ml por kg.
-     * - Adultos (18 a 55 anos): 35 ml por kg.
-     * - Adultos (55 a 65 anos): 30 ml por kg.
-     * - Idosos (66 anos ou mais): 25 ml por kg.
-     * - Atividades físicas / Atletas ou climas quentes: 45 ml por kg (40-50 ml/kg).
+     * Provides a conservative hydration starting point. It is intentionally capped
+     * and remains user-editable because sweat, climate and medical conditions vary.
      */
     fun calculateWaterIntakeMl(
         weightKg: Float,
         age: Int,
         isAthleteOrWarmClimate: Boolean = true
     ): Int {
-        val mlPerKg = if (isAthleteOrWarmClimate) {
-            45f // 40 to 50 ml/kg recommendation for athletes / training
-        } else {
-            when {
-                age <= 17 -> 40f
-                age in 18..55 -> 35f
-                age in 56..65 -> 30f
-                else -> 25f // 66 years or older
-            }
+        // Using total body weight without a ceiling can greatly overestimate hydration
+        // for people with a high BMI. Use an adjusted reference weight instead.
+        val referenceWeight = weightKg.coerceIn(45f, 100f)
+        val ageBase = when {
+            age <= 17 -> 35f
+            age <= 55 -> 30f
+            age <= 65 -> 28f
+            else -> 25f
         }
-        return (weightKg * mlPerKg).roundToInt().coerceIn(1500, 7000)
+        val activityExtra = if (isAthleteOrWarmClimate) 500 else 0
+        return ((referenceWeight * ageBase).roundToInt() + activityExtra).coerceIn(1500, 5000)
+    }
+
+    /**
+     * Weight used only as a reference for macro calculations. For high BMI values,
+     * adjusted body weight avoids prescribing macros from total body weight alone.
+     */
+    fun calculateMacroReferenceWeight(weightKg: Float, heightCm: Float): Float {
+        val heightMeters = (heightCm / 100f).coerceAtLeast(0.5f)
+        val bmi25Weight = 25f * heightMeters * heightMeters
+        return if (weightKg > bmi25Weight) {
+            bmi25Weight + 0.25f * (weightKg - bmi25Weight)
+        } else {
+            weightKg
+        }.coerceAtLeast(35f)
     }
 
     data class CalculatedDietPlan(
@@ -58,6 +68,7 @@ object MacroCalculator {
         val carbsGrams: Int,
         val fatGrams: Int,
         val waterMl: Int,
+        val macroReferenceWeightKg: Float,
         val proteinGPerKg: Float,
         val carbsGPerKg: Float,
         val fatGPerKg: Float,
@@ -77,22 +88,24 @@ object MacroCalculator {
         biotype: BodyType = BodyType.MESOMORPH,
         customProteinGPerKg: Float = 2.2f,
         customFatGPerKg: Float = 0.8f,
-        isAthleteOrWarmClimate: Boolean = true
+        isAthleteOrWarmClimate: Boolean = true,
+        customTargetCalories: Int? = null
     ): CalculatedDietPlan {
         val bmr = calculateBMR(weightKg, heightCm, age, gender)
+        // Kept as an optional theoretical estimate. It is not used as the food goal.
         val tdee = calculateTDEE(bmr, activityLevel)
-        
-        // Calorie adjustment based on goal and biotype
-        val biotypeCalorieDelta = when (biotype) {
-            BodyType.ECTOMORPH -> 150 // Ectomorphs need a bit more calories to grow
-            BodyType.MESOMORPH -> 0
-            BodyType.ENDOMORPH -> -100 // Endomorphs need tighter caloric control
-        }
 
-        val targetCalories = (tdee + goal.calorieAdjustment + biotypeCalorieDelta).coerceAtLeast(1200)
+        // Food target is independent from estimated activity. Recorded exercise is
+        // added to daily expenditure by VirtusViewModel, never to this target.
+        val targetCalories = (customTargetCalories ?: (bmr + goal.calorieAdjustment))
+            .coerceIn(1200, 6000)
 
-        val proteinGrams = (weightKg * customProteinGPerKg).roundToInt()
-        val fatGrams = (weightKg * customFatGPerKg).roundToInt()
+        // Body type is retained in the profile for compatibility, but it no longer
+        // changes calories or macros: somatotypes are not a clinical calculation.
+        @Suppress("UNUSED_VARIABLE") val ignoredBodyType = biotype
+        val macroReferenceWeight = calculateMacroReferenceWeight(weightKg, heightCm)
+        val proteinGrams = (macroReferenceWeight * customProteinGPerKg).roundToInt()
+        val fatGrams = (macroReferenceWeight * customFatGPerKg).roundToInt()
 
         val proteinCalories = proteinGrams * 4
         val fatCalories = fatGrams * 9
@@ -116,8 +129,9 @@ object MacroCalculator {
             fatGrams = fatGrams,
             waterMl = waterMl,
             proteinGPerKg = customProteinGPerKg,
-            carbsGPerKg = (carbsGrams / weightKg),
+            carbsGPerKg = (carbsGrams / macroReferenceWeight),
             fatGPerKg = customFatGPerKg,
+            macroReferenceWeightKg = macroReferenceWeight,
             highCarbCalories = highCarbCals,
             highCarbGrams = highCarbGrams,
             lowCarbCalories = lowCarbCals,

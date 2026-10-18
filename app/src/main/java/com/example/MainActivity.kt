@@ -12,6 +12,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -51,6 +52,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -135,7 +137,7 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
     }
 
     // Handle back button on sub-screens
-    if (currentScreen != AppNavigationScreen.DASHBOARD && currentScreen != AppNavigationScreen.AUTH) {
+    if (currentScreen != AppNavigationScreen.DASHBOARD) {
         BackHandler {
             currentScreen = AppNavigationScreen.DASHBOARD
         }
@@ -149,11 +151,13 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
         snackbarHost = { SnackbarHost(snackbarHostState) },
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 8.dp
-                ) {
-                    val navItems = listOf(
+                BoxWithConstraints {
+                    val compactNavigation = maxWidth < 400.dp
+                    NavigationBar(
+                        containerColor = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 8.dp
+                    ) {
+                        val navItems = listOf(
                         AppNavigationScreen.DASHBOARD,
                         AppNavigationScreen.DIET,
                         AppNavigationScreen.WORKOUT,
@@ -171,17 +175,22 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
                                 Icon(
                                     imageVector = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
                                     contentDescription = screen.title,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(22.dp)
                                 )
                             },
-                            label = {
-                                Text(
-                                    text = screen.title,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    maxLines = 1
-                                )
+                            label = if (compactNavigation) null else {
+                                {
+                                    Text(
+                                        text = screen.title,
+                                        fontSize = 9.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
                             },
+                            alwaysShowLabel = !compactNavigation,
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = GrowthOrange,
                                 selectedTextColor = GrowthOrangeLight,
@@ -192,6 +201,7 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
                             modifier = Modifier.testTag(screen.testTag)
                         )
                     }
+                }
                 }
             }
         }
@@ -246,7 +256,8 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
                     )
                     AppNavigationScreen.PROFILE -> UserProfileScreen(
                         viewModel = viewModel,
-                        onNavigateBack = { currentScreen = AppNavigationScreen.DASHBOARD }
+                        onNavigateBack = { currentScreen = AppNavigationScreen.DASHBOARD },
+                        onNavigateToAccount = { currentScreen = AppNavigationScreen.AUTH }
                     )
                     AppNavigationScreen.AUTH -> AuthAndOnboardingScreen(
                         viewModel = viewModel,

@@ -85,6 +85,7 @@ import com.example.data.model.MealPlanItem
 import com.example.data.model.MealType
 import com.example.ui.VirtusViewModel
 import com.example.ui.components.GrowthHeader
+import com.example.util.MacroCalculator
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
 import com.example.ui.theme.CarbonCardElevated
@@ -262,10 +263,9 @@ fun DietScreen(
                                 .testTag("diet_daily_energy_card")
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(
@@ -285,6 +285,7 @@ fun DietScreen(
                                     }
 
                                     Surface(
+                                        modifier = Modifier.align(Alignment.End),
                                         color = if (dailyEnergy.hasWorkoutToday) GrowthGreen.copy(alpha = 0.2f) else GrowthCyan.copy(alpha = 0.15f),
                                         shape = RoundedCornerShape(6.dp)
                                     ) {
@@ -300,12 +301,12 @@ fun DietScreen(
 
                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                Row(
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Surface(
-                                        modifier = Modifier.weight(1f),
+                                        modifier = Modifier.fillMaxWidth(),
                                         color = CarbonDark,
                                         shape = RoundedCornerShape(8.dp),
                                         border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder)
@@ -318,7 +319,7 @@ fun DietScreen(
                                     }
 
                                     Surface(
-                                        modifier = Modifier.weight(1f),
+                                        modifier = Modifier.fillMaxWidth(),
                                         color = CarbonDark,
                                         shape = RoundedCornerShape(8.dp),
                                         border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder)
@@ -331,7 +332,7 @@ fun DietScreen(
                                     }
 
                                     Surface(
-                                        modifier = Modifier.weight(1.1f),
+                                        modifier = Modifier.fillMaxWidth(),
                                         color = CarbonCardElevated,
                                         shape = RoundedCornerShape(8.dp),
                                         border = androidx.compose.foundation.BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.5f))
@@ -627,6 +628,10 @@ fun DietScreen(
                 MonthlyDietConfigSection(
                     profile = profile,
                     onSave = { cycleType, notes, targetWeight, trainingDays ->
+                        val macroReferenceWeight = MacroCalculator.calculateMacroReferenceWeight(
+                            profile.weightKg,
+                            profile.heightCm
+                        )
                         viewModel.updateProfileAndCalculateMacros(
                             name = profile.name,
                             gender = profile.gender,
@@ -635,11 +640,12 @@ fun DietScreen(
                             heightCm = profile.heightCm,
                             activityLevel = profile.activityLevel,
                             goal = profile.goal,
-                            proteinGPerKg = (profile.targetProteinGrams / profile.weightKg),
-                            fatGPerKg = (profile.targetFatGrams / profile.weightKg),
+                            proteinGPerKg = (profile.targetProteinGrams / macroReferenceWeight),
+                            fatGPerKg = (profile.targetFatGrams / macroReferenceWeight),
                             monthlyTargetWeightKg = targetWeight,
                             monthlyNotes = notes,
-                            dietCycleType = cycleType
+                            dietCycleType = cycleType,
+                            targetCalories = profile.targetCalories
                         )
                         selectedTab = 2
                     }
