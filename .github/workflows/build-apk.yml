@@ -65,17 +65,6 @@ jobs:
           chmod 600 "$CREDENTIAL_FILE"
           GOOGLE_APPLICATION_CREDENTIALS="$CREDENTIAL_FILE" npx -y firebase-tools@15.34.0 appdistribution:distribute             app/build/outputs/apk/debug/app-debug.apk             --app "1:204365877775:android:f77650214127790642497a"             --groups "alpha"             --release-notes "Alpha automático — commit $GITHUB_SHA"
 
-      - name: Deploy owner-scoped Firestore rules
-        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.head_ref == 'test/maplibre-running-tab'
-        env:
-          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-        run: |
-          test -n "$FIREBASE_SERVICE_ACCOUNT_JSON"
-          CREDENTIAL_FILE="$RUNNER_TEMP/firebase-service-account.json"
-          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$CREDENTIAL_FILE"
-          chmod 600 "$CREDENTIAL_FILE"
-          GOOGLE_APPLICATION_CREDENTIALS="$CREDENTIAL_FILE" npx -y firebase-tools@15.34.0 deploy --only firestore:rules --project "gen-lang-client-0338831300" --non-interactive
-
       - name: Remove Firebase credential from runner
         if: always()
         run: rm -f "$RUNNER_TEMP/firebase-service-account.json"
