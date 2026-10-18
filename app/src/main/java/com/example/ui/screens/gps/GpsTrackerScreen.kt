@@ -100,7 +100,9 @@ import com.example.ui.theme.GrowthOrangeLight
 import com.example.ui.theme.GrowthYellow
 import androidx.compose.runtime.LaunchedEffect
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
+import java.text.SimpleDateFormat
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
@@ -114,6 +116,7 @@ fun GpsTrackerScreen(
     val context = LocalContext.current
     val activeSession by viewModel.activeGpsSession.collectAsStateWithLifecycle()
     val allLogs by viewModel.allGpsRouteLogs.collectAsStateWithLifecycle()
+    val selectedDateMillis by viewModel.selectedDateMillis.collectAsStateWithLifecycle()
     val voiceState by workoutTrackerViewModel.uiState.collectAsStateWithLifecycle()
     val ttsIntervalMeters = voiceState.narrationIntervalMeters
     val isTtsVoiceCoachEnabled = voiceState.isTtsEnabled
@@ -204,17 +207,19 @@ fun GpsTrackerScreen(
     }
 
     // Compute Daily & Monthly Running Statistics
-    val now = remember { System.currentTimeMillis() }
-    val todayStartMillis = remember(now) {
-        val cal = Calendar.getInstance()
+    val todayStartMillis = remember(selectedDateMillis) {
+        val cal = Calendar.getInstance().apply { timeInMillis = selectedDateMillis }
         cal.set(Calendar.HOUR_OF_DAY, 0)
         cal.set(Calendar.MINUTE, 0)
         cal.set(Calendar.SECOND, 0)
         cal.set(Calendar.MILLISECOND, 0)
         cal.timeInMillis
     }
-    val monthStartMillis = remember(now) {
-        val cal = Calendar.getInstance()
+    val selectedDayEndMillis = remember(todayStartMillis) {
+        Calendar.getInstance().apply { timeInMillis = todayStartMillis; add(Calendar.DAY_OF_MONTH, 1) }.timeInMillis
+    }
+    val monthStartMillis = remember(selectedDateMillis) {
+        val cal = Calendar.getInstance().apply { timeInMillis = selectedDateMillis }
         cal.set(Calendar.DAY_OF_MONTH, 1)
         cal.set(Calendar.HOUR_OF_DAY, 0)
         cal.set(Calendar.MINUTE, 0)
@@ -222,22 +227,34 @@ fun GpsTrackerScreen(
         cal.set(Calendar.MILLISECOND, 0)
         cal.timeInMillis
     }
-
-    val dailyLogs = remember(allLogs, todayStartMillis) {
-        allLogs.filter { it.dateMillis >= todayStartMillis }
+    val monthEndMillis = remember(monthStartMillis) {
+        Calendar.getInstance().apply { timeInMillis = monthStartMillis; add(Calendar.MONTH, 1) }.timeInMillis
     }
-    val monthlyLogs = remember(allLogs, monthStartMillis) {
-        allLogs.filter { it.dateMillis >= monthStartMillis }
+    val selectedIsToday = remember(todayStartMillis) {
+        val current = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        todayStartMillis == current
     }
 
-    val todayDistanceKm = (dailyLogs.sumOf { it.distanceMeters.toDouble() } + activeSession.distanceMeters) / 1000.0
-    val todayDurationSec = dailyLogs.sumOf { it.durationSeconds } + activeSession.elapsedSeconds
-    val todayCalories = dailyLogs.sumOf { it.caloriesBurned.toDouble() } + activeSession.caloriesBurned
-    val todayRunsCount = dailyLogs.size + if (activeSession.isRunning) 1 else 0
+    val dailyLogs = remember(allLogs, todayStartMillis, selectedDayEndMillis) {
+        allLogs.filter { it.dateMillis in todayStartMillis until selectedDayEndMillis }
+    }
+    val monthlyLogs = remember(allLogs, monthStartMillis, monthEndMillis) {
+        allLogs.filter { it.dateMillis in monthStartMillis until monthEndMillis }
+    }
 
-    val totalMonthlyDistanceKm = (monthlyLogs.sumOf { it.distanceMeters.toDouble() } + activeSession.distanceMeters) / 1000.0
-    val totalMonthlyCalories = monthlyLogs.sumOf { it.caloriesBurned.toDouble() } + activeSession.caloriesBurned
-    val totalMonthlyRunsCount = monthlyLogs.size + if (activeSession.isRunning) 1 else 0
+    val activeDistance = if (selectedIsToday) activeSession.distanceMeters else 0f
+    val activeDuration = if (selectedIsToday) activeSession.elapsedSeconds else 0
+    val activeCalories = if (selectedIsToday) activeSession.caloriesBurned else 0f
+    val todayDistanceKm = (dailyLogs.sumOf { it.distanceMeters.toDouble() } + activeDistance) / 1000.0
+    val todayDurationSec = dailyLogs.sumOf { it.durationSeconds } + activeDuration
+    val todayCalories = dailyLogs.sumOf { it.caloriesBurned.toDouble() } + activeCalories
+    val todayRunsCount = dailyLogs.size + if (selectedIsToday && activeSession.isRunning) 1 else 0
+
+    val totalMonthlyDistanceKm = (monthlyLogs.sumOf { it.distanceMeters.toDouble() } + activeDistance) / 1000.0
+    val totalMonthlyCalories = monthlyLogs.sumOf { it.caloriesBurned.toDouble() } + activeCalories
+    val totalMonthlyRunsCount = monthlyLogs.size + if (selectedIsToday && activeSession.isRunning) 1 else 0
 
     LazyColumn(
         modifier = Modifier
@@ -249,7 +266,7 @@ fun GpsTrackerScreen(
         item {
             GrowthHeader(
                 title = "Corrida GPS",
-                subtitle = "Mapeamento em tempo real, ritmo e quilometragem",
+                subtitle = "Dados de ${SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR")).format(Date(selectedDateMillis))}",
                 badgeText = "TREINO DE CORRIDA",
                 trailingContent = {
                     IconButton(

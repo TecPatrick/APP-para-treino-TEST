@@ -117,18 +117,14 @@ fun DashboardScreen(
     val progressLogs by viewModel.progressLogs.collectAsStateWithLifecycle()
     val waterDrank by viewModel.waterDrankMl.collectAsStateWithLifecycle()
     val dailyEnergy by viewModel.dailyEnergyExpenditure.collectAsStateWithLifecycle()
+    val selectedDateMillis by viewModel.selectedDateMillis.collectAsStateWithLifecycle()
     var showWaterGoalDialog by remember { mutableStateOf(false) }
     var showMoreDialog by remember { mutableStateOf(false) }
     var newWaterGoalInput by remember { mutableStateOf("") }
 
-    // Only food actually checked/recorded today counts as consumed.
-    val todayStart = remember {
-        Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-    }
-    val todayFood = foodRecords.filter { it.dateMillis >= todayStart }
+    // The selected date is shared across the whole app.
+    val selectedDateKey = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(selectedDateMillis))
+    val todayFood = foodRecords.filter { it.dateString == selectedDateKey }
     val consumedCalories = todayFood.sumOf { it.calories.toDouble() }.toFloat()
     val consumedProtein = todayFood.sumOf { it.protein.toDouble() }.toFloat()
     val consumedCarbs = todayFood.sumOf { it.carbs.toDouble() }.toFloat()
@@ -144,7 +140,7 @@ fun DashboardScreen(
     ) {
         // Header
         item {
-            val dateStr = SimpleDateFormat("EEEE, d 'de' MMMM", Locale("pt", "BR")).format(Date())
+            val dateStr = SimpleDateFormat("EEEE, d 'de' MMMM", Locale("pt", "BR")).format(Date(selectedDateMillis))
             GrowthHeader(
                 title = "Olá, ${profile.name}",
                 subtitle = dateStr.replaceFirstChar { it.uppercase() },

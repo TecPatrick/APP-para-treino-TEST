@@ -115,14 +115,13 @@ fun DietScreen(
     val gpsLogs by viewModel.allGpsRouteLogs.collectAsStateWithLifecycle()
     val intakeHistory by viewModel.recentIntakeHistory.collectAsStateWithLifecycle()
     val progressLogs by viewModel.progressLogs.collectAsStateWithLifecycle()
+    val selectedDateMillis by viewModel.selectedDateMillis.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var showAddFoodDialog by remember { mutableStateOf(false) }
     var selectedMealTypeForAdd by remember { mutableStateOf(MealType.BREAKFAST) }
     var showCustomFoodDialog by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf(0) } // 0: Refeições Diárias, 1: Base de Alimentos, 2: Dieta Mensal, 3: Configuração
-    var selectedDateMillis by remember { mutableStateOf(System.currentTimeMillis()) }
-
     val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US) }
     val selectedDateKey = dateFormatter.format(Date(selectedDateMillis))
     val selectedFoods = foodRecords.filter { it.dateString == selectedDateKey }
@@ -295,7 +294,7 @@ fun DietScreen(
                     item {
                         DailyHistoryHeader(
                             selectedDateMillis = selectedDateMillis,
-                            onDateSelected = { selectedDateMillis = it },
+                            onDateSelected = viewModel::selectAppDate,
                             daysWithData = daysWithData,
                             summary = DailyHistorySummary(
                                 caloriesConsumed = selectedFoods.sumOf { it.calories.toDouble() }.toInt(),

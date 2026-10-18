@@ -348,6 +348,33 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
             initialValue = emptyList()
         )
 
+    private val _selectedDateMillis = MutableStateFlow(startOfDay(System.currentTimeMillis()))
+    val selectedDateMillis: StateFlow<Long> = _selectedDateMillis.asStateFlow()
+
+    fun selectAppDate(dateMillis: Long) {
+        _selectedDateMillis.value = startOfDay(dateMillis)
+    }
+
+    fun selectedDateKey(): String =
+        SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(_selectedDateMillis.value))
+
+    private fun startOfDay(timeMillis: Long): Long = Calendar.getInstance().apply {
+        timeInMillis = timeMillis
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
+
+    private fun selectedDateWithCurrentTime(): Long {
+        val selected = Calendar.getInstance().apply { timeInMillis = _selectedDateMillis.value }
+        val now = Calendar.getInstance()
+        selected.set(Calendar.HOUR_OF_DAY, now.get(Calendar.HOUR_OF_DAY))
+        selected.set(Calendar.MINUTE, now.get(Calendar.MINUTE))
+        selected.set(Calendar.SECOND, now.get(Calendar.SECOND))
+        return selected.timeInMillis
+    }
+
     val totalGpsDistanceMeters: StateFlow<Float> = repository.totalGpsDistanceMeters
         .stateIn(
             scope = viewModelScope,
@@ -392,38 +419,35 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         workoutLogs,
         allGpsRouteLogs,
         allCardioLogs,
-        _activeGpsSession
-    ) { profile, gymLogs, gpsLogs, cardioLogs, activeGps ->
+        combine(_activeGpsSession, _selectedDateMillis) { session, date -> session to date }
+    ) { profile, gymLogs, gpsLogs, cardioLogs, sessionAndDate ->
+        val (activeGps, selectedDate) = sessionAndDate
         val weight = if (profile.weightKg > 20f) profile.weightKg else 78.5f
         val height = if (profile.heightCm > 50f) profile.heightCm else 178f
         val age = if (profile.age > 10) profile.age else 26
         val bmr = MacroCalculator.calculateBMR(weight, height, age, profile.gender)
 
-        val cal = Calendar.getInstance().apply {
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-        val todayStart = cal.timeInMillis
+        val dayStart = startOfDay(selectedDate)
+        val dayEnd = Calendar.getInstance().apply { timeInMillis = dayStart; add(Calendar.DAY_OF_MONTH, 1) }.timeInMillis
+        val selectedIsToday = dayStart == startOfDay(System.currentTimeMillis())
 
         // Treinos de musculação realizados hoje
-        val todayGym = gymLogs.filter { it.dateMillis >= todayStart }
+        val todayGym = gymLogs.filter { it.dateMillis in dayStart until dayEnd }
         val gymCals = todayGym.sumOf { log ->
             val duration = log.durationMinutes.coerceAtLeast(1)
             (duration * (weight * 0.08f)).toInt().coerceIn(80, 800)
         }
 
         // Treinos de corrida / cardio GPS realizados hoje
-        val todayRuns = gpsLogs.filter { it.dateMillis >= todayStart }
-        val runsCals = todayRuns.sumOf { it.caloriesBurned.toInt() } + activeGps.caloriesBurned.toInt()
+        val todayRuns = gpsLogs.filter { it.dateMillis in dayStart until dayEnd }
+        val runsCals = todayRuns.sumOf { it.caloriesBurned.toInt() } + if (selectedIsToday) activeGps.caloriesBurned.toInt() else 0
 
         // Cardios manuais realizados hoje
-        val todayCardio = cardioLogs.filter { it.dateMillis >= todayStart }
+        val todayCardio = cardioLogs.filter { it.dateMillis in dayStart until dayEnd }
         val manualCardioCals = todayCardio.sumOf { it.caloriesBurned }
 
         val totalWorkoutBurned = gymCals + runsCals + manualCardioCals
-        val hasWorkoutToday = totalWorkoutBurned > 0 || todayGym.isNotEmpty() || todayRuns.isNotEmpty() || todayCardio.isNotEmpty() || activeGps.isRunning
+        val hasWorkoutToday = totalWorkoutBurned > 0 || todayGym.isNotEmpty() || todayRuns.isNotEmpty() || todayCardio.isNotEmpty() || (selectedIsToday && activeGps.isRunning)
 
         // REGRA: Sem treino, TMB de parado. Com treino, TMB + calorias gastas no treino.
         val totalDailyExp = if (hasWorkoutToday) bmr + totalWorkoutBurned else bmr
@@ -437,7 +461,7 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
             totalExpenditure = totalDailyExp,
             hasWorkoutToday = hasWorkoutToday,
             gymWorkoutsCount = todayGym.size,
-            runningWorkoutsCount = todayRuns.size + if (activeGps.isRunning) 1 else 0,
+            runningWorkoutsCount = todayRuns.size + if (selectedIsToday && activeGps.isRunning) 1 else 0,
             cardioWorkoutsCount = todayCardio.size
         )
     }.stateIn(
@@ -469,9 +493,10 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 repository.resetDailyMeals()
                 preferences.edit().putString("meal_completion_date", today).apply()
             }
-            repository.recentIntakeHistory.collect { history ->
-                _waterDrankMl.value = history.firstOrNull { it.dateString == currentDateKey() }?.waterDrankMl ?: 0
-            }
+            combine(repository.recentIntakeHistory, _selectedDateMillis) { history, _ -> history }
+                .collect { history ->
+                    _waterDrankMl.value = history.firstOrNull { it.dateString == selectedDateKey() }?.waterDrankMl ?: 0
+                }
         }
     }
 
@@ -828,8 +853,9 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
 
     fun addCardioLog(log: CardioLog) {
         viewModelScope.launch {
-            val insertedId = repository.addCardioLog(log)
-            firestoreSync.syncCardioLogToCloud(log.copy(id = insertedId), userProfile.value.firebaseUid)
+            val datedLog = log.copy(dateMillis = selectedDateWithCurrentTime())
+            val insertedId = repository.addCardioLog(datedLog)
+            firestoreSync.syncCardioLogToCloud(datedLog.copy(id = insertedId), userProfile.value.firebaseUid)
             _toastMessage.value = "Log de cardio salvo com sucesso!"
         }
     }
@@ -838,12 +864,12 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
 
     fun addWater(amountMl: Int) {
         _waterDrankMl.value = (_waterDrankMl.value + amountMl).coerceIn(0, 10000)
-        persistTodayIntake()
+        persistSelectedIntake()
     }
 
     fun resetWater() {
         _waterDrankMl.value = 0
-        persistTodayIntake()
+        persistSelectedIntake()
     }
 
     fun updateDailyWaterGoal(newGoalMl: Int) {
@@ -1099,19 +1125,21 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
 
     fun logFoodConsumption(record: FoodRecord) {
         viewModelScope.launch {
-            val normalized = record.copy(dateString = currentDateKey(), dateMillis = System.currentTimeMillis())
+            val normalized = record.copy(dateString = selectedDateKey(), dateMillis = selectedDateWithCurrentTime())
             val insertedId = repository.addFoodRecord(normalized)
             firestoreSync.syncFoodRecordToCloud(normalized.copy(id = insertedId), userProfile.value.firebaseUid)
-            persistTodayIntakeNow()
+            persistIntakeForDate(selectedDateKey())
             _toastMessage.value = "${record.foodName} registrado no seu diário alimentar!"
         }
     }
 
     fun deleteFoodRecord(id: Long) {
         viewModelScope.launch {
+            val affectedDate = repository.allFoodRecords.firstOrNull().orEmpty()
+                .firstOrNull { it.id == id }?.dateString ?: selectedDateKey()
             repository.deleteFoodRecord(id)
             firestoreSync.deleteFoodRecordFromCloud(id, userProfile.value.firebaseUid)
-            persistTodayIntakeNow()
+            persistIntakeForDate(affectedDate)
             _toastMessage.value = "Alimento removido do diário!"
         }
     }
@@ -1163,8 +1191,8 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     private fun currentDateKey(): String =
         SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
 
-    private fun persistTodayIntake() {
-        viewModelScope.launch { persistTodayIntakeNow() }
+    private fun persistSelectedIntake() {
+        viewModelScope.launch { persistIntakeForDate(selectedDateKey()) }
     }
 
     private suspend fun persistTodayIntakeNow() {
@@ -1188,7 +1216,7 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
             totalFat = recordsForDate.sumOf { it.fat.toDouble() }.toFloat(),
             targetCalories = profile.targetCalories,
             isAdhered = recordsForDate.sumOf { it.calories.toDouble() } <= profile.targetCalories,
-            waterDrankMl = if (dateKey == currentDateKey()) _waterDrankMl.value else savedWater
+            waterDrankMl = if (dateKey == selectedDateKey()) _waterDrankMl.value else savedWater
         )
         val id = repository.saveDailyIntake(summary)
         firestoreSync.syncDailyIntakeToCloud(summary.copy(id = id), profile.firebaseUid)
@@ -1721,6 +1749,7 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         val durationMinutes = (current.elapsedSeconds / 60).coerceAtLeast(1)
 
         viewModelScope.launch {
+            val workoutDate = selectedDateWithCurrentTime()
             val insertedId = repository.logCompletedWorkout(
                 routineId = routine.id,
                 routineName = "Treino ${routine.letter} - ${routine.title}",
@@ -1728,7 +1757,8 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 totalVolumeKg = totalVolume,
                 totalSetsCompleted = current.completedSetsCount.coerceAtLeast(current.exercises.sumOf { it.sets }),
                 perceivedExertion = perceivedExertion,
-                notes = notes
+                notes = notes,
+                dateMillis = workoutDate
             )
 
             // Sincroniza log de treino no Firestore (persistido no cache local imediatamente)
@@ -1736,7 +1766,7 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 id = insertedId,
                 routineId = routine.id,
                 routineName = "Treino ${routine.letter} - ${routine.title}",
-                dateMillis = System.currentTimeMillis(),
+                dateMillis = workoutDate,
                 durationMinutes = durationMinutes,
                 totalVolumeKg = totalVolume,
                 totalSetsCompleted = current.completedSetsCount.coerceAtLeast(current.exercises.sumOf { it.sets }),

@@ -444,13 +444,14 @@ class VirtusRepository(private val dao: AppDao) {
         totalVolumeKg: Float,
         totalSetsCompleted: Int,
         perceivedExertion: Int,
-        notes: String
+        notes: String,
+        dateMillis: Long = System.currentTimeMillis()
     ): Long {
         return dao.insertWorkoutLog(
             WorkoutLog(
                 routineId = routineId,
                 routineName = routineName,
-                dateMillis = System.currentTimeMillis(),
+                dateMillis = dateMillis,
                 durationMinutes = durationMinutes,
                 totalVolumeKg = totalVolumeKg,
                 totalSetsCompleted = totalSetsCompleted,
