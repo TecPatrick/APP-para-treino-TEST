@@ -131,13 +131,6 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     init {
-        viewModelScope.launch {
-            RunningForegroundService.session.collect { serviceSession ->
-                if (serviceSession.isRunning || _activeGpsSession.value.isRunning) {
-                    _activeGpsSession.value = serviceSession
-                }
-            }
-        }
         // Inicializar somente os catálogos ausentes, preservando os dados pessoais.
         viewModelScope.launch {
             // Inicializar base de dados alimentar com macronutrientes caso a tabela esteja vazia ou incompleta
@@ -380,6 +373,16 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     private val _activeGpsSession = MutableStateFlow(ActiveGpsSession())
     val activeGpsSession: StateFlow<ActiveGpsSession> = _activeGpsSession.asStateFlow()
     private var gpsTimerJob: Job? = null
+
+    init {
+        viewModelScope.launch {
+            RunningForegroundService.session.collect { serviceSession ->
+                if (serviceSession.isRunning || _activeGpsSession.value.isRunning) {
+                    _activeGpsSession.value = serviceSession
+                }
+            }
+        }
+    }
 
     // Cálculo Dinâmico de Gasto Calórico Diário & TMB:
     // Sem o treino no dia, o valor permanece com o TMB de repouso (parado).
