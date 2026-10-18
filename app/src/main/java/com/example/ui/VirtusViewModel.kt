@@ -56,6 +56,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import com.example.data.ai.GeminiRepository
+import com.example.service.RunningForegroundService
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -130,6 +131,13 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     init {
+        viewModelScope.launch {
+            RunningForegroundService.session.collect { serviceSession ->
+                if (serviceSession.isRunning || _activeGpsSession.value.isRunning) {
+                    _activeGpsSession.value = serviceSession
+                }
+            }
+        }
         // Inicializar somente os catálogos ausentes, preservando os dados pessoais.
         viewModelScope.launch {
             // Inicializar base de dados alimentar com macronutrientes caso a tabela esteja vazia ou incompleta
@@ -898,59 +906,24 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     // --- 🌍 GPS Outdoor Route & Daily/Monthly Steps Tracking ---
-    fun startGpsSession(initialLat: Double? = null, initialLng: Double? = null) {
+    fun startGpsSession(
+        initialLat: Double? = null,
+        initialLng: Double? = null,
+        voiceEnabled: Boolean = true,
+        narrationIntervalMeters: Float = 1000f
+    ) {
         if (_activeGpsSession.value.isRunning && !_activeGpsSession.value.isPaused) return
-
-        val startPoints = if (initialLat != null && initialLng != null) {
-            listOf(Pair(initialLat, initialLng))
-        } else {
-            emptyList()
-        }
-
-        _activeGpsSession.value = ActiveGpsSession(
-            isRunning = true,
-            isPaused = false,
-            elapsedSeconds = 0,
-            distanceMeters = 0f,
-            stepsCount = 0,
-            caloriesBurned = 0f,
-            currentSpeedKmh = 0f,
-            paceSecondsPerKm = 0L,
-            routePoints = startPoints
-        )
-
-        gpsTimerJob?.cancel()
-        gpsTimerJob = viewModelScope.launch {
-            while (_activeGpsSession.value.isRunning) {
-                delay(1000L)
-                if (!_activeGpsSession.value.isPaused) {
-                    val current = _activeGpsSession.value
-                    val newSeconds = current.elapsedSeconds + 1
-                    val paceSeconds = if (current.distanceMeters > 20f && newSeconds > 0) {
-                        ((newSeconds.toDouble() / (current.distanceMeters / 1000.0)).toLong()).coerceIn(60, 3600)
-                    } else 0L
-                    val speed = if (newSeconds > 0 && current.distanceMeters > 0) {
-                        ((current.distanceMeters / 1000f) / (newSeconds / 3600f)).coerceIn(0f, 60f)
-                    } else 0f
-
-                    _activeGpsSession.value = current.copy(
-                        elapsedSeconds = newSeconds,
-                        paceSecondsPerKm = paceSeconds,
-                        currentSpeedKmh = speed
-                    )
-                }
-            }
-        }
+        RunningForegroundService.start(getApplication(), initialLat, initialLng, voiceEnabled, narrationIntervalMeters)
         _toastMessage.value = "Rastreamento de corrida iniciado!"
     }
 
     fun pauseGpsSession() {
-        _activeGpsSession.value = _activeGpsSession.value.copy(isPaused = true)
+        RunningForegroundService.pause(getApplication())
         _toastMessage.value = "Corrida pausada."
     }
 
     fun resumeGpsSession() {
-        _activeGpsSession.value = _activeGpsSession.value.copy(isPaused = false)
+        RunningForegroundService.resume(getApplication())
         _toastMessage.value = "Corrida retomada!"
     }
 
@@ -998,6 +971,7 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         gpsTimerJob?.cancel()
         gpsTimerJob = null
         val session = _activeGpsSession.value
+        RunningForegroundService.stop(getApplication())
         if (session.elapsedSeconds < 2 && session.distanceMeters < 5f) {
             _activeGpsSession.value = ActiveGpsSession()
             _toastMessage.value = "Sessão muito curta descartada."
@@ -1039,7 +1013,14 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         gpsTimerJob?.cancel()
         gpsTimerJob = null
         _activeGpsSession.value = ActiveGpsSession()
+        RunningForegroundService.stop(getApplication())
         _toastMessage.value = "Sessão GPS cancelada."
+    }
+
+    fun configureBackgroundRunningVoice(enabled: Boolean, intervalMeters: Float) {
+        if (_activeGpsSession.value.isRunning) {
+            RunningForegroundService.configureVoice(getApplication(), enabled, intervalMeters)
+        }
     }
 
     fun deleteGpsRoute(id: Long) {
