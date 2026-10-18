@@ -3,7 +3,6 @@ package com.example.ui.screens.gps
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.os.Looper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -100,15 +99,11 @@ import com.example.ui.theme.GrowthOrange
 import com.example.ui.theme.GrowthOrangeLight
 import com.example.ui.theme.GrowthYellow
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableFloatStateOf
 import java.util.Calendar
 import java.util.Locale
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
-import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationResult
 
 @Composable
 fun GpsTrackerScreen(
@@ -123,39 +118,6 @@ fun GpsTrackerScreen(
     val ttsIntervalMeters = voiceState.narrationIntervalMeters
     val isTtsVoiceCoachEnabled = voiceState.isTtsEnabled
     val lastSpokenMessage = voiceState.lastNarratedMessage
-    var lastAnnouncedDistanceMeters by remember { mutableFloatStateOf(0f) }
-
-    LaunchedEffect(activeSession.isRunning) {
-        if (!activeSession.isRunning) lastAnnouncedDistanceMeters = 0f
-    }
-
-    // TTS Announcements: Real-time narration of Distance, Elapsed Time, and Pace (Ritmo)
-    LaunchedEffect(activeSession.distanceMeters, isTtsVoiceCoachEnabled, ttsIntervalMeters) {
-        if (!isTtsVoiceCoachEnabled) return@LaunchedEffect
-        val currentMeters = activeSession.distanceMeters
-        if (currentMeters >= lastAnnouncedDistanceMeters + ttsIntervalMeters && currentMeters >= ttsIntervalMeters) {
-            val milestoneIndex = (currentMeters / ttsIntervalMeters).toInt()
-            lastAnnouncedDistanceMeters = milestoneIndex * ttsIntervalMeters
-            val paceSec = if (activeSession.distanceMeters > 20f && activeSession.elapsedSeconds > 0) {
-                (activeSession.elapsedSeconds / (activeSession.distanceMeters / 1000f)).toLong().coerceIn(60, 3600)
-            } else 0L
-            val announcement = if (ttsIntervalMeters >= 1000f && (lastAnnouncedDistanceMeters % 1000f == 0f)) {
-                workoutTrackerViewModel.formatMilestoneSpeech(
-                    kmNumber = (lastAnnouncedDistanceMeters / 1000f).toInt(),
-                    elapsedSeconds = activeSession.elapsedSeconds.toLong(),
-                    paceSecondsPerKm = paceSec
-                )
-            } else {
-                workoutTrackerViewModel.formatDistanceMilestoneSpeech(
-                    distanceMeters = lastAnnouncedDistanceMeters,
-                    elapsedSeconds = activeSession.elapsedSeconds.toLong(),
-                    paceSecondsPerKm = paceSec
-                )
-            }
-            workoutTrackerViewModel.speak(announcement)
-        }
-    }
-
     var showFinishDialog by remember { mutableStateOf(false) }
     var routeNameInput by remember { mutableStateOf("Corrida ao Ar Livre") }
     var routeNotesInput by remember { mutableStateOf("") }
@@ -191,10 +153,12 @@ fun GpsTrackerScreen(
                         return@addOnSuccessListener
                     }
                     currentGpsLocation = location.latitude to location.longitude
-                    viewModel.startGpsSession(location.latitude, location.longitude)
-                    if (isTtsVoiceCoachEnabled) {
-                        workoutTrackerViewModel.speak("Treino de corrida iniciado. Boa corrida!")
-                    }
+                    viewModel.startGpsSession(
+                        location.latitude,
+                        location.longitude,
+                        isTtsVoiceCoachEnabled,
+                        ttsIntervalMeters
+                    )
                 }
                 .addOnFailureListener {
                     viewModel.showToast("Falha ao localizar o aparelho. Verifique o GPS e tente novamente.")
@@ -235,37 +199,8 @@ fun GpsTrackerScreen(
         onDispose {}
     }
 
-    // One continuous location source for the active session.
-    DisposableEffect(activeSession.isRunning, activeSession.isPaused, hasLocationPermission) {
-        var locationCallback: LocationCallback? = null
-
-        if (activeSession.isRunning && !activeSession.isPaused && hasLocationPermission) {
-            try {
-                val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 2_000L)
-                    .setMinUpdateIntervalMillis(1_000L)
-                    .setMinUpdateDistanceMeters(2f)
-                    .build()
-                locationCallback = object : LocationCallback() {
-                    override fun onLocationResult(result: LocationResult) {
-                        result.lastLocation?.let { location ->
-                            currentGpsLocation = location.latitude to location.longitude
-                            viewModel.addGpsCoordinate(location.latitude, location.longitude)
-                        }
-                    }
-                }
-                fusedLocationClient.requestLocationUpdates(
-                    request,
-                    locationCallback!!,
-                    Looper.getMainLooper()
-                )
-            } catch (_: SecurityException) {
-                viewModel.showToast("Sem permissão para atualizar o GPS.")
-            } catch (_: Exception) {}
-        }
-
-        onDispose {
-            locationCallback?.let { fusedLocationClient.removeLocationUpdates(it) }
-        }
+    LaunchedEffect(activeSession.routePoints.lastOrNull()) {
+        activeSession.routePoints.lastOrNull()?.let { currentGpsLocation = it }
     }
 
     // Compute Daily & Monthly Running Statistics
@@ -853,6 +788,7 @@ fun GpsTrackerScreen(
                                     checked = isTtsVoiceCoachEnabled,
                                     onCheckedChange = { enabled ->
                                         workoutTrackerViewModel.setTtsEnabled(enabled)
+                                        viewModel.configureBackgroundRunningVoice(enabled, ttsIntervalMeters)
                                     },
                                     colors = SwitchDefaults.colors(
                                         checkedThumbColor = Color.White,
@@ -935,6 +871,7 @@ fun GpsTrackerScreen(
                                                     .weight(1f)
                                                     .clickable {
                                                         workoutTrackerViewModel.setNarrationIntervalMeters(dist)
+                                                        viewModel.configureBackgroundRunningVoice(isTtsVoiceCoachEnabled, dist)
                                                     }
                                             ) {
                                                 Text(
@@ -1003,9 +940,6 @@ fun GpsTrackerScreen(
                                 OutlinedButton(
                                     onClick = {
                                         viewModel.pauseGpsSession()
-                                        if (isTtsVoiceCoachEnabled) {
-                                            workoutTrackerViewModel.speak("Treino pausado.")
-                                        }
                                     },
                                     border = BorderStroke(1.dp, GrowthYellow),
                                     shape = RoundedCornerShape(10.dp),
@@ -1022,9 +956,6 @@ fun GpsTrackerScreen(
                                 Button(
                                     onClick = {
                                         viewModel.resumeGpsSession()
-                                        if (isTtsVoiceCoachEnabled) {
-                                            workoutTrackerViewModel.speak("Treino retomado. Vamos lá!")
-                                        }
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = GrowthGreen),
                                     shape = RoundedCornerShape(10.dp),
