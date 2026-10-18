@@ -1116,14 +1116,19 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun toggleMealItemCompleted(item: MealPlanItem) {
+    fun toggleMealItemCompleted(
+        item: MealPlanItem,
+        dateKey: String = currentDateKey(),
+        isCompletedForDate: Boolean = item.isCompletedToday
+    ) {
         viewModelScope.launch {
-            val dateKey = currentDateKey()
-            if (!item.isCompletedToday) {
-                val now = System.currentTimeMillis()
+            if (!isCompletedForDate) {
+                val recordDate = runCatching {
+                    SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(dateKey)?.time
+                }.getOrNull() ?: System.currentTimeMillis()
                 val record = FoodRecord(
                     dateString = dateKey,
-                    dateMillis = now,
+                    dateMillis = recordDate,
                     mealType = item.mealType,
                     foodItemId = item.foodItemId,
                     foodName = item.foodName,
@@ -1148,8 +1153,10 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                     firestoreSync.deleteFoodRecordFromCloud(record.id, userProfile.value.firebaseUid)
                 }
             }
-            repository.toggleMealCompletion(item.id, item.isCompletedToday)
-            persistTodayIntakeNow()
+            if (dateKey == currentDateKey()) {
+                repository.toggleMealCompletion(item.id, isCompletedForDate)
+            }
+            persistIntakeForDate(dateKey)
         }
     }
 
@@ -1161,22 +1168,27 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private suspend fun persistTodayIntakeNow() {
-        val dateKey = currentDateKey()
-        val today = repository.allFoodRecords.firstOrNull().orEmpty().filter { it.dateString == dateKey }
+        persistIntakeForDate(currentDateKey())
+    }
+
+    private suspend fun persistIntakeForDate(dateKey: String) {
+        val recordsForDate = repository.allFoodRecords.firstOrNull().orEmpty().filter { it.dateString == dateKey }
         val profile = userProfile.value
+        val dateMillis = runCatching {
+            SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(dateKey)?.time
+        }.getOrNull() ?: System.currentTimeMillis()
+        val savedWater = repository.recentIntakeHistory.firstOrNull().orEmpty()
+            .firstOrNull { it.dateString == dateKey }?.waterDrankMl ?: 0
         val summary = DailyIntakeHistory(
             dateString = dateKey,
-            dateMillis = Calendar.getInstance().apply {
-                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-            }.timeInMillis,
-            totalCalories = today.sumOf { it.calories.toDouble() }.toFloat(),
-            totalProtein = today.sumOf { it.protein.toDouble() }.toFloat(),
-            totalCarbs = today.sumOf { it.carbs.toDouble() }.toFloat(),
-            totalFat = today.sumOf { it.fat.toDouble() }.toFloat(),
+            dateMillis = dateMillis,
+            totalCalories = recordsForDate.sumOf { it.calories.toDouble() }.toFloat(),
+            totalProtein = recordsForDate.sumOf { it.protein.toDouble() }.toFloat(),
+            totalCarbs = recordsForDate.sumOf { it.carbs.toDouble() }.toFloat(),
+            totalFat = recordsForDate.sumOf { it.fat.toDouble() }.toFloat(),
             targetCalories = profile.targetCalories,
-            isAdhered = today.sumOf { it.calories.toDouble() } <= profile.targetCalories,
-            waterDrankMl = _waterDrankMl.value
+            isAdhered = recordsForDate.sumOf { it.calories.toDouble() } <= profile.targetCalories,
+            waterDrankMl = if (dateKey == currentDateKey()) _waterDrankMl.value else savedWater
         )
         val id = repository.saveDailyIntake(summary)
         firestoreSync.syncDailyIntakeToCloud(summary.copy(id = id), profile.firebaseUid)
