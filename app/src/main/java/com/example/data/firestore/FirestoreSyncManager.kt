@@ -2,6 +2,7 @@ package com.example.data.firestore
 
 import android.content.Context
 import android.util.Log
+import com.example.BuildConfig
 import com.example.R
 import com.example.data.model.ActivityLevel
 import com.example.data.model.BodyType
@@ -67,11 +68,11 @@ class FirestoreSyncManager(private val context: Context) {
                 .setLocalCacheSettings(PersistentCacheSettings.newBuilder().build())
                 .build()
             fs.firestoreSettings = settings
-            Log.d("FirestoreSync", "Firestore inicializado com persistência offline ativa.")
+            if (BuildConfig.DEBUG) Log.d("FirestoreSync", "Firestore inicializado com persistência offline ativa.")
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.w("FirestoreSync", "Configuração do Firestore já aplicada ou aviso: ${e.message}")
+            if (BuildConfig.DEBUG) Log.w("FirestoreSync", "Configuração do Firestore já aplicada ou aviso: ${e.message}")
         }
         fs
     }
@@ -132,12 +133,12 @@ class FirestoreSyncManager(private val context: Context) {
                 "updatedAt" to FieldValue.serverTimestamp()
             )
             awaitCloudWrite(userDoc.set(data, SetOptions.merge()))
-            Log.d("FirestoreSync", "Perfil do usuário $uid salvo com sucesso (offline/online).")
+            if (BuildConfig.DEBUG) Log.d("FirestoreSync", "Perfil do usuário $uid salvo com sucesso (offline/online).")
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.e("FirestoreSync", "Erro ao salvar perfil no Firestore: ${e.message}", e)
+            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao salvar perfil no Firestore: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -160,7 +161,7 @@ class FirestoreSyncManager(private val context: Context) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.e("FirestoreSync", "Erro ao buscar perfil da nuvem: ${e.message}", e)
+            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao buscar perfil da nuvem: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -180,7 +181,7 @@ class FirestoreSyncManager(private val context: Context) {
         val registration = firestore.collection("users").document(uid)
             .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
                 if (error != null) {
-                    Log.w("FirestoreSync", "Erro no listener do perfil: ${error.message}")
+                    if (BuildConfig.DEBUG) Log.w("FirestoreSync", "Erro no listener do perfil: ${error.message}")
                     return@addSnapshotListener
                 }
                 if (snapshot != null && snapshot.exists()) {
@@ -270,12 +271,12 @@ class FirestoreSyncManager(private val context: Context) {
                 .set(userRef, summaryData, SetOptions.merge())
                 .commit())
 
-            Log.d("FirestoreSync", "Metas calóricas sincronizadas no Firestore (offline/online).")
+            if (BuildConfig.DEBUG) Log.d("FirestoreSync", "Metas calóricas sincronizadas no Firestore (offline/online).")
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.e("FirestoreSync", "Erro ao salvar metas calóricas: ${e.message}", e)
+            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao salvar metas calóricas: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -306,7 +307,7 @@ class FirestoreSyncManager(private val context: Context) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.e("FirestoreSync", "Erro ao buscar meta calórica: ${e.message}", e)
+            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao buscar meta calórica: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -326,7 +327,7 @@ class FirestoreSyncManager(private val context: Context) {
             .collection("calorieGoals").document("current")
             .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
                 if (error != null) {
-                    Log.w("FirestoreSync", "Erro ao observar metas calóricas: ${error.message}")
+                    if (BuildConfig.DEBUG) Log.w("FirestoreSync", "Erro ao observar metas calóricas: ${error.message}")
                     return@addSnapshotListener
                 }
                 if (snapshot != null && snapshot.exists()) {
@@ -377,12 +378,12 @@ class FirestoreSyncManager(private val context: Context) {
                 "updatedAt" to FieldValue.serverTimestamp()
             )
             awaitCloudWrite(docRef.set(data, SetOptions.merge()))
-            Log.d("FirestoreSync", "WorkoutLog $docId sincronizado com sucesso no Firestore.")
+            if (BuildConfig.DEBUG) Log.d("FirestoreSync", "WorkoutLog $docId sincronizado com sucesso no Firestore.")
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.e("FirestoreSync", "Erro ao salvar WorkoutLog no Firestore: ${e.message}", e)
+            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao salvar WorkoutLog no Firestore: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -401,7 +402,7 @@ class FirestoreSyncManager(private val context: Context) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.e("FirestoreSync", "Erro ao excluir WorkoutLog do Firestore: ${e.message}", e)
+            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao excluir WorkoutLog do Firestore: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -438,7 +439,7 @@ class FirestoreSyncManager(private val context: Context) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.e("FirestoreSync", "Erro ao buscar logs de treino: ${e.message}", e)
+            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao buscar logs de treino: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -459,7 +460,7 @@ class FirestoreSyncManager(private val context: Context) {
             .orderBy("dateMillis", Query.Direction.DESCENDING)
             .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
                 if (error != null) {
-                    Log.w("FirestoreSync", "Erro ao escutar workoutLogs: ${error.message}")
+                    if (BuildConfig.DEBUG) Log.w("FirestoreSync", "Erro ao escutar workoutLogs: ${error.message}")
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
@@ -513,12 +514,12 @@ class FirestoreSyncManager(private val context: Context) {
                 "updatedAt" to FieldValue.serverTimestamp()
             )
             awaitCloudWrite(docRef.set(data, SetOptions.merge()))
-            Log.d("FirestoreSync", "GpsRouteLog $docId sincronizado no Firestore.")
+            if (BuildConfig.DEBUG) Log.d("FirestoreSync", "GpsRouteLog $docId sincronizado no Firestore.")
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.e("FirestoreSync", "Erro ao salvar GpsRouteLog no Firestore: ${e.message}", e)
+            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao salvar GpsRouteLog no Firestore: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -549,7 +550,7 @@ class FirestoreSyncManager(private val context: Context) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.e("FirestoreSync", "Erro ao sincronizar refeição: ${e.message}", e)
+            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao sincronizar refeição: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -574,7 +575,7 @@ class FirestoreSyncManager(private val context: Context) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.e("FirestoreSync", "Erro ao sincronizar item de compra: ${e.message}", e)
+            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao sincronizar item de compra: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -597,8 +598,63 @@ class FirestoreSyncManager(private val context: Context) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.e("FirestoreSync", "Erro ao sincronizar progresso: ${e.message}", e)
+            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao sincronizar progresso: ${e.message}", e)
             Result.failure(e)
+        }
+    }
+
+    private val userOwnedCollections = listOf(
+        "calorieGoals",
+        "workoutLogs",
+        "gpsRouteLogs",
+        "mealPlans",
+        "shoppingItems",
+        "progressLogs",
+        // Included defensively for newer clients so account deletion remains complete.
+        "foodRecords",
+        "cardioLogs",
+        "dailyIntake"
+    )
+
+    private suspend fun deleteCollectionFromServer(
+        userRef: com.google.firebase.firestore.DocumentReference,
+        collectionName: String
+    ) {
+        while (true) {
+            val page = userRef.collection(collectionName)
+                .limit(450)
+                .get(Source.SERVER)
+                .await()
+            if (page.isEmpty) return
+
+            val batch = firestore.batch()
+            page.documents.forEach { batch.delete(it.reference) }
+            batch.commit().await()
+        }
+    }
+
+    /**
+     * Deletes the complete known Firestore subtree while the Firebase session is
+     * still valid. Authentication is removed only after this operation succeeds.
+     */
+    suspend fun deleteAllUserData(): Result<Unit> {
+        val uid = currentUserId
+            ?: return Result.failure(IllegalStateException("Usuário não autenticado."))
+
+        return try {
+            val userRef = firestore.collection("users").document(uid)
+            userOwnedCollections.forEach { collectionName ->
+                deleteCollectionFromServer(userRef, collectionName)
+            }
+            userRef.delete().await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(IllegalStateException(
+                "Não foi possível confirmar a exclusão dos dados no servidor. Tente novamente com internet.",
+                e
+            ))
         }
     }
 

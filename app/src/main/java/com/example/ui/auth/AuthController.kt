@@ -26,6 +26,31 @@ class AuthController(
     val authError = _authError.asStateFlow()
     fun clearAuthError() { _authError.value = null }
 
+    private suspend fun localProfileForUser(uid: String): UserProfile {
+        val current = profile()
+        val previousUid = current.firebaseUid
+        return if (
+            previousUid.isNotBlank() &&
+            !previousUid.startsWith("guest_") &&
+            previousUid != uid
+        ) {
+            repository.clearAllLocalData()
+            UserProfile()
+        } else {
+            current
+        }
+    }
+
+    private suspend fun localProfileForGuest(): UserProfile {
+        val current = profile()
+        return if (current.firebaseUid.isNotBlank() && !current.firebaseUid.startsWith("guest_")) {
+            repository.clearAllLocalData()
+            UserProfile()
+        } else {
+            current
+        }
+    }
+
     private fun launchAuth(block: suspend CoroutineScope.() -> Unit) {
         if (!_isAuthLoading.compareAndSet(false, true)) return
         scope.launch {
@@ -53,7 +78,7 @@ class AuthController(
             val result = authService.signInWithGoogle(credential)
 
             result.onSuccess { user ->
-                val current = profile()
+                val current = localProfileForUser(user.uid)
                 val hasOnboarded = current.hasCompletedOnboarding || current.weightKg > 30f
                 val updated = current.copy(
                     isLoggedIn = true,
@@ -84,7 +109,7 @@ class AuthController(
             val result = authService.login(emailInput, passwordInput)
             
             result.onSuccess { user ->
-                val current = profile()
+                val current = localProfileForUser(user.uid)
                 val hasOnboarded = current.hasCompletedOnboarding || current.weightKg > 30f
                 val fallbackName = if (current.name.isNotBlank() && current.name != "Atleta") {
                     current.name
@@ -112,8 +137,8 @@ class AuthController(
 
     fun enterAsGuest(onSuccess: () -> Unit) {
         launchAuth {
+            val current = localProfileForGuest()
             authService.signOut()
-            val current = profile()
             val hasOnboarded = current.hasCompletedOnboarding || current.weightKg > 30f
             val updated = current.copy(
                 isLoggedIn = true,
@@ -179,6 +204,7 @@ class AuthController(
                 showMessage(message)
                 return@launchAuth
             }
+            localProfileForUser(user.uid)
             val plan = MacroCalculator.computeFullPlan(
                 weightKg = weightKg,
                 heightCm = heightCm,
@@ -229,7 +255,7 @@ class AuthController(
         launchAuth {
             val result = authService.sendPasswordReset(email)
             result.onSuccess {
-                val msg = "E-mail de recuperação enviado com sucesso para $email!"
+                val msg = "Se existir uma conta para esse e-mail, enviaremos as instruções de recuperação."
                 showMessage(msg)
                 onComplete(true, msg)
             }.onFailure { ex ->

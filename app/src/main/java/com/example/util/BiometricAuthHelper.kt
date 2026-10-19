@@ -17,8 +17,7 @@ object BiometricAuthHelper {
 
     fun checkBiometricSupport(context: Context): BiometricAvailability {
         val biometricManager = BiometricManager.from(context)
-        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
-                BiometricManager.Authenticators.BIOMETRIC_WEAK
+        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG
 
         return when (biometricManager.canAuthenticate(authenticators)) {
             BiometricManager.BIOMETRIC_SUCCESS -> BiometricAvailability.AVAILABLE
@@ -31,7 +30,7 @@ object BiometricAuthHelper {
     fun promptBiometricAuth(
         activity: FragmentActivity,
         title: String = "Login Biométrico",
-        subtitle: String = "Victus Dieta & Treino",
+        subtitle: String = "Virtus Dieta & Treino",
         description: String = "Confirme sua digital ou reconhecimento facial para entrar rapidamente no seu treino.",
         negativeButtonText: String = "Cancelar",
         onSuccess: () -> Unit,
@@ -44,8 +43,7 @@ object BiometricAuthHelper {
             .setDescription(description)
             .setNegativeButtonText(negativeButtonText)
             .setAllowedAuthenticators(
-                BiometricManager.Authenticators.BIOMETRIC_STRONG or
-                        BiometricManager.Authenticators.BIOMETRIC_WEAK
+                BiometricManager.Authenticators.BIOMETRIC_STRONG
             )
             .build()
 
