@@ -6,7 +6,7 @@ plugins {
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.secrets)
   alias(libs.plugins.google.services)
-  kotlin("plugin.serialization") version "2.0.20"
+  kotlin("plugin.serialization") version "2.4.21"
 }
 
 android {
@@ -129,7 +129,7 @@ dependencies {
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
   testImplementation(libs.junit)
-  testImplementation("org.mockito:mockito-core:5.14.2")
+  testImplementation("org.mockito:mockito-core:5.24.0")
   testImplementation(libs.kotlinx.coroutines.test)
   testImplementation(libs.robolectric)
   androidTestImplementation(platform(libs.androidx.compose.bom))
