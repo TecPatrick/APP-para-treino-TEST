@@ -602,6 +602,61 @@ class FirestoreSyncManager(private val context: Context) {
         }
     }
 
+    private val userOwnedCollections = listOf(
+        "calorieGoals",
+        "workoutLogs",
+        "gpsRouteLogs",
+        "mealPlans",
+        "shoppingItems",
+        "progressLogs",
+        // Included defensively for newer clients so account deletion remains complete.
+        "foodRecords",
+        "cardioLogs",
+        "dailyIntake"
+    )
+
+    private suspend fun deleteCollectionFromServer(
+        userRef: com.google.firebase.firestore.DocumentReference,
+        collectionName: String
+    ) {
+        while (true) {
+            val page = userRef.collection(collectionName)
+                .limit(450)
+                .get(Source.SERVER)
+                .await()
+            if (page.isEmpty) return
+
+            val batch = firestore.batch()
+            page.documents.forEach { batch.delete(it.reference) }
+            batch.commit().await()
+        }
+    }
+
+    /**
+     * Deletes the complete known Firestore subtree while the Firebase session is
+     * still valid. Authentication is removed only after this operation succeeds.
+     */
+    suspend fun deleteAllUserData(): Result<Unit> {
+        val uid = currentUserId
+            ?: return Result.failure(IllegalStateException("Usuário não autenticado."))
+
+        return try {
+            val userRef = firestore.collection("users").document(uid)
+            userOwnedCollections.forEach { collectionName ->
+                deleteCollectionFromServer(userRef, collectionName)
+            }
+            userRef.delete().await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(IllegalStateException(
+                "Não foi possível confirmar a exclusão dos dados no servidor. Tente novamente com internet.",
+                e
+            ))
+        }
+    }
+
     // =========================================================================
     // 5. SINCRONIZAÇÃO COMPLETA DE DADOS PENDENTES (Full Sync)
     // =========================================================================
