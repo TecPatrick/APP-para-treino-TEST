@@ -59,4 +59,29 @@ class AuthRegressionTest {
             .thenReturn(Tasks.forException<Void>(IllegalStateException("recaptcha failure")))
         assertTrue(FirebaseAuthService(firebase).sendPasswordReset("p@example.com").isFailure)
     }
+
+    @Test fun weakPasswordIsRejectedBeforeCallingFirebase() = runTest {
+        val firebase = mock(FirebaseAuth::class.java)
+        val result = FirebaseAuthService(firebase).register(
+            email = "p@example.com",
+            password = "short",
+            displayName = "Patrick"
+        )
+
+        assertTrue(result.isFailure)
+        verifyNoInteractions(firebase)
+    }
+
+    @Test fun authenticationErrorsNeverExposeProviderDetails() {
+        val providerError = IllegalStateException(
+            "INTERNAL_ERROR apiKey=secret user=p@example.com"
+        )
+
+        val message = FirebaseAuthService.translateAuthError(providerError)
+
+        assertEquals("Não foi possível autenticar. Tente novamente.", message)
+        assertFalse(message.contains("apiKey", ignoreCase = true))
+        assertFalse(message.contains("p@example.com"))
+    }
+
 }
