@@ -174,6 +174,30 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
         viewingRoutineDetail = null
     }
 
+    if (showRoutineEditorDialog) {
+        BackHandler { showRoutineEditorDialog = false }
+        WorkoutRoutineBuilderScreen(
+            existingRoutine = routineToEdit,
+            existingExercises = if (routineToEdit != null) allExercises.filter { it.routineId == routineToEdit!!.id } else emptyList(),
+            initialSplit = presetSplitForNewRoutine,
+            onBack = { showRoutineEditorDialog = false },
+            onSave = { existingId, splitType, letter, title, dayOfWeek, muscles, durationMin, exercises ->
+                viewModel.saveFullRoutineWithExercises(
+                    existingRoutineId = existingId,
+                    splitType = splitType,
+                    letter = letter.ifBlank { presetLetterForNewRoutine },
+                    title = title,
+                    dayOfWeekLabel = dayOfWeek,
+                    targetMuscleGroups = muscles,
+                    estimatedDurationMinutes = durationMin,
+                    exercises = exercises
+                )
+                showRoutineEditorDialog = false
+            }
+        )
+        return
+    }
+
     if (viewingRoutineDetail != null) {
         // --- VIEW 2: DEDICATED ROUTINE DETAIL & ACTIVE EXERCISES VIEW ---
         val currentRoutine = viewingRoutineDetail!!
@@ -558,29 +582,6 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
     }
 
     // --- MODAL DIALOGS ---
-
-    // 1. Routine Editor Dialog
-    if (showRoutineEditorDialog) {
-        WorkoutRoutineEditorDialog(
-            existingRoutine = routineToEdit,
-            existingExercises = if (routineToEdit != null) allExercises.filter { it.routineId == routineToEdit!!.id } else emptyList(),
-            initialSplit = presetSplitForNewRoutine,
-            onDismiss = { showRoutineEditorDialog = false },
-            onSave = { existingId, splitType, letter, title, dayOfWeek, muscles, durationMin, exercises ->
-                viewModel.saveFullRoutineWithExercises(
-                    existingRoutineId = existingId,
-                    splitType = splitType,
-                    letter = letter.ifBlank { presetLetterForNewRoutine },
-                    title = title,
-                    dayOfWeekLabel = dayOfWeek,
-                    targetMuscleGroups = muscles,
-                    estimatedDurationMinutes = durationMin,
-                    exercises = exercises
-                )
-                showRoutineEditorDialog = false
-            }
-        )
-    }
 
     // 2. Biomechanics Guide & GIF Modal
     if (selectedExerciseGuide != null) {
