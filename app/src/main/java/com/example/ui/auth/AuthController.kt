@@ -54,7 +54,7 @@ class AuthController(
 
             result.onSuccess { user ->
                 val current = profile()
-                val hasOnboarded = current.hasCompletedOnboarding || current.weightKg > 30f
+                val hasOnboarded = true
                 val updated = current.copy(
                     isLoggedIn = true,
                     hasCompletedOnboarding = hasOnboarded,
@@ -85,7 +85,7 @@ class AuthController(
             
             result.onSuccess { user ->
                 val current = profile()
-                val hasOnboarded = current.hasCompletedOnboarding || current.weightKg > 30f
+                val hasOnboarded = true
                 val fallbackName = if (current.name.isNotBlank() && current.name != "Atleta") {
                     current.name
                 } else {
