@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Height
 import androidx.compose.material.icons.filled.Info
@@ -106,7 +107,8 @@ import kotlin.math.roundToInt
 @Composable
 fun UserProfileScreen(
     viewModel: VirtusViewModel,
-    onNavigateBack: () -> Unit = {}
+    onNavigateBack: () -> Unit = {},
+    onNavigateToAccount: () -> Unit = {}
 ) {
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
 
@@ -187,6 +189,43 @@ fun UserProfileScreen(
             contentPadding = PaddingValues(bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item {
+                val isGuest = profile.firebaseUid.startsWith("guest_") || profile.email.endsWith("@growth.local")
+                Card(
+                    modifier = Modifier.fillMaxWidth().testTag("account_card"),
+                    colors = CardDefaults.cardColors(containerColor = CarbonCard),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, if (isGuest) GrowthOrange else GrowthGreen)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Email, contentDescription = null, tint = if (isGuest) GrowthOrange else GrowthGreen)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isGuest) "Perfil local (visitante)" else "Conta vinculada",
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Text(
+                                    text = if (isGuest) "Vincule um e-mail para login e sincronização." else profile.email,
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Button(
+                            onClick = onNavigateToAccount,
+                            modifier = Modifier.fillMaxWidth().testTag("manage_account_btn"),
+                            colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange)
+                        ) {
+                            Text(if (isGuest) "Vincular e-mail ou criar conta" else "Trocar ou acessar conta")
+                        }
+                    }
+                }
+            }
+
             // Hero: Current Biometric Overview
             item {
                 Card(
@@ -299,10 +338,9 @@ fun UserProfileScreen(
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Text(
                                         text = "Diagnóstico Corporal:",
@@ -320,9 +358,9 @@ fun UserProfileScreen(
 
                                 Spacer(modifier = Modifier.height(6.dp))
 
-                                Row(
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Text(
                                         text = "• TMB (Parado sem treino): $liveBmr kcal",
@@ -339,9 +377,9 @@ fun UserProfileScreen(
 
                                 Spacer(modifier = Modifier.height(4.dp))
 
-                                Row(
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Text(
                                         text = "• Faixa de peso normal: ${idealMinWeight.toInt()} a ${idealMaxWeight.toInt()} kg",

@@ -349,7 +349,7 @@ interface AppDao {
     @Query("DELETE FROM progress_logs WHERE id = :id")
     suspend fun deleteProgressLog(id: Long)
 
-    @Query("SELECT * FROM daily_intake_history ORDER BY dateMillis DESC LIMIT 30")
+    @Query("SELECT * FROM daily_intake_history ORDER BY dateMillis DESC")
     fun getRecentIntakeHistory(): Flow<List<DailyIntakeHistory>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -357,6 +357,9 @@ interface AppDao {
 
     @Query("SELECT * FROM daily_intake_history WHERE dateString = :dateString LIMIT 1")
     suspend fun getDailyIntakeForDate(dateString: String): DailyIntakeHistory?
+
+    @Query("DELETE FROM food_records WHERE id = (SELECT id FROM food_records WHERE dateString = :dateString AND foodItemId = :foodItemId AND mealType = :mealType ORDER BY dateMillis DESC LIMIT 1)")
+    suspend fun deleteLatestMatchingFoodRecord(dateString: String, foodItemId: Long, mealType: MealType)
 
     // =========================================================================
     // 🛒 ShoppingItem DAO Operations (Lista de Compras Offline)

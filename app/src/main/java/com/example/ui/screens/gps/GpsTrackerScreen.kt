@@ -3,10 +3,6 @@ package com.example.ui.screens.gps
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.location.Location
-import android.location.LocationListener
-import android.location.LocationManager
-import android.os.Bundle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -59,7 +55,6 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Public
-import androidx.compose.material.icons.filled.Satellite
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.RecordVoiceOver
@@ -104,10 +99,13 @@ import com.example.ui.theme.GrowthOrange
 import com.example.ui.theme.GrowthOrangeLight
 import com.example.ui.theme.GrowthYellow
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableFloatStateOf
-import com.example.util.TextToSpeechManager
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
+import java.text.SimpleDateFormat
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 
 @Composable
 fun GpsTrackerScreen(
@@ -118,52 +116,20 @@ fun GpsTrackerScreen(
     val context = LocalContext.current
     val activeSession by viewModel.activeGpsSession.collectAsStateWithLifecycle()
     val allLogs by viewModel.allGpsRouteLogs.collectAsStateWithLifecycle()
-    val workoutTrackerState by workoutTrackerViewModel.uiState.collectAsStateWithLifecycle()
-    
-    val ttsManager = remember { TextToSpeechManager(context) }
-    var ttsIntervalMeters by remember { mutableFloatStateOf(1000f) }
-    var lastAnnouncedDistanceMeters by remember { mutableFloatStateOf(0f) }
-    var isTtsVoiceCoachEnabled by remember { mutableStateOf(true) }
-    var lastSpokenMessage by remember { mutableStateOf<String?>(null) }
-
-    // TTS Announcements: Real-time narration of Distance, Elapsed Time, and Pace (Ritmo)
-    LaunchedEffect(activeSession.distanceMeters, isTtsVoiceCoachEnabled, ttsIntervalMeters) {
-        if (!isTtsVoiceCoachEnabled) return@LaunchedEffect
-        val currentMeters = activeSession.distanceMeters
-        if (currentMeters >= lastAnnouncedDistanceMeters + ttsIntervalMeters && currentMeters >= ttsIntervalMeters) {
-            val milestoneIndex = (currentMeters / ttsIntervalMeters).toInt()
-            lastAnnouncedDistanceMeters = milestoneIndex * ttsIntervalMeters
-            val paceSec = if (activeSession.distanceMeters > 20f && activeSession.elapsedSeconds > 0) {
-                (activeSession.elapsedSeconds / (activeSession.distanceMeters / 1000f)).toLong().coerceIn(60, 3600)
-            } else 0L
-            val announcement = if (ttsIntervalMeters >= 1000f && (lastAnnouncedDistanceMeters % 1000f == 0f)) {
-                ttsManager.service.formatMilestoneSpeech(
-                    kmNumber = (lastAnnouncedDistanceMeters / 1000f).toInt(),
-                    elapsedSeconds = activeSession.elapsedSeconds.toLong(),
-                    paceSecondsPerKm = paceSec
-                )
-            } else {
-                ttsManager.service.formatDistanceMilestoneSpeech(
-                    distanceMeters = lastAnnouncedDistanceMeters,
-                    elapsedSeconds = activeSession.elapsedSeconds.toLong(),
-                    paceSecondsPerKm = paceSec
-                )
-            }
-            lastSpokenMessage = announcement
-            ttsManager.speak(announcement)
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose { ttsManager.shutdown() }
-    }
-
+    val selectedDateMillis by viewModel.selectedDateMillis.collectAsStateWithLifecycle()
+    val voiceState by workoutTrackerViewModel.uiState.collectAsStateWithLifecycle()
+    val ttsIntervalMeters = voiceState.narrationIntervalMeters
+    val isTtsVoiceCoachEnabled = voiceState.isTtsEnabled
+    val lastSpokenMessage = voiceState.lastNarratedMessage
     var showFinishDialog by remember { mutableStateOf(false) }
     var routeNameInput by remember { mutableStateOf("Corrida ao Ar Livre") }
     var routeNotesInput by remember { mutableStateOf("") }
     var selectedLogForDetails by remember { mutableStateOf<GpsRouteLog?>(null) }
     var currentGpsLocation by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     var useInteractiveMap by remember { mutableStateOf(true) }
+    var showMapOptions by remember { mutableStateOf(false) }
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+    var startAfterPermission by remember { mutableStateOf(false) }
 
     // Check location permissions
     var hasLocationPermission by remember {
@@ -179,6 +145,32 @@ fun GpsTrackerScreen(
         )
     }
 
+    val startGpsWithCurrentLocation: () -> Unit = {
+        val tokenSource = CancellationTokenSource()
+        try {
+            fusedLocationClient
+                .getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, tokenSource.token)
+                .addOnSuccessListener { location ->
+                    if (location == null) {
+                        viewModel.showToast("Não foi possível obter o GPS. Ative a localização e tente novamente.")
+                        return@addOnSuccessListener
+                    }
+                    currentGpsLocation = location.latitude to location.longitude
+                    viewModel.startGpsSession(
+                        location.latitude,
+                        location.longitude,
+                        isTtsVoiceCoachEnabled,
+                        ttsIntervalMeters
+                    )
+                }
+                .addOnFailureListener {
+                    viewModel.showToast("Falha ao localizar o aparelho. Verifique o GPS e tente novamente.")
+                }
+        } catch (_: SecurityException) {
+            viewModel.showToast("A permissão de localização foi removida.")
+        }
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -187,19 +179,22 @@ fun GpsTrackerScreen(
         hasLocationPermission = fine || coarse
         if (hasLocationPermission) {
             viewModel.showToast("Permissão de GPS concedida!")
+            if (startAfterPermission) {
+                startAfterPermission = false
+                startGpsWithCurrentLocation()
+            }
+        } else {
+            startAfterPermission = false
+            viewModel.showToast("A corrida precisa da permissão de localização.")
         }
     }
 
-    // Pre-fetch last known location as soon as permission is granted
+    // Pre-fetch the last fused location as soon as permission is granted.
     DisposableEffect(hasLocationPermission) {
         if (hasLocationPermission) {
             try {
-                val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-                val locGps = lm?.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-                val locNet = lm?.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
-                val best = locGps ?: locNet
-                if (best != null) {
-                    currentGpsLocation = Pair(best.latitude, best.longitude)
+                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                    location?.let { currentGpsLocation = it.latitude to it.longitude }
                 }
             } catch (_: SecurityException) {
             } catch (_: Exception) {}
@@ -207,65 +202,24 @@ fun GpsTrackerScreen(
         onDispose {}
     }
 
-    // Android LocationManager GPS hook during active tracking
-    DisposableEffect(activeSession.isRunning, activeSession.isPaused, hasLocationPermission) {
-        var locationManager: LocationManager? = null
-        var locationListener: LocationListener? = null
-
-        if (activeSession.isRunning && !activeSession.isPaused && hasLocationPermission) {
-            try {
-                locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-                locationListener = object : LocationListener {
-                    override fun onLocationChanged(loc: Location) {
-                        currentGpsLocation = Pair(loc.latitude, loc.longitude)
-                        viewModel.addGpsCoordinate(loc.latitude, loc.longitude)
-                    }
-                    @Deprecated("Deprecated in Java")
-                    override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
-                    override fun onProviderEnabled(provider: String) {}
-                    override fun onProviderDisabled(provider: String) {}
-                }
-
-                if (locationManager?.isProviderEnabled(LocationManager.GPS_PROVIDER) == true) {
-                    locationManager.requestLocationUpdates(
-                        LocationManager.GPS_PROVIDER,
-                        2000L,
-                        2.0f,
-                        locationListener
-                    )
-                } else if (locationManager?.isProviderEnabled(LocationManager.NETWORK_PROVIDER) == true) {
-                    locationManager.requestLocationUpdates(
-                        LocationManager.NETWORK_PROVIDER,
-                        2000L,
-                        2.0f,
-                        locationListener
-                    )
-                }
-            } catch (_: SecurityException) {
-            } catch (_: Exception) {}
-        }
-
-        onDispose {
-            if (locationManager != null && locationListener != null) {
-                try {
-                    locationManager.removeUpdates(locationListener)
-                } catch (_: Exception) {}
-            }
-        }
+    LaunchedEffect(activeSession.routePoints.lastOrNull()) {
+        activeSession.routePoints.lastOrNull()?.let { currentGpsLocation = it }
     }
 
     // Compute Daily & Monthly Running Statistics
-    val now = remember { System.currentTimeMillis() }
-    val todayStartMillis = remember(now) {
-        val cal = Calendar.getInstance()
+    val todayStartMillis = remember(selectedDateMillis) {
+        val cal = Calendar.getInstance().apply { timeInMillis = selectedDateMillis }
         cal.set(Calendar.HOUR_OF_DAY, 0)
         cal.set(Calendar.MINUTE, 0)
         cal.set(Calendar.SECOND, 0)
         cal.set(Calendar.MILLISECOND, 0)
         cal.timeInMillis
     }
-    val monthStartMillis = remember(now) {
-        val cal = Calendar.getInstance()
+    val selectedDayEndMillis = remember(todayStartMillis) {
+        Calendar.getInstance().apply { timeInMillis = todayStartMillis; add(Calendar.DAY_OF_MONTH, 1) }.timeInMillis
+    }
+    val monthStartMillis = remember(selectedDateMillis) {
+        val cal = Calendar.getInstance().apply { timeInMillis = selectedDateMillis }
         cal.set(Calendar.DAY_OF_MONTH, 1)
         cal.set(Calendar.HOUR_OF_DAY, 0)
         cal.set(Calendar.MINUTE, 0)
@@ -273,22 +227,34 @@ fun GpsTrackerScreen(
         cal.set(Calendar.MILLISECOND, 0)
         cal.timeInMillis
     }
-
-    val dailyLogs = remember(allLogs, todayStartMillis) {
-        allLogs.filter { it.dateMillis >= todayStartMillis }
+    val monthEndMillis = remember(monthStartMillis) {
+        Calendar.getInstance().apply { timeInMillis = monthStartMillis; add(Calendar.MONTH, 1) }.timeInMillis
     }
-    val monthlyLogs = remember(allLogs, monthStartMillis) {
-        allLogs.filter { it.dateMillis >= monthStartMillis }
+    val selectedIsToday = remember(todayStartMillis) {
+        val current = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        todayStartMillis == current
     }
 
-    val todayDistanceKm = (dailyLogs.sumOf { it.distanceMeters.toDouble() } + activeSession.distanceMeters) / 1000.0
-    val todayDurationSec = dailyLogs.sumOf { it.durationSeconds } + activeSession.elapsedSeconds
-    val todayCalories = dailyLogs.sumOf { it.caloriesBurned.toDouble() } + activeSession.caloriesBurned
-    val todayRunsCount = dailyLogs.size + if (activeSession.isRunning) 1 else 0
+    val dailyLogs = remember(allLogs, todayStartMillis, selectedDayEndMillis) {
+        allLogs.filter { it.dateMillis in todayStartMillis until selectedDayEndMillis }
+    }
+    val monthlyLogs = remember(allLogs, monthStartMillis, monthEndMillis) {
+        allLogs.filter { it.dateMillis in monthStartMillis until monthEndMillis }
+    }
 
-    val totalMonthlyDistanceKm = (monthlyLogs.sumOf { it.distanceMeters.toDouble() } + activeSession.distanceMeters) / 1000.0
-    val totalMonthlyCalories = monthlyLogs.sumOf { it.caloriesBurned.toDouble() } + activeSession.caloriesBurned
-    val totalMonthlyRunsCount = monthlyLogs.size + if (activeSession.isRunning) 1 else 0
+    val activeDistance = if (selectedIsToday) activeSession.distanceMeters else 0f
+    val activeDuration = if (selectedIsToday) activeSession.elapsedSeconds else 0
+    val activeCalories = if (selectedIsToday) activeSession.caloriesBurned else 0f
+    val todayDistanceKm = (dailyLogs.sumOf { it.distanceMeters.toDouble() } + activeDistance) / 1000.0
+    val todayDurationSec = dailyLogs.sumOf { it.durationSeconds } + activeDuration
+    val todayCalories = dailyLogs.sumOf { it.caloriesBurned.toDouble() } + activeCalories
+    val todayRunsCount = dailyLogs.size + if (selectedIsToday && activeSession.isRunning) 1 else 0
+
+    val totalMonthlyDistanceKm = (monthlyLogs.sumOf { it.distanceMeters.toDouble() } + activeDistance) / 1000.0
+    val totalMonthlyCalories = monthlyLogs.sumOf { it.caloriesBurned.toDouble() } + activeCalories
+    val totalMonthlyRunsCount = monthlyLogs.size + if (selectedIsToday && activeSession.isRunning) 1 else 0
 
     LazyColumn(
         modifier = Modifier
@@ -300,7 +266,7 @@ fun GpsTrackerScreen(
         item {
             GrowthHeader(
                 title = "Corrida GPS",
-                subtitle = "Mapeamento em tempo real, ritmo e quilometragem",
+                subtitle = "Dados de ${SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR")).format(Date(selectedDateMillis))}",
                 badgeText = "TREINO DE CORRIDA",
                 trailingContent = {
                     IconButton(
@@ -516,7 +482,10 @@ fun GpsTrackerScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Route,
                                 contentDescription = null,
@@ -529,9 +498,13 @@ fun GpsTrackerScreen(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (activeSession.isRunning) GrowthOrangeLight else MaterialTheme.colorScheme.onSurfaceVariant,
-                                letterSpacing = 1.sp
+                                letterSpacing = 0.6.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
+
+                        Spacer(modifier = Modifier.width(8.dp))
 
                         if (activeSession.isRunning) {
                             Surface(
@@ -555,7 +528,8 @@ fun GpsTrackerScreen(
                                         text = if (activeSession.isPaused) "PAUSADO" else "GRAVANDO",
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (activeSession.isPaused) GrowthYellow else GrowthGreen
+                                        color = if (activeSession.isPaused) GrowthYellow else GrowthGreen,
+                                        maxLines = 1
                                     )
                                 }
                             }
@@ -577,15 +551,40 @@ fun GpsTrackerScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Map Mode Selector (Interactive Real Map vs Vector Grid)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    // Compact submenu prevents map actions from being squeezed on phones.
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showMapOptions = !showMapOptions }
+                            .testTag("toggle_map_options_btn"),
+                        color = CarbonDark,
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, CarbonBorder)
                     ) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Layers, null, tint = GrowthOrangeLight, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("OPÇÕES DO MAPA", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GrowthOrangeLight)
+                            }
+                            Text(if (showMapOptions) "OCULTAR" else "MOSTRAR", fontSize = 9.sp, color = GrowthCyan)
+                        }
+                    }
+
+                    if (showMapOptions) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
                             Surface(
                                 modifier = Modifier
+                                    .weight(1f)
                                     .clickable { useInteractiveMap = true }
                                     .testTag("toggle_interactive_map_btn"),
                                 color = if (useInteractiveMap) GrowthOrange.copy(alpha = 0.22f) else CarbonDark,
@@ -604,7 +603,7 @@ fun GpsTrackerScreen(
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = "Mapa Real (OSM)",
+                                        text = "Mapa de ruas",
                                         fontSize = 10.sp,
                                         fontWeight = if (useInteractiveMap) FontWeight.Bold else FontWeight.Normal,
                                         color = if (useInteractiveMap) GrowthOrangeLight else MaterialTheme.colorScheme.onSurfaceVariant
@@ -614,6 +613,7 @@ fun GpsTrackerScreen(
 
                             Surface(
                                 modifier = Modifier
+                                    .weight(1f)
                                     .clickable { useInteractiveMap = false }
                                     .testTag("toggle_vector_grid_btn"),
                                 color = if (!useInteractiveMap) GrowthCyan.copy(alpha = 0.22f) else CarbonDark,
@@ -632,7 +632,7 @@ fun GpsTrackerScreen(
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = "Grade Vetorial",
+                                        text = "Traçado offline",
                                         fontSize = 10.sp,
                                         fontWeight = if (!useInteractiveMap) FontWeight.Bold else FontWeight.Normal,
                                         color = if (!useInteractiveMap) GrowthCyan else MaterialTheme.colorScheme.onSurfaceVariant
@@ -641,13 +641,13 @@ fun GpsTrackerScreen(
                             }
                         }
 
-                        // Google Maps Direct Shortcut
                         val activeCoord = currentGpsLocation ?: displayPoints.lastOrNull()
                         if (activeCoord != null) {
                             Surface(
                                 modifier = Modifier
+                                    .fillMaxWidth()
                                     .clickable {
-                                        openInGoogleMaps(context, activeCoord.first, activeCoord.second)
+                                        openInExternalMap(context, activeCoord.first, activeCoord.second)
                                     }
                                     .testTag("open_google_maps_top_btn"),
                                 color = CarbonDark,
@@ -655,8 +655,9 @@ fun GpsTrackerScreen(
                                 border = BorderStroke(1.dp, CarbonBorder)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.OpenInNew,
@@ -675,12 +676,13 @@ fun GpsTrackerScreen(
                             }
                         }
                     }
+                    }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
                     // Map Container: Real OpenStreetMap Leaflet View OR High-Tech Vector Canvas
                     if (useInteractiveMap) {
-                        GpsInteractiveMapView(
+                        NativeGpsMapView(
                             points = displayPoints,
                             currentLocation = currentGpsLocation,
                             isTracking = activeSession.isRunning && !activeSession.isPaused,
@@ -762,7 +764,8 @@ fun GpsTrackerScreen(
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f)
                                 ) {
                                     Surface(
                                         color = if (isTtsVoiceCoachEnabled) GrowthGreen.copy(alpha = 0.18f) else CarbonCard,
@@ -778,7 +781,7 @@ fun GpsTrackerScreen(
                                             )
                                         }
                                     }
-                                    Column {
+                                    Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = "TREINADOR POR VOZ (TTS)",
                                             fontSize = 11.sp,
@@ -789,21 +792,20 @@ fun GpsTrackerScreen(
                                         Text(
                                             text = if (isTtsVoiceCoachEnabled) "Narra distância, tempo e ritmo (pace) ao vivo" else "Voz desativada",
                                             fontSize = 10.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
                                 }
 
+                                Spacer(modifier = Modifier.width(8.dp))
+
                                 Switch(
                                     checked = isTtsVoiceCoachEnabled,
                                     onCheckedChange = { enabled ->
-                                        isTtsVoiceCoachEnabled = enabled
                                         workoutTrackerViewModel.setTtsEnabled(enabled)
-                                        if (enabled) {
-                                            ttsManager.speak("Treinador por voz ativado.")
-                                        } else {
-                                            ttsManager.stop()
-                                        }
+                                        viewModel.configureBackgroundRunningVoice(enabled, ttsIntervalMeters)
                                     },
                                     colors = SwitchDefaults.colors(
                                         checkedThumbColor = Color.White,
@@ -817,28 +819,26 @@ fun GpsTrackerScreen(
 
                             if (isTtsVoiceCoachEnabled) {
                                 Spacer(modifier = Modifier.height(10.dp))
-                                Row(
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     OutlinedButton(
                                         onClick = {
                                             val paceSec = if (activeSession.distanceMeters > 20f && activeSession.elapsedSeconds > 0) {
                                                 (activeSession.elapsedSeconds / (activeSession.distanceMeters / 1000f)).toLong().coerceIn(60, 3600)
                                             } else 0L
-                                            val message = ttsManager.service.formatFullWorkoutSpeech(
+                                            val message = workoutTrackerViewModel.formatFullWorkoutSpeech(
                                                 distanceMeters = activeSession.distanceMeters,
                                                 elapsedSeconds = activeSession.elapsedSeconds.toLong(),
                                                 paceSecondsPerKm = paceSec
                                             )
-                                            lastSpokenMessage = message
-                                            ttsManager.speak(message)
+                                            workoutTrackerViewModel.speak(message)
                                         },
                                         border = BorderStroke(1.dp, GrowthGreen.copy(alpha = 0.8f)),
                                         shape = RoundedCornerShape(8.dp),
                                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                        modifier = Modifier.testTag("speak_metrics_now_btn")
+                                        modifier = Modifier.fillMaxWidth().testTag("speak_metrics_now_btn")
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.RecordVoiceOver,
@@ -866,10 +866,9 @@ fun GpsTrackerScreen(
                                 }
 
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Row(
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Text(
                                         text = "Avisar por voz a cada:",
@@ -877,15 +876,19 @@ fun GpsTrackerScreen(
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
                                         listOf(500f to "500m", 1000f to "1 km", 2000f to "2 km").forEach { (dist, label) ->
                                             Surface(
                                                 color = if (ttsIntervalMeters == dist) GrowthCyan else CarbonCardElevated,
                                                 shape = RoundedCornerShape(6.dp),
                                                 modifier = Modifier
+                                                    .weight(1f)
                                                     .clickable {
-                                                        ttsIntervalMeters = dist
                                                         workoutTrackerViewModel.setNarrationIntervalMeters(dist)
+                                                        viewModel.configureBackgroundRunningVoice(isTtsVoiceCoachEnabled, dist)
                                                     }
                                             ) {
                                                 Text(
@@ -893,7 +896,9 @@ fun GpsTrackerScreen(
                                                     fontSize = 10.sp,
                                                     fontWeight = if (ttsIntervalMeters == dist) FontWeight.Black else FontWeight.Normal,
                                                     color = if (ttsIntervalMeters == dist) Color.Black else Color.White,
-                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 7.dp),
+                                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                                    maxLines = 1
                                                 )
                                             }
                                         }
@@ -925,18 +930,15 @@ fun GpsTrackerScreen(
                             Button(
                                 onClick = {
                                     if (!hasLocationPermission) {
+                                        startAfterPermission = true
                                         permissionLauncher.launch(
                                              arrayOf(
                                                  Manifest.permission.ACCESS_FINE_LOCATION,
                                                  Manifest.permission.ACCESS_COARSE_LOCATION
                                              )
                                          )
-                                    }
-                                    val startPos = currentGpsLocation ?: Pair(-23.550520, -46.633308)
-                                    viewModel.startGpsSession(startPos.first, startPos.second)
-                                    workoutTrackerViewModel.startWorkout(startPos.first, startPos.second)
-                                    if (isTtsVoiceCoachEnabled) {
-                                        ttsManager.speak("Treino de corrida iniciado. Boa corrida!")
+                                    } else {
+                                        startGpsWithCurrentLocation()
                                     }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
@@ -955,10 +957,6 @@ fun GpsTrackerScreen(
                                 OutlinedButton(
                                     onClick = {
                                         viewModel.pauseGpsSession()
-                                        workoutTrackerViewModel.pauseWorkout()
-                                        if (isTtsVoiceCoachEnabled) {
-                                            ttsManager.speak("Treino pausado.")
-                                        }
                                     },
                                     border = BorderStroke(1.dp, GrowthYellow),
                                     shape = RoundedCornerShape(10.dp),
@@ -969,16 +967,12 @@ fun GpsTrackerScreen(
                                 ) {
                                     Icon(Icons.Default.Pause, contentDescription = null, tint = GrowthYellow)
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("PAUSAR", color = GrowthYellow, fontWeight = FontWeight.Bold)
+                                    Text("PAUSAR", color = GrowthYellow, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
                                 }
                             } else {
                                 Button(
                                     onClick = {
                                         viewModel.resumeGpsSession()
-                                        workoutTrackerViewModel.resumeWorkout()
-                                        if (isTtsVoiceCoachEnabled) {
-                                            ttsManager.speak("Treino retomado. Vamos lá!")
-                                        }
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = GrowthGreen),
                                     shape = RoundedCornerShape(10.dp),
@@ -989,14 +983,13 @@ fun GpsTrackerScreen(
                                 ) {
                                     Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("RETOMAR", color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text("RETOMAR", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
                                 }
                             }
 
                             Button(
                                 onClick = {
                                     showFinishDialog = true
-                                    workoutTrackerViewModel.stopWorkout()
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
                                 shape = RoundedCornerShape(10.dp),
@@ -1007,7 +1000,7 @@ fun GpsTrackerScreen(
                             ) {
                                 Icon(Icons.Default.Stop, contentDescription = null, tint = Color.White)
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("FINALIZAR", color = Color.White, fontWeight = FontWeight.Bold)
+                                Text("FINALIZAR", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
                             }
                         }
                     }
@@ -1433,7 +1426,7 @@ fun GpsRouteLogCard(
                         if (firstPt != null) {
                             Surface(
                                 modifier = Modifier
-                                    .clickable { openInGoogleMaps(context, firstPt.first, firstPt.second) }
+                                    .clickable { openInExternalMap(context, firstPt.first, firstPt.second) }
                                     .testTag("open_log_in_gmaps_${log.id}"),
                                 color = CarbonDark,
                                 shape = RoundedCornerShape(6.dp),
@@ -1463,7 +1456,7 @@ fun GpsRouteLogCard(
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    GpsInteractiveMapView(
+                    NativeGpsMapView(
                         points = coords,
                         currentLocation = null,
                         isTracking = false,

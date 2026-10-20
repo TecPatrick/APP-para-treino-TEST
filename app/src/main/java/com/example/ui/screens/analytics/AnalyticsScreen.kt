@@ -41,6 +41,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -84,6 +85,23 @@ import com.example.ui.theme.GrowthOrange
 import com.example.ui.theme.GrowthOrangeLight
 import com.example.ui.theme.GrowthRed
 import com.example.ui.theme.GrowthYellow
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+private enum class HistoryPeriod(val title: String, val pattern: String) {
+    DAY("Dia", "yyyy-MM-dd"), MONTH("Mês", "yyyy-MM"), YEAR("Ano", "yyyy")
+}
+
+private data class ActivityHistoryBucket(
+    val key: String,
+    val caloriesConsumed: Int,
+    val foodRecords: Int,
+    val workouts: Int,
+    val cardioSessions: Int,
+    val exerciseCalories: Int,
+    val waterMl: Int
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -92,8 +110,13 @@ fun AnalyticsScreen(viewModel: VirtusViewModel) {
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
     val progressLogs by viewModel.progressLogs.collectAsStateWithLifecycle()
     val workoutLogs by viewModel.workoutLogs.collectAsStateWithLifecycle()
+    val foodRecords by viewModel.allFoodRecords.collectAsStateWithLifecycle()
+    val cardioLogs by viewModel.allCardioLogs.collectAsStateWithLifecycle()
+    val gpsLogs by viewModel.allGpsRouteLogs.collectAsStateWithLifecycle()
+    val intakeHistory by viewModel.recentIntakeHistory.collectAsStateWithLifecycle()
 
     var showAddMeasurementDialog by remember { mutableStateOf(false) }
+    var historyPeriod by remember { mutableStateOf(HistoryPeriod.DAY) }
 
     val sortedLogs = progressLogs.sortedBy { it.dateMillis }
     val initialWeight = sortedLogs.firstOrNull()?.weightKg ?: profile.weightKg
@@ -101,6 +124,33 @@ fun AnalyticsScreen(viewModel: VirtusViewModel) {
     val weightDelta = currentWeight - initialWeight
 
     val totalVolumeLifted = workoutLogs.sumOf { it.totalVolumeKg.toDouble() }.toFloat()
+
+    val activityHistory = remember(historyPeriod, foodRecords, workoutLogs, cardioLogs, gpsLogs, intakeHistory, profile.weightKg) {
+        val formatter = SimpleDateFormat(historyPeriod.pattern, Locale.US)
+        fun key(time: Long) = formatter.format(Date(time))
+        val keys = (foodRecords.map { key(it.dateMillis) } + workoutLogs.map { key(it.dateMillis) } +
+            cardioLogs.map { key(it.dateMillis) } + gpsLogs.map { key(it.dateMillis) } +
+            intakeHistory.map { key(it.dateMillis) }).distinct().sortedDescending()
+        keys.map { bucketKey ->
+            val foods = foodRecords.filter { key(it.dateMillis) == bucketKey }
+            val workoutsForPeriod = workoutLogs.filter { key(it.dateMillis) == bucketKey }
+            val cardioForPeriod = cardioLogs.filter { key(it.dateMillis) == bucketKey }
+            val gpsForPeriod = gpsLogs.filter { key(it.dateMillis) == bucketKey }
+            val water = intakeHistory.filter { key(it.dateMillis) == bucketKey }.sumOf { it.waterDrankMl }
+            val gymCalories = workoutsForPeriod.sumOf {
+                (it.durationMinutes.coerceAtLeast(1) * (profile.weightKg * 0.08f)).toInt().coerceIn(80, 800)
+            }
+            ActivityHistoryBucket(
+                key = bucketKey,
+                caloriesConsumed = foods.sumOf { it.calories.toDouble() }.toInt(),
+                foodRecords = foods.size,
+                workouts = workoutsForPeriod.size,
+                cardioSessions = cardioForPeriod.size + gpsForPeriod.size,
+                exerciseCalories = gymCalories + cardioForPeriod.sumOf { it.caloriesBurned } + gpsForPeriod.sumOf { it.caloriesBurned.toDouble() }.toInt(),
+                waterMl = water
+            )
+        }.take(24)
+    }
 
     Box(
         modifier = Modifier
@@ -250,6 +300,49 @@ fun AnalyticsScreen(viewModel: VirtusViewModel) {
                     }
                 }
 
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CarbonCard),
+                        shape = RoundedCornerShape(14.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text("HISTÓRICO DE ATIVIDADES", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GrowthOrangeLight, letterSpacing = 1.sp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                HistoryPeriod.values().forEach { period ->
+                                    FilterChip(
+                                        selected = historyPeriod == period,
+                                        onClick = { historyPeriod = period },
+                                        label = { Text(period.title) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            if (activityHistory.isEmpty()) {
+                                Text("Nenhuma refeição ou atividade registrada ainda.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            } else {
+                                activityHistory.forEach { item ->
+                                    Surface(
+                                        color = CarbonCardElevated,
+                                        shape = RoundedCornerShape(10.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                    ) {
+                                        Column(modifier = Modifier.padding(10.dp)) {
+                                            Text(item.key, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                                            Text("Alimentação: ${item.caloriesConsumed} kcal • ${item.foodRecords} registros", fontSize = 11.sp, color = GrowthCyan)
+                                            Text("Musculação: ${item.workouts} • Cardio/corrida: ${item.cardioSessions} • Gasto: ${item.exerciseCalories} kcal", fontSize = 11.sp, color = GrowthOrangeLight)
+                                            if (item.waterMl > 0) Text("Água: ${item.waterMl} ml", fontSize = 11.sp, color = GrowthCyan)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Interactive Weight Chart
                 item {
                     WeightProgressionChart(
@@ -367,12 +460,11 @@ fun AnalyticsScreen(viewModel: VirtusViewModel) {
                         }
                     }
 
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
                             text = "HISTÓRICO DE MEDIDAS & PESAGENS",
@@ -386,7 +478,7 @@ fun AnalyticsScreen(viewModel: VirtusViewModel) {
                             onClick = { showAddMeasurementDialog = true },
                             shape = RoundedCornerShape(8.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
-                            modifier = Modifier.testTag("add_measurement_btn")
+                            modifier = Modifier.fillMaxWidth().testTag("add_measurement_btn")
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, tint = GrowthCyan, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))

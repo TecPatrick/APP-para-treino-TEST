@@ -85,6 +85,7 @@ import com.example.data.model.MealPlanItem
 import com.example.data.model.MealType
 import com.example.ui.VirtusViewModel
 import com.example.ui.components.GrowthHeader
+import com.example.util.MacroCalculator
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
 import com.example.ui.theme.CarbonCardElevated
@@ -94,6 +95,9 @@ import com.example.ui.theme.GrowthGreen
 import com.example.ui.theme.GrowthOrange
 import com.example.ui.theme.GrowthOrangeLight
 import com.example.ui.theme.GrowthYellow
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -105,17 +109,54 @@ fun DietScreen(
     val mealPlans by viewModel.mealPlanItems.collectAsStateWithLifecycle()
     val allFoods by viewModel.allFoods.collectAsStateWithLifecycle()
     val dailyEnergy by viewModel.dailyEnergyExpenditure.collectAsStateWithLifecycle()
+    val foodRecords by viewModel.allFoodRecords.collectAsStateWithLifecycle()
+    val workoutLogs by viewModel.workoutLogs.collectAsStateWithLifecycle()
+    val cardioLogs by viewModel.allCardioLogs.collectAsStateWithLifecycle()
+    val gpsLogs by viewModel.allGpsRouteLogs.collectAsStateWithLifecycle()
+    val intakeHistory by viewModel.recentIntakeHistory.collectAsStateWithLifecycle()
+    val progressLogs by viewModel.progressLogs.collectAsStateWithLifecycle()
+    val selectedDateMillis by viewModel.selectedDateMillis.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var showAddFoodDialog by remember { mutableStateOf(false) }
     var selectedMealTypeForAdd by remember { mutableStateOf(MealType.BREAKFAST) }
     var showCustomFoodDialog by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf(0) } // 0: Refeições Diárias, 1: Base de Alimentos, 2: Dieta Mensal, 3: Configuração
-
-    val totalPlanCalories = mealPlans.sumOf { it.calories.toDouble() }.toFloat()
-    val totalPlanProtein = mealPlans.sumOf { it.protein.toDouble() }.toFloat()
-    val totalPlanCarbs = mealPlans.sumOf { it.carbs.toDouble() }.toFloat()
-    val totalPlanFat = mealPlans.sumOf { it.fat.toDouble() }.toFloat()
+    val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US) }
+    val selectedDateKey = dateFormatter.format(Date(selectedDateMillis))
+    val selectedFoods = foodRecords.filter { it.dateString == selectedDateKey }
+    fun sameSelectedDay(time: Long): Boolean = dateFormatter.format(Date(time)) == selectedDateKey
+    val selectedWorkouts = workoutLogs.filter { sameSelectedDay(it.dateMillis) }
+    val selectedCardio = cardioLogs.filter { sameSelectedDay(it.dateMillis) }
+    val selectedRuns = gpsLogs.filter { sameSelectedDay(it.dateMillis) }
+    val selectedIntake = intakeHistory.firstOrNull { it.dateString == selectedDateKey }
+    val selectedProgress = progressLogs.filter { sameSelectedDay(it.dateMillis) }.maxByOrNull { it.dateMillis }
+    val gymCalories = selectedWorkouts.sumOf {
+        (it.durationMinutes.coerceAtLeast(1) * (profile.weightKg * 0.08f)).toInt().coerceIn(80, 800)
+    }
+    val selectedExerciseCalories = gymCalories + selectedCardio.sumOf { it.caloriesBurned } +
+        selectedRuns.sumOf { it.caloriesBurned.toDouble() }.toInt()
+    val todayKey = dateFormatter.format(Date())
+    val displayEnergy = if (selectedDateKey == todayKey) dailyEnergy else dailyEnergy.copy(
+        gymWorkoutCalories = gymCalories,
+        runningWorkoutCalories = selectedRuns.sumOf { it.caloriesBurned.toDouble() }.toInt(),
+        cardioWorkoutCalories = selectedCardio.sumOf { it.caloriesBurned },
+        totalWorkoutCalories = selectedExerciseCalories,
+        totalExpenditure = dailyEnergy.bmr + selectedExerciseCalories,
+        hasWorkoutToday = selectedWorkouts.isNotEmpty() || selectedRuns.isNotEmpty() || selectedCardio.isNotEmpty(),
+        gymWorkoutsCount = selectedWorkouts.size,
+        runningWorkoutsCount = selectedRuns.size,
+        cardioWorkoutsCount = selectedCardio.size
+    )
+    val daysWithData = remember(foodRecords, workoutLogs, cardioLogs, gpsLogs, intakeHistory) {
+        buildSet {
+            addAll(foodRecords.map { it.dateString })
+            addAll(workoutLogs.map { dateFormatter.format(Date(it.dateMillis)) })
+            addAll(cardioLogs.map { dateFormatter.format(Date(it.dateMillis)) })
+            addAll(gpsLogs.map { dateFormatter.format(Date(it.dateMillis)) })
+            addAll(intakeHistory.map { it.dateString })
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -250,6 +291,30 @@ fun DietScreen(
                         .padding(horizontal = 16.dp),
                     contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp)
                 ) {
+                    item {
+                        DailyHistoryHeader(
+                            selectedDateMillis = selectedDateMillis,
+                            onDateSelected = viewModel::selectAppDate,
+                            daysWithData = daysWithData,
+                            summary = DailyHistorySummary(
+                                caloriesConsumed = selectedFoods.sumOf { it.calories.toDouble() }.toInt(),
+                                targetCalories = profile.targetCalories,
+                                protein = selectedFoods.sumOf { it.protein.toDouble() }.toInt(),
+                                proteinTarget = profile.targetProteinGrams,
+                                carbs = selectedFoods.sumOf { it.carbs.toDouble() }.toInt(),
+                                carbsTarget = profile.targetCarbsGrams,
+                                fat = selectedFoods.sumOf { it.fat.toDouble() }.toInt(),
+                                fatTarget = profile.targetFatGrams,
+                                waterMl = selectedIntake?.waterDrankMl ?: 0,
+                                waterTargetMl = profile.targetWaterMl,
+                                workouts = selectedWorkouts.size,
+                                cardioSessions = selectedCardio.size + selectedRuns.size,
+                                exerciseCalories = selectedExerciseCalories,
+                                weightKg = selectedProgress?.weightKg
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                    }
                     // Gasto Calórico Diário & TMB Card (Regra: Parado = TMB; Treino soma gasto)
                     item {
                         Card(
@@ -262,10 +327,9 @@ fun DietScreen(
                                 .testTag("diet_daily_energy_card")
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(
@@ -285,14 +349,15 @@ fun DietScreen(
                                     }
 
                                     Surface(
-                                        color = if (dailyEnergy.hasWorkoutToday) GrowthGreen.copy(alpha = 0.2f) else GrowthCyan.copy(alpha = 0.15f),
+                                        modifier = Modifier.align(Alignment.End),
+                                        color = if (displayEnergy.hasWorkoutToday) GrowthGreen.copy(alpha = 0.2f) else GrowthCyan.copy(alpha = 0.15f),
                                         shape = RoundedCornerShape(6.dp)
                                     ) {
                                         Text(
-                                            text = if (dailyEnergy.hasWorkoutToday) "TREINO REGISTRADO" else "PARADO (SEM TREINO)",
+                                            text = if (displayEnergy.hasWorkoutToday) "TREINO REGISTRADO" else "PARADO (SEM TREINO)",
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (dailyEnergy.hasWorkoutToday) GrowthGreen else GrowthCyan,
+                                            color = if (displayEnergy.hasWorkoutToday) GrowthGreen else GrowthCyan,
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                         )
                                     }
@@ -300,46 +365,46 @@ fun DietScreen(
 
                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                Row(
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Surface(
-                                        modifier = Modifier.weight(1f),
+                                        modifier = Modifier.fillMaxWidth(),
                                         color = CarbonDark,
                                         shape = RoundedCornerShape(8.dp),
                                         border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder)
                                     ) {
                                         Column(modifier = Modifier.padding(8.dp)) {
                                             Text("TMB (PARADO)", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
-                                            Text("${dailyEnergy.bmr} kcal", fontSize = 14.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground)
+                                            Text("${displayEnergy.bmr} kcal", fontSize = 14.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground)
                                             Text("Metabolismo basal", fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                     }
 
                                     Surface(
-                                        modifier = Modifier.weight(1f),
+                                        modifier = Modifier.fillMaxWidth(),
                                         color = CarbonDark,
                                         shape = RoundedCornerShape(8.dp),
                                         border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder)
                                     ) {
                                         Column(modifier = Modifier.padding(8.dp)) {
-                                            Text("GASTO TREINO", fontSize = 9.sp, color = if (dailyEnergy.hasWorkoutToday) GrowthOrange else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
-                                            Text(if (dailyEnergy.hasWorkoutToday) "+${dailyEnergy.totalWorkoutCalories} kcal" else "0 kcal", fontSize = 14.sp, fontWeight = FontWeight.Black, color = if (dailyEnergy.hasWorkoutToday) GrowthOrangeLight else MaterialTheme.colorScheme.onSurfaceVariant)
-                                            Text(if (dailyEnergy.hasWorkoutToday) "${dailyEnergy.gymWorkoutsCount} musc • ${dailyEnergy.runningWorkoutsCount} corr" else "Sem treino hoje", fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text("GASTO TREINO", fontSize = 9.sp, color = if (displayEnergy.hasWorkoutToday) GrowthOrange else MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+                                            Text(if (displayEnergy.hasWorkoutToday) "+${displayEnergy.totalWorkoutCalories} kcal" else "0 kcal", fontSize = 14.sp, fontWeight = FontWeight.Black, color = if (displayEnergy.hasWorkoutToday) GrowthOrangeLight else MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text(if (displayEnergy.hasWorkoutToday) "${displayEnergy.gymWorkoutsCount} musc • ${displayEnergy.runningWorkoutsCount} corr" else "Sem treino neste dia", fontSize = 8.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                     }
 
                                     Surface(
-                                        modifier = Modifier.weight(1.1f),
+                                        modifier = Modifier.fillMaxWidth(),
                                         color = CarbonCardElevated,
                                         shape = RoundedCornerShape(8.dp),
                                         border = androidx.compose.foundation.BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.5f))
                                     ) {
                                         Column(modifier = Modifier.padding(8.dp)) {
                                             Text("GASTO TOTAL", fontSize = 9.sp, color = GrowthOrangeLight, fontWeight = FontWeight.Bold)
-                                            Text("${dailyEnergy.totalExpenditure} kcal", fontSize = 14.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground)
-                                            Text(if (dailyEnergy.hasWorkoutToday) "TMB + Treino" else "Valor TMB parado", fontSize = 8.sp, color = GrowthCyan)
+                                            Text("${displayEnergy.totalExpenditure} kcal", fontSize = 14.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground)
+                                            Text(if (displayEnergy.hasWorkoutToday) "TMB + Treino" else "Valor TMB parado", fontSize = 8.sp, color = GrowthCyan)
                                         }
                                     }
                                 }
@@ -347,10 +412,10 @@ fun DietScreen(
                                 Spacer(modifier = Modifier.height(6.dp))
 
                                 Text(
-                                    text = if (dailyEnergy.hasWorkoutToday) {
-                                        "⚡ Treino realizado hoje: o gasto dos treinos (${dailyEnergy.totalWorkoutCalories} kcal) foi somado à sua TMB (${dailyEnergy.bmr} kcal)."
+                                    text = if (displayEnergy.hasWorkoutToday) {
+                                        "⚡ Treino realizado neste dia: o gasto dos treinos (${displayEnergy.totalWorkoutCalories} kcal) foi somado à sua TMB (${displayEnergy.bmr} kcal)."
                                     } else {
-                                        "ℹ️ Nenhum treino realizado hoje: seu gasto calórico permanece estritamente com a sua Taxa Metabólica Basal de repouso (${dailyEnergy.bmr} kcal). O gasto calórico extra só é adicionado ao registrar o treino."
+                                        "ℹ️ Nenhum treino realizado neste dia: o gasto permanece na Taxa Metabólica Basal (${displayEnergy.bmr} kcal)."
                                     },
                                     fontSize = 9.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -433,14 +498,14 @@ fun DietScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "TOTAL PLANEJADO",
+                                        text = "CONSUMIDO NO DIA",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = GrowthOrangeLight,
                                         letterSpacing = 1.sp
                                     )
                                     Text(
-                                        text = "${totalPlanCalories.toInt()} / ${profile.targetCalories} kcal",
+                                        text = "${selectedFoods.sumOf { it.calories.toDouble() }.toInt()} / ${profile.targetCalories} kcal",
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Black,
                                         color = MaterialTheme.colorScheme.onBackground
@@ -455,21 +520,21 @@ fun DietScreen(
                                 ) {
                                     MacroPill(
                                         title = "Proteína",
-                                        current = totalPlanProtein,
+                                        current = selectedFoods.sumOf { it.protein.toDouble() }.toFloat(),
                                         target = profile.targetProteinGrams.toFloat(),
                                         color = GrowthCyan,
                                         modifier = Modifier.weight(1f)
                                     )
                                     MacroPill(
                                         title = "Carboidratos",
-                                        current = totalPlanCarbs,
+                                        current = selectedFoods.sumOf { it.carbs.toDouble() }.toFloat(),
                                         target = profile.targetCarbsGrams.toFloat(),
                                         color = GrowthYellow,
                                         modifier = Modifier.weight(1f)
                                     )
                                     MacroPill(
                                         title = "Gorduras",
-                                        current = totalPlanFat,
+                                        current = selectedFoods.sumOf { it.fat.toDouble() }.toFloat(),
                                         target = profile.targetFatGrams.toFloat(),
                                         color = GrowthOrange,
                                         modifier = Modifier.weight(1f)
@@ -486,6 +551,7 @@ fun DietScreen(
                         val itemsForType = groupedMeals[type] ?: emptyList()
                         val mealCalories = itemsForType.sumOf { it.calories.toDouble() }.toFloat()
                         val mealProtein = itemsForType.sumOf { it.protein.toDouble() }.toFloat()
+                        val consumedForType = selectedFoods.filter { it.mealType == type }
 
                         item(key = "meal_type_${type.name}") {
                             Card(
@@ -510,7 +576,7 @@ fun DietScreen(
                                                 color = MaterialTheme.colorScheme.onBackground
                                             )
                                             Text(
-                                                text = "Horário: ${type.defaultTime} • ${mealCalories.toInt()} kcal • P: ${mealProtein.toInt()}g",
+                                                text = "${consumedForType.sumOf { it.calories.toDouble() }.toInt()} kcal consumidas • ${itemsForType.size} item(ns) planejados",
                                                 fontSize = 11.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
@@ -541,6 +607,9 @@ fun DietScreen(
                                     } else {
                                         Spacer(modifier = Modifier.height(6.dp))
                                         itemsForType.forEach { item ->
+                                            val completedForDate = consumedForType.any {
+                                                it.foodItemId == item.foodItemId && it.mealType == item.mealType
+                                            }
                                             Row(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
@@ -562,18 +631,54 @@ fun DietScreen(
                                                     )
                                                 }
 
-                                                IconButton(
-                                                    onClick = { viewModel.removeMealItem(item.id) },
-                                                    modifier = Modifier.size(28.dp).testTag("delete_meal_${item.id}")
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Close,
-                                                        contentDescription = "Remover",
-                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                        modifier = Modifier.size(16.dp)
-                                                    )
+                                                Row {
+                                                    IconButton(
+                                                        onClick = {
+                                                            viewModel.toggleMealItemCompleted(item, selectedDateKey, completedForDate)
+                                                        },
+                                                        modifier = Modifier.size(32.dp).testTag("consume_meal_${item.id}")
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Check,
+                                                            contentDescription = if (completedForDate) "Desmarcar consumo" else "Marcar como consumido",
+                                                            tint = if (completedForDate) GrowthGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            modifier = Modifier.size(18.dp)
+                                                        )
+                                                    }
+                                                    IconButton(
+                                                        onClick = { viewModel.removeMealItem(item.id) },
+                                                        modifier = Modifier.size(32.dp).testTag("delete_meal_${item.id}")
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Close,
+                                                            contentDescription = "Remover do plano",
+                                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                    }
                                                 }
                                             }
+                                        }
+                                    }
+
+                                    val extraRecords = consumedForType.filter { record ->
+                                        itemsForType.none { it.foodItemId == record.foodItemId }
+                                    }
+                                    if (extraRecords.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = "OUTROS REGISTROS DO DIA",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = GrowthCyan
+                                        )
+                                        extraRecords.forEach { record ->
+                                            Text(
+                                                text = "• ${record.foodName} — ${record.amount.toInt()} ${record.unit} — ${record.calories.toInt()} kcal",
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.padding(top = 4.dp)
+                                            )
                                         }
                                     }
                                 }
@@ -627,6 +732,10 @@ fun DietScreen(
                 MonthlyDietConfigSection(
                     profile = profile,
                     onSave = { cycleType, notes, targetWeight, trainingDays ->
+                        val macroReferenceWeight = MacroCalculator.calculateMacroReferenceWeight(
+                            profile.weightKg,
+                            profile.heightCm
+                        )
                         viewModel.updateProfileAndCalculateMacros(
                             name = profile.name,
                             gender = profile.gender,
@@ -635,11 +744,12 @@ fun DietScreen(
                             heightCm = profile.heightCm,
                             activityLevel = profile.activityLevel,
                             goal = profile.goal,
-                            proteinGPerKg = (profile.targetProteinGrams / profile.weightKg),
-                            fatGPerKg = (profile.targetFatGrams / profile.weightKg),
+                            proteinGPerKg = (profile.targetProteinGrams / macroReferenceWeight),
+                            fatGPerKg = (profile.targetFatGrams / macroReferenceWeight),
                             monthlyTargetWeightKg = targetWeight,
                             monthlyNotes = notes,
-                            dietCycleType = cycleType
+                            dietCycleType = cycleType,
+                            targetCalories = profile.targetCalories
                         )
                         selectedTab = 2
                     }

@@ -461,13 +461,14 @@ class VirtusRepository(
         totalVolumeKg: Float,
         totalSetsCompleted: Int,
         perceivedExertion: Int,
-        notes: String
+        notes: String,
+        dateMillis: Long = System.currentTimeMillis()
     ): Long {
         return dao.insertWorkoutLog(
             WorkoutLog(
                 routineId = routineId,
                 routineName = routineName,
-                dateMillis = System.currentTimeMillis(),
+                dateMillis = dateMillis,
                 durationMinutes = durationMinutes,
                 totalVolumeKg = totalVolumeKg,
                 totalSetsCompleted = totalSetsCompleted,
@@ -509,8 +510,16 @@ class VirtusRepository(
 
     suspend fun deleteFoodRecord(id: Long) = dao.deleteFoodRecord(id)
 
+    suspend fun deleteLatestMatchingFoodRecord(dateString: String, foodItemId: Long, mealType: MealType) =
+        dao.deleteLatestMatchingFoodRecord(dateString, foodItemId, mealType)
+
     suspend fun deleteFoodRecordsForDate(dateString: String) =
         dao.deleteFoodRecordsForDate(dateString)
+
+    suspend fun saveDailyIntake(intake: DailyIntakeHistory): Long {
+        val existing = dao.getDailyIntakeForDate(intake.dateString)
+        return dao.insertDailyIntake(intake.copy(id = existing?.id ?: intake.id))
+    }
 
     // --- Dietas Semanais (Dia a Dia) ---
     fun getWeeklyDietPlans(dietPlanId: Long = 1L): Flow<List<WeeklyDietPlan>> =
