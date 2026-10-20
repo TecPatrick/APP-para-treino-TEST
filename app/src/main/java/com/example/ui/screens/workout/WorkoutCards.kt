@@ -152,14 +152,13 @@ fun RoutineDetailView(
                 shadowElevation = 4.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = onBackClick) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = MaterialTheme.colorScheme.onBackground)
                         }
@@ -174,7 +173,7 @@ fun RoutineDetailView(
                             }
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(routine.title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text("${routine.dayOfWeekLabel} • ${exercises.size} Exercícios", fontSize = 11.sp, color = GrowthOrangeLight)
                         }
@@ -184,7 +183,8 @@ fun RoutineDetailView(
                         onClick = onAddExerciseClick,
                         colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
                         shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
@@ -373,12 +373,11 @@ fun ExerciseExecutionCard(
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             // Exercise Title and Muscle Tag
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Surface(
                         color = GrowthOrange.copy(alpha = 0.2f),
                         shape = CircleShape,
@@ -389,7 +388,7 @@ fun ExerciseExecutionCard(
                         }
                     }
                     Spacer(modifier = Modifier.width(8.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = exercise.exerciseName,
                             fontSize = 15.sp,
@@ -404,17 +403,20 @@ fun ExerciseExecutionCard(
                     }
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     // Quick Substitute button (1-tap swap)
                     Surface(
                         color = CarbonCardElevated,
                         shape = RoundedCornerShape(6.dp),
                         border = BorderStroke(1.dp, CarbonBorder),
-                        modifier = Modifier.clickable { onSubstitute() }
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onSubstitute() }
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
                         ) {
                             Icon(Icons.Default.SwapHoriz, contentDescription = "Substituir", tint = GrowthOrange, modifier = Modifier.size(13.dp))
                             Spacer(modifier = Modifier.width(3.dp))
@@ -426,11 +428,14 @@ fun ExerciseExecutionCard(
                     Surface(
                         color = GrowthCyan.copy(alpha = 0.15f),
                         shape = RoundedCornerShape(6.dp),
-                        modifier = Modifier.clickable { onOpenGuide() }
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onOpenGuide() }
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
                         ) {
                             Text("💡 Postura & GIF", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GrowthCyan)
                         }
@@ -441,13 +446,12 @@ fun ExerciseExecutionCard(
             Spacer(modifier = Modifier.height(10.dp))
 
             // Weight Adjuster Row
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(CarbonDark, shape = RoundedCornerShape(8.dp))
                     .padding(horizontal = 10.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = "${exercise.sets} séries • ${exercise.repsMin}-${exercise.repsMax} reps",
@@ -455,7 +459,7 @@ fun ExerciseExecutionCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
                     Text("Carga: ", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     IconButton(
                         onClick = { onUpdateWeight((exercise.currentWeightKg - 2.5f).coerceAtLeast(0f)) },
