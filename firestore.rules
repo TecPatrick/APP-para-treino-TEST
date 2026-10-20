@@ -160,7 +160,17 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, delete: if isOwner(userId);
       allow create: if isOwner(userId) && isValidUser(request.resource.data, userId);
-      allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) && isValidUser(request.resource.data, userId);
+      allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) &&
+        (isValidUser(request.resource.data, userId) ||
+         (request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+           'targetCalories', 'targetProteinGrams', 'targetCarbsGrams', 'targetFatGrams', 'targetWaterMl', 'updatedAt'
+         ]) &&
+          validNumber(request.resource.data.targetCalories, 500, 10000) &&
+          validNumber(request.resource.data.targetProteinGrams, 0, 1000) &&
+          validNumber(request.resource.data.targetCarbsGrams, 0, 2000) &&
+          validNumber(request.resource.data.targetFatGrams, 0, 1000) &&
+          validNumber(request.resource.data.targetWaterMl, 0, 20000) &&
+          validUpdatedAt(request.resource.data)));
 
       match /calorieGoals/{goalId} {
         allow read, delete: if isOwner(userId);
