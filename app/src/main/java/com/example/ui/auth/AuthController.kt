@@ -44,6 +44,7 @@ class AuthController(
         }
     }
 
+    // Login state is persisted before notifying the UI.
     fun loginWithGoogleCredential(
         credential: com.google.firebase.auth.AuthCredential,
         onSuccess: () -> Unit
