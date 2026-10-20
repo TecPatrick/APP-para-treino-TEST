@@ -522,24 +522,17 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     fun logout() {
         viewModelScope.launch {
 fun logout() {
-    viewModelScope.launch {
-        runCatching {
-            repository.clearAllLocalData()
-        }.onSuccess {
-            authService.signOut()
-            _toastMessage.value =
-                "Você saiu da conta e os dados deste aparelho foram removidos."
-        }.onFailure {
-            _toastMessage.value =
-                "Não foi possível limpar os dados locais. " +
-                    "A sessão foi mantida por segurança."
+        viewModelScope.launch {
+            runCatching {
+                repository.clearAllLocalData()
+            }.onSuccess {
+                authService.signOut()
+                _toastMessage.value = "Você saiu da conta e os dados deste aparelho foram removidos."
+            }.onFailure {
+                _toastMessage.value = "Não foi possível limpar os dados locais. A sessão foi mantida por segurança."
+            }
         }
     }
-}
-main
-        }
-    }
-
     fun clearAllUsersAndResetDatabase(onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             runCatching { repository.clearAllLocalData() }
