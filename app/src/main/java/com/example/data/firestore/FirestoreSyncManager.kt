@@ -6,12 +6,9 @@ import com.example.BuildConfig
 import com.example.R
 import com.example.data.model.ActivityLevel
 import com.example.data.model.BodyType
-import com.example.data.model.CardioLog
-import com.example.data.model.DailyIntakeHistory
 import com.example.data.model.FitnessGoal
 import com.example.data.model.Gender
 import com.example.data.model.GpsRouteLog
-import com.example.data.model.FoodRecord
 import com.example.data.model.MealPlanItem
 import com.example.data.model.ProgressLog
 import com.example.data.model.ShoppingItem
@@ -527,62 +524,6 @@ class FirestoreSyncManager(private val context: Context) {
         }
     }
 
-    suspend fun syncFoodRecordToCloud(record: FoodRecord, customUid: String? = null): Result<Unit> {
-        val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado"))
-        return try {
-            val docId = if (record.id > 0) record.id.toString() else "food_${record.dateMillis}"
-            val data = mapOf(
-                "userId" to uid, "dateString" to record.dateString, "dateMillis" to record.dateMillis,
-                "mealType" to record.mealType.name, "foodItemId" to record.foodItemId,
-                "foodName" to record.foodName, "amount" to record.amount.toDouble(), "unit" to record.unit,
-                "calories" to record.calories.toDouble(), "protein" to record.protein.toDouble(),
-                "carbs" to record.carbs.toDouble(), "fat" to record.fat.toDouble(),
-                "fiber" to record.fiber.toDouble(), "notes" to record.notes,
-                "updatedAt" to FieldValue.serverTimestamp()
-            )
-            awaitCloudWrite(firestore.collection("users").document(uid).collection("foodRecords").document(docId).set(data, SetOptions.merge()))
-            Result.success(Unit)
-        } catch (e: CancellationException) { throw e } catch (e: Exception) { Result.failure(e) }
-    }
-
-    suspend fun deleteFoodRecordFromCloud(recordId: Long, customUid: String? = null): Result<Unit> {
-        val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado"))
-        return try {
-            awaitCloudWrite(firestore.collection("users").document(uid).collection("foodRecords").document(recordId.toString()).delete())
-            Result.success(Unit)
-        } catch (e: CancellationException) { throw e } catch (e: Exception) { Result.failure(e) }
-    }
-
-    suspend fun syncCardioLogToCloud(log: CardioLog, customUid: String? = null): Result<Unit> {
-        val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado"))
-        return try {
-            val docId = if (log.id > 0) log.id.toString() else "cardio_${log.dateMillis}"
-            val data = mapOf(
-                "userId" to uid, "type" to log.type.name, "durationMinutes" to log.durationMinutes,
-                "caloriesBurned" to log.caloriesBurned, "distanceKm" to (log.distanceKm?.toDouble() ?: 0.0),
-                "dateMillis" to log.dateMillis, "notes" to log.notes,
-                "updatedAt" to FieldValue.serverTimestamp()
-            )
-            awaitCloudWrite(firestore.collection("users").document(uid).collection("cardioLogs").document(docId).set(data, SetOptions.merge()))
-            Result.success(Unit)
-        } catch (e: CancellationException) { throw e } catch (e: Exception) { Result.failure(e) }
-    }
-
-    suspend fun syncDailyIntakeToCloud(intake: DailyIntakeHistory, customUid: String? = null): Result<Unit> {
-        val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado"))
-        return try {
-            val data = mapOf(
-                "userId" to uid, "dateString" to intake.dateString, "dateMillis" to intake.dateMillis,
-                "totalCalories" to intake.totalCalories.toDouble(), "totalProtein" to intake.totalProtein.toDouble(),
-                "totalCarbs" to intake.totalCarbs.toDouble(), "totalFat" to intake.totalFat.toDouble(),
-                "targetCalories" to intake.targetCalories, "isAdhered" to intake.isAdhered,
-                "waterDrankMl" to intake.waterDrankMl, "updatedAt" to FieldValue.serverTimestamp()
-            )
-            awaitCloudWrite(firestore.collection("users").document(uid).collection("dailyIntake").document(intake.dateString).set(data, SetOptions.merge()))
-            Result.success(Unit)
-        } catch (e: CancellationException) { throw e } catch (e: Exception) { Result.failure(e) }
-    }
-
     // =========================================================================
     // 4. ITENS ADICIONAIS EXISTENTES (MealPlan, Shopping, Progress)
     // =========================================================================
@@ -729,10 +670,7 @@ class FirestoreSyncManager(private val context: Context) {
         profile: UserProfile?,
         workoutLogs: List<WorkoutLog>,
         progressLogs: List<ProgressLog> = emptyList(),
-        gpsLogs: List<GpsRouteLog> = emptyList(),
-        foodRecords: List<FoodRecord> = emptyList(),
-        cardioLogs: List<CardioLog> = emptyList(),
-        dailyIntakes: List<DailyIntakeHistory> = emptyList()
+        gpsLogs: List<GpsRouteLog> = emptyList()
     ): Result<SyncReport> {
         val uid = resolveUserId(profile?.firebaseUid)
             ?: return Result.failure(IllegalStateException("Entre na sua conta para sincronizar. Os dados locais continuam no aparelho."))
@@ -747,9 +685,6 @@ class FirestoreSyncManager(private val context: Context) {
         workoutLogs.forEach { log -> operations.add { syncWorkoutLogToCloud(log, uid) } }
         progressLogs.forEach { log -> operations.add { syncProgressLogToCloud(log) } }
         gpsLogs.forEach { log -> operations.add { syncGpsRouteLogToCloud(log, uid) } }
-        foodRecords.forEach { log -> operations.add { syncFoodRecordToCloud(log, uid) } }
-        cardioLogs.forEach { log -> operations.add { syncCardioLogToCloud(log, uid) } }
-        dailyIntakes.forEach { log -> operations.add { syncDailyIntakeToCloud(log, uid) } }
         return Result.success(collectSyncResults(operations))
     }
 }

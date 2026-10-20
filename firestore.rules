@@ -157,35 +157,6 @@ service cloud.firestore {
              validText(data.notes, 5000) && validUpdatedAt(data);
     }
 
-    function isValidFoodRecord(data, userId) {
-      let fields = ['userId', 'dateString', 'dateMillis', 'mealType', 'foodItemId', 'foodName', 'amount', 'unit', 'calories', 'protein', 'carbs', 'fat', 'fiber', 'notes', 'updatedAt'];
-      return data.keys().hasAll(fields) && data.keys().hasOnly(fields) && uidUnchanged(data, userId) &&
-             validText(data.dateString, 10) && validNumber(data.dateMillis, 0, 9999999999999) &&
-             validText(data.mealType, 50) && validNumber(data.foodItemId, 0, 9999999999999) &&
-             validText(data.foodName, 200) && validNumber(data.amount, 0, 100000) && validText(data.unit, 20) &&
-             validNumber(data.calories, 0, 100000) && validNumber(data.protein, 0, 10000) &&
-             validNumber(data.carbs, 0, 10000) && validNumber(data.fat, 0, 10000) &&
-             validNumber(data.fiber, 0, 10000) && validText(data.notes, 5000) && validUpdatedAt(data);
-    }
-
-    function isValidCardio(data, userId) {
-      let fields = ['userId', 'type', 'durationMinutes', 'caloriesBurned', 'distanceKm', 'dateMillis', 'notes', 'updatedAt'];
-      return data.keys().hasAll(fields) && data.keys().hasOnly(fields) && uidUnchanged(data, userId) &&
-             validText(data.type, 50) && validNumber(data.durationMinutes, 0, 10000) &&
-             validNumber(data.caloriesBurned, 0, 1000000) && validNumber(data.distanceKm, 0, 1000000) &&
-             validNumber(data.dateMillis, 0, 9999999999999) && validText(data.notes, 5000) && validUpdatedAt(data);
-    }
-
-    function isValidDailyIntake(data, userId) {
-      let fields = ['userId', 'dateString', 'dateMillis', 'totalCalories', 'totalProtein', 'totalCarbs', 'totalFat', 'targetCalories', 'isAdhered', 'waterDrankMl', 'updatedAt'];
-      return data.keys().hasAll(fields) && data.keys().hasOnly(fields) && uidUnchanged(data, userId) &&
-             validText(data.dateString, 10) && validNumber(data.dateMillis, 0, 9999999999999) &&
-             validNumber(data.totalCalories, 0, 100000) && validNumber(data.totalProtein, 0, 10000) &&
-             validNumber(data.totalCarbs, 0, 10000) && validNumber(data.totalFat, 0, 10000) &&
-             validNumber(data.targetCalories, 500, 10000) && data.isAdhered is bool &&
-             validNumber(data.waterDrankMl, 0, 20000) && validUpdatedAt(data);
-    }
-
     match /users/{userId} {
       allow read, delete: if isOwner(userId);
       allow create: if isOwner(userId) && isValidUser(request.resource.data, userId);
@@ -230,21 +201,6 @@ service cloud.firestore {
         allow read, delete: if isOwner(userId);
         allow create: if isOwner(userId) && isValidProgress(request.resource.data, userId);
         allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) && isValidProgress(request.resource.data, userId);
-      }
-      match /foodRecords/{recordId} {
-        allow read, delete: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidFoodRecord(request.resource.data, userId);
-        allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) && isValidFoodRecord(request.resource.data, userId);
-      }
-      match /cardioLogs/{logId} {
-        allow read, delete: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidCardio(request.resource.data, userId);
-        allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) && isValidCardio(request.resource.data, userId);
-      }
-      match /dailyIntake/{dateId} {
-        allow read, delete: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidDailyIntake(request.resource.data, userId);
-        allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) && isValidDailyIntake(request.resource.data, userId);
       }
     }
 

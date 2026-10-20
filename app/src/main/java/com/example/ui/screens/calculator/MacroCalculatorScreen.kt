@@ -89,26 +89,20 @@ fun MacroCalculatorScreen(
     var heightText by remember { mutableStateOf(currentProfile.heightCm.toInt().toString()) }
     var activityLevel by remember { mutableStateOf(currentProfile.activityLevel) }
     var goal by remember { mutableStateOf(currentProfile.goal) }
-    var targetCaloriesText by remember { mutableStateOf(currentProfile.targetCalories.toString()) }
-    val initialMacroReferenceWeight = MacroCalculator.calculateMacroReferenceWeight(
-        currentProfile.weightKg,
-        currentProfile.heightCm
-    )
 
     var proteinGPerKg by remember {
-        mutableFloatStateOf((currentProfile.targetProteinGrams / initialMacroReferenceWeight).coerceIn(1.6f, 3.0f))
+        mutableFloatStateOf((currentProfile.targetProteinGrams / currentProfile.weightKg).coerceIn(1.6f, 3.0f))
     }
     var fatGPerKg by remember {
-        mutableFloatStateOf((currentProfile.targetFatGrams / initialMacroReferenceWeight).coerceIn(0.6f, 1.5f))
+        mutableFloatStateOf((currentProfile.targetFatGrams / currentProfile.weightKg).coerceIn(0.6f, 1.5f))
     }
 
     val currentWeight = weightText.toFloatOrNull() ?: 78.5f
     val currentHeight = heightText.toFloatOrNull() ?: 178f
     val currentAge = ageText.toIntOrNull() ?: 26
-    val customTargetCalories = targetCaloriesText.toIntOrNull()?.coerceIn(1200, 6000)
 
     // Live Calculation
-    val calculatedPlan = remember(currentWeight, currentHeight, currentAge, gender, activityLevel, goal, proteinGPerKg, fatGPerKg, customTargetCalories) {
+    val calculatedPlan = remember(currentWeight, currentHeight, currentAge, gender, activityLevel, goal, proteinGPerKg, fatGPerKg) {
         MacroCalculator.computeFullPlan(
             weightKg = currentWeight,
             heightCm = currentHeight,
@@ -117,8 +111,7 @@ fun MacroCalculatorScreen(
             activityLevel = activityLevel,
             goal = goal,
             customProteinGPerKg = proteinGPerKg,
-            customFatGPerKg = fatGPerKg,
-            customTargetCalories = customTargetCalories
+            customFatGPerKg = fatGPerKg
         )
     }
 
@@ -132,7 +125,7 @@ fun MacroCalculatorScreen(
         item {
             GrowthHeader(
                 title = "Calculadora de Macros",
-                subtitle = "TMB, meta alimentar e exercício separados",
+                subtitle = "Algoritmo científico Mifflin-St Jeor & Harris-Benedict",
                 badgeText = "SISTEMA CIENTÍFICO DE MACROS"
             )
         }
@@ -202,12 +195,16 @@ fun MacroCalculatorScreen(
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
-                    Text("TMB (repouso): ${calculatedPlan.bmr} kcal", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = GrowthOrangeLight)
-                    Text("Peso de referência dos macros: ${String.format("%.1f", calculatedPlan.macroReferenceWeightKg)} kg", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Água-base estimada: ${calculatedPlan.waterMl} ml/dia", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = GrowthCyan)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("TMB (Parado sem treino): ${calculatedPlan.bmr} kcal", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = GrowthOrangeLight)
+                        Text("Água: ${calculatedPlan.waterMl} ml/dia", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = GrowthCyan)
+                    }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "A meta alimentar não aumenta com o treino. O gasto diário começa na TMB e só soma exercícios registrados.",
+                        text = "ℹ️ Regra do App: Em dias sem treino, seu gasto permanece no valor basal do TMB (${calculatedPlan.bmr} kcal). O gasto calórico adicional só é somado após realizar o treino no dia.",
                         fontSize = 10.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -369,21 +366,6 @@ fun MacroCalculatorScreen(
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
-                    OutlinedTextField(
-                        value = targetCaloriesText,
-                        onValueChange = { targetCaloriesText = it.filter(Char::isDigit).take(4) },
-                        label = { Text("Meta alimentar diária (kcal)") },
-                        supportingText = { Text("Definida por você; não aumenta automaticamente com exercícios") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().testTag("calc_target_calories_input"),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GrowthGreen,
-                            unfocusedBorderColor = CarbonBorder
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
                     Text("Objetivo Nutricional Principal:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(modifier = Modifier.height(6.dp))
 
@@ -443,7 +425,7 @@ fun MacroCalculatorScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Proteína por kg de referência:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Proteína por kg de peso corporal:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("${String.format("%.1f", proteinGPerKg)} g/kg (${calculatedPlan.proteinGrams}g)", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GrowthCyan)
                     }
                     Slider(
@@ -464,7 +446,7 @@ fun MacroCalculatorScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Gordura por kg de referência:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Gordura por kg de peso corporal:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("${String.format("%.1f", fatGPerKg)} g/kg (${calculatedPlan.fatGrams}g)", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GrowthOrange)
                     }
                     Slider(
@@ -498,8 +480,7 @@ fun MacroCalculatorScreen(
                             fatGPerKg = fatGPerKg,
                             monthlyTargetWeightKg = currentProfile.monthlyTargetWeightKg,
                             monthlyNotes = currentProfile.monthlyNotes,
-                            dietCycleType = currentProfile.dietCycleType,
-                            targetCalories = calculatedPlan.targetCalories
+                            dietCycleType = currentProfile.dietCycleType
                         )
                         onNavigateBack()
                     },

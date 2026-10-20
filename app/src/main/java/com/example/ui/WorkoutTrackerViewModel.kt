@@ -9,7 +9,7 @@ import com.example.data.firestore.FirestoreSyncManager
 import com.example.data.local.AppDatabase
 import com.example.data.model.GpsRouteLog
 import com.example.data.repository.VirtusRepository
-import com.example.service.VoiceProviderFactory
+import com.example.service.WorkoutTtsService
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -54,7 +54,7 @@ class WorkoutTrackerViewModel(application: Application) : AndroidViewModel(appli
     private val _uiState = MutableStateFlow(ActiveWorkoutGpsState())
     val uiState: StateFlow<ActiveWorkoutGpsState> = _uiState.asStateFlow()
 
-    private val ttsService = VoiceProviderFactory.create(application)
+    private val ttsService = WorkoutTtsService(application)
     private val firestoreSync = FirestoreSyncManager(application)
     private val repository by lazy {
         val db = AppDatabase.getDatabase(application)
@@ -195,11 +195,8 @@ class WorkoutTrackerViewModel(application: Application) : AndroidViewModel(appli
     }
 
     fun setTtsEnabled(enabled: Boolean) {
-        val changed = _uiState.value.isTtsEnabled != enabled
         _uiState.value = _uiState.value.copy(isTtsEnabled = enabled)
-        if (enabled && changed) {
-            ttsService.speak("Treinador por voz ativado.")
-        } else if (!enabled) {
+        if (!enabled) {
             ttsService.stop()
         }
     }
@@ -230,26 +227,6 @@ class WorkoutTrackerViewModel(application: Application) : AndroidViewModel(appli
     fun speak(text: String) {
         ttsService.speak(text)
     }
-
-    fun stopSpeaking() = ttsService.stop()
-
-    fun formatFullWorkoutSpeech(
-        distanceMeters: Float,
-        elapsedSeconds: Long,
-        paceSecondsPerKm: Long
-    ): String = ttsService.formatFullWorkoutSpeech(distanceMeters, elapsedSeconds, paceSecondsPerKm)
-
-    fun formatMilestoneSpeech(
-        kmNumber: Int,
-        elapsedSeconds: Long,
-        paceSecondsPerKm: Long
-    ): String = ttsService.formatMilestoneSpeech(kmNumber, elapsedSeconds, paceSecondsPerKm)
-
-    fun formatDistanceMilestoneSpeech(
-        distanceMeters: Float,
-        elapsedSeconds: Long,
-        paceSecondsPerKm: Long
-    ): String = ttsService.formatDistanceMilestoneSpeech(distanceMeters, elapsedSeconds, paceSecondsPerKm)
 
     @SuppressLint("MissingPermission")
     private fun startLocationUpdates() {

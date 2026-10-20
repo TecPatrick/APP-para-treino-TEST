@@ -15,19 +15,17 @@ import java.util.UUID
  * High-performance, natural-sounding Text-to-Speech service for workout tracking.
  * Formats distance, elapsed time, and pace (ritmo) in Brazilian Portuguese.
  */
-class WorkoutTtsService(private val context: Context) : TextToSpeech.OnInitListener, VoiceProvider {
-
-    override val providerId: String = "android_tts"
+class WorkoutTtsService(private val context: Context) : TextToSpeech.OnInitListener {
 
     private val tag = "WorkoutTtsService"
     private var tts: TextToSpeech? = TextToSpeech(context.applicationContext, this)
     private var isInitialized = false
 
     private val _isSpeaking = MutableStateFlow(false)
-    override val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
+    val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
 
     private val _lastNarratedText = MutableStateFlow<String?>(null)
-    override val lastNarratedText: StateFlow<String?> = _lastNarratedText.asStateFlow()
+    val lastNarratedText: StateFlow<String?> = _lastNarratedText.asStateFlow()
 
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
@@ -69,7 +67,7 @@ class WorkoutTtsService(private val context: Context) : TextToSpeech.OnInitListe
     /**
      * Speaks the specified text with QUEUE_FLUSH by default.
      */
-    override fun speak(text: String, flush: Boolean) {
+    fun speak(text: String, flush: Boolean = true) {
         _lastNarratedText.value = text
         if (!isInitialized || tts == null) {
             Log.w(tag, "TTS not initialized yet. Skipping phrase: $text")
@@ -88,7 +86,7 @@ class WorkoutTtsService(private val context: Context) : TextToSpeech.OnInitListe
     /**
      * Narrates live workout metrics: Distance, Time, and Pace.
      */
-    override fun narrateMetrics(distanceMeters: Float, elapsedSeconds: Long, paceSecondsPerKm: Long) {
+    fun narrateMetrics(distanceMeters: Float, elapsedSeconds: Long, paceSecondsPerKm: Long) {
         val speech = formatFullWorkoutSpeech(distanceMeters, elapsedSeconds, paceSecondsPerKm)
         speak(speech)
     }
@@ -96,7 +94,7 @@ class WorkoutTtsService(private val context: Context) : TextToSpeech.OnInitListe
     /**
      * Narrates a split milestone (e.g. Kilometer 1, 2, 3...)
      */
-    override fun narrateMilestone(kmNumber: Int, elapsedSeconds: Long, paceSecondsPerKm: Long) {
+    fun narrateMilestone(kmNumber: Int, elapsedSeconds: Long, paceSecondsPerKm: Long) {
         val speech = formatMilestoneSpeech(kmNumber, elapsedSeconds, paceSecondsPerKm)
         speak(speech)
     }
@@ -104,7 +102,7 @@ class WorkoutTtsService(private val context: Context) : TextToSpeech.OnInitListe
     /**
      * Narrates milestone for any interval in meters (e.g. 500m, 1000m, 1500m, 2000m...)
      */
-    override fun narrateDistanceMilestone(distanceMeters: Float, elapsedSeconds: Long, paceSecondsPerKm: Long) {
+    fun narrateDistanceMilestone(distanceMeters: Float, elapsedSeconds: Long, paceSecondsPerKm: Long) {
         val speech = formatDistanceMilestoneSpeech(distanceMeters, elapsedSeconds, paceSecondsPerKm)
         speak(speech)
     }
@@ -112,7 +110,7 @@ class WorkoutTtsService(private val context: Context) : TextToSpeech.OnInitListe
     /**
      * Stop current speech immediately.
      */
-    override fun stop() {
+    fun stop() {
         tts?.stop()
         _isSpeaking.value = false
     }
@@ -120,7 +118,7 @@ class WorkoutTtsService(private val context: Context) : TextToSpeech.OnInitListe
     /**
      * Clean up and release TTS resources.
      */
-    override fun shutdown() {
+    fun shutdown() {
         try {
             tts?.stop()
             tts?.shutdown()
@@ -134,7 +132,7 @@ class WorkoutTtsService(private val context: Context) : TextToSpeech.OnInitListe
 
     // --- Portuguese Speech Formatting Helpers ---
 
-    override fun formatDistanceSpeech(distanceMeters: Float): String {
+    fun formatDistanceSpeech(distanceMeters: Float): String {
         if (distanceMeters < 50f) {
             return "início da corrida"
         }
@@ -157,7 +155,7 @@ class WorkoutTtsService(private val context: Context) : TextToSpeech.OnInitListe
         }
     }
 
-    override fun formatTimeSpeech(elapsedSeconds: Long): String {
+    fun formatTimeSpeech(elapsedSeconds: Long): String {
         if (elapsedSeconds < 60) {
             return "$elapsedSeconds segundos"
         }
@@ -180,7 +178,7 @@ class WorkoutTtsService(private val context: Context) : TextToSpeech.OnInitListe
         }
     }
 
-    override fun formatPaceSpeech(paceSecondsPerKm: Long): String {
+    fun formatPaceSpeech(paceSecondsPerKm: Long): String {
         if (paceSecondsPerKm <= 0 || paceSecondsPerKm > 3600) {
             return "ritmo em cálculo"
         }
@@ -197,7 +195,7 @@ class WorkoutTtsService(private val context: Context) : TextToSpeech.OnInitListe
         }
     }
 
-    override fun formatFullWorkoutSpeech(distanceMeters: Float, elapsedSeconds: Long, paceSecondsPerKm: Long): String {
+    fun formatFullWorkoutSpeech(distanceMeters: Float, elapsedSeconds: Long, paceSecondsPerKm: Long): String {
         val distText = formatDistanceSpeech(distanceMeters)
         val timeText = formatTimeSpeech(elapsedSeconds)
         val paceText = formatPaceSpeech(paceSecondsPerKm)
@@ -205,7 +203,7 @@ class WorkoutTtsService(private val context: Context) : TextToSpeech.OnInitListe
         return "Atenção: Distância percorrida, $distText. Tempo decorrido, $timeText. $paceText."
     }
 
-    override fun formatMilestoneSpeech(kmNumber: Int, elapsedSeconds: Long, paceSecondsPerKm: Long): String {
+    fun formatMilestoneSpeech(kmNumber: Int, elapsedSeconds: Long, paceSecondsPerKm: Long): String {
         val kmWord = if (kmNumber == 1) "Primeiro quilômetro" else "Quilômetro $kmNumber"
         val timeText = formatTimeSpeech(elapsedSeconds)
         val paceText = formatPaceSpeech(paceSecondsPerKm)
@@ -213,7 +211,7 @@ class WorkoutTtsService(private val context: Context) : TextToSpeech.OnInitListe
         return "$kmWord completado! Tempo total: $timeText. $paceText."
     }
 
-    override fun formatDistanceMilestoneSpeech(distanceMeters: Float, elapsedSeconds: Long, paceSecondsPerKm: Long): String {
+    fun formatDistanceMilestoneSpeech(distanceMeters: Float, elapsedSeconds: Long, paceSecondsPerKm: Long): String {
         val distText = formatDistanceSpeech(distanceMeters)
         val timeText = formatTimeSpeech(elapsedSeconds)
         val paceText = formatPaceSpeech(paceSecondsPerKm)
