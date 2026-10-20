@@ -180,12 +180,14 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
                                 )
                             },
                             label = if (compactNavigation) null else {
-                                Text(
-                                    text = screen.title,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    maxLines = 1
-                                )
+                                {
+                                    Text(
+                                        text = screen.title,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        maxLines = 1
+                                    )
+                                }
                             },
                             alwaysShowLabel = !compactNavigation,
                             colors = NavigationBarItemDefaults.colors(
