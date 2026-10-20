@@ -51,7 +51,7 @@ data class CaloricGoalData(
  * Utiliza o cache local persistente em disco (PersistentCacheSettings) para assegurar
  * que leitura e gravação funcionem mesmo sem conexão à internet.
  */
-class FirestoreSyncManager(private val context: Context) {
+open class FirestoreSyncManager(private val context: Context) {
 
     private val firestore: FirebaseFirestore by lazy {
         val databaseId = try {

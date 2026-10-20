@@ -40,7 +40,7 @@ import java.util.Locale
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
-class VirtusRepository(
+open class VirtusRepository(
     private val dao: AppDao,
     private val clearLocalStorage: (() -> Unit)? = null
 ) {
