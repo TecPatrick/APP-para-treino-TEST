@@ -262,10 +262,9 @@ fun DietScreen(
                                 .testTag("diet_daily_energy_card")
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(
@@ -300,12 +299,12 @@ fun DietScreen(
 
                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                Row(
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Surface(
-                                        modifier = Modifier.weight(1f),
+                                        modifier = Modifier.fillMaxWidth(),
                                         color = CarbonDark,
                                         shape = RoundedCornerShape(8.dp),
                                         border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder)
@@ -318,7 +317,7 @@ fun DietScreen(
                                     }
 
                                     Surface(
-                                        modifier = Modifier.weight(1f),
+                                        modifier = Modifier.fillMaxWidth(),
                                         color = CarbonDark,
                                         shape = RoundedCornerShape(8.dp),
                                         border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder)
@@ -331,7 +330,7 @@ fun DietScreen(
                                     }
 
                                     Surface(
-                                        modifier = Modifier.weight(1.1f),
+                                        modifier = Modifier.fillMaxWidth(),
                                         color = CarbonCardElevated,
                                         shape = RoundedCornerShape(8.dp),
                                         border = androidx.compose.foundation.BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.5f))
