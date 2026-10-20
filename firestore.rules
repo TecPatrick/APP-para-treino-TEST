@@ -36,11 +36,20 @@ service cloud.firestore {
     }
 
     function validUpdatedAt(data) {
-      return data.updatedAt is timestamp;
+      // Every client write must use FieldValue.serverTimestamp(). This prevents
+      // forged future timestamps from winning synchronization conflicts.
+      return data.updatedAt is timestamp && data.updatedAt == request.time;
     }
 
     function validEmail(value) {
-      return validText(value, 254) && value.matches('^[^@]+@[^@]+[.][^@]+$');
+      return validText(value, 254) &&
+             value.matches('^[^@]+@[^@]+[.][^@]+$');
+    }
+
+    function authenticatedEmailMatches(value) {
+      return 'email' in request.auth.token &&
+             request.auth.token.email is string &&
+             value == request.auth.token.email;
     }
 
     function isValidUser(data, userId) {
@@ -54,6 +63,7 @@ service cloud.firestore {
       return data.keys().hasAll(fields) && data.keys().hasOnly(fields) &&
              uidUnchanged(data, userId) &&
              validText(data.name, 100) && validEmail(data.email) &&
+             authenticatedEmailMatches(data.email) &&
              data.gender in ['MASCULINO', 'FEMININO'] &&
              validNumber(data.age, 1, 120) &&
              validNumber(data.weightKg, 20, 500) &&
@@ -109,7 +119,7 @@ service cloud.firestore {
              validNumber(data.stepsCount, 0, 100000000) &&
              validNumber(data.caloriesBurned, 0, 1000000) &&
              validNumber(data.averagePaceMinPerKm, 0, 10000) &&
-             validText(data.routePointsJson, 750000) &&
+             validText(data.routePointsJson, 500000) &&
              validText(data.notes, 5000) && validUpdatedAt(data);
     }
 
@@ -179,7 +189,17 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, delete: if isOwner(userId);
       allow create: if isOwner(userId) && isValidUser(request.resource.data, userId);
-      allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) && isValidUser(request.resource.data, userId);
+      allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) &&
+        (isValidUser(request.resource.data, userId) ||
+         (request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+           'targetCalories', 'targetProteinGrams', 'targetCarbsGrams', 'targetFatGrams', 'targetWaterMl', 'updatedAt'
+         ]) &&
+          validNumber(request.resource.data.targetCalories, 500, 10000) &&
+          validNumber(request.resource.data.targetProteinGrams, 0, 1000) &&
+          validNumber(request.resource.data.targetCarbsGrams, 0, 2000) &&
+          validNumber(request.resource.data.targetFatGrams, 0, 1000) &&
+          validNumber(request.resource.data.targetWaterMl, 0, 20000) &&
+          validUpdatedAt(request.resource.data)));
 
       match /calorieGoals/{goalId} {
         allow read, delete: if isOwner(userId);

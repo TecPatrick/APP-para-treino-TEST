@@ -11,7 +11,9 @@ open class MainApplication : Application() {
     private val applicationScope = CoroutineScope(SupervisorJob())
 
     val database by lazy { AppDatabase.getDatabase(this) }
-    val repository by lazy { VirtusRepository(database.appDao()) }
+    val repository by lazy {
+        VirtusRepository(database.appDao(), database::clearAllTables)
+    }
 
     override fun onCreate() {
         super.onCreate()

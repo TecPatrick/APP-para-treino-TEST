@@ -521,19 +521,36 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
 
     fun logout() {
         viewModelScope.launch {
+fun logout() {
+    viewModelScope.launch {
+        runCatching {
+            repository.clearAllLocalData()
+        }.onSuccess {
             authService.signOut()
-            val current = userProfile.value
-            repository.saveUserProfile(current.copy(isLoggedIn = false))
-            _toastMessage.value = "Você saiu da conta. Seu perfil local foi preservado para o próximo login."
+            _toastMessage.value =
+                "Você saiu da conta e os dados deste aparelho foram removidos."
+        }.onFailure {
+            _toastMessage.value =
+                "Não foi possível limpar os dados locais. " +
+                    "A sessão foi mantida por segurança."
+        }
+    }
+}
+main
         }
     }
 
     fun clearAllUsersAndResetDatabase(onComplete: () -> Unit = {}) {
         viewModelScope.launch {
-            authService.signOut()
-            repository.deleteAllUserProfiles()
-            _toastMessage.value = "Todos os usuários foram excluídos do banco de dados!"
-            onComplete()
+            runCatching { repository.clearAllLocalData() }
+                .onSuccess {
+                    authService.signOut()
+                    _toastMessage.value = "Todos os dados locais foram excluídos."
+                    onComplete()
+                }
+                .onFailure {
+                    _toastMessage.value = "Não foi possível excluir todos os dados locais."
+                }
         }
     }
 
@@ -619,20 +636,23 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
 
     fun deleteAccountLgpd(onSuccess: () -> Unit) {
         viewModelScope.launch {
-            val result = authService.deleteAccount()
-            result.onSuccess {
-                repository.saveUserProfile(
-                    UserProfile(
-                        id = 1,
-                        isLoggedIn = false,
-                        hasCompletedOnboarding = false,
-                        lgpdConsentAccepted = false
-                    )
-                )
-                _toastMessage.value = "Conta e dados excluídos conforme a LGPD."
+            val cloudResult = firestoreSync.deleteAllUserData()
+            if (cloudResult.isFailure) {
+                _toastMessage.value = cloudResult.exceptionOrNull()?.message
+                    ?: "Não foi possível excluir os dados do servidor."
+                return@launch
+            }
+
+            val authResult = authService.deleteAccount()
+            runCatching { repository.clearAllLocalData() }
+            authService.signOut()
+
+            if (authResult.isSuccess) {
+                _toastMessage.value = "Conta e dados locais e remotos excluídos conforme a LGPD."
                 onSuccess()
-            }.onFailure { ex ->
-                _toastMessage.value = "Erro ao excluir conta: ${ex.message}"
+            } else {
+                _toastMessage.value =
+                    "Os dados foram apagados, mas o Firebase exige login recente para excluir a conta. Entre novamente e repita."
             }
         }
     }

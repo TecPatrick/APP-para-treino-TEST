@@ -26,9 +26,11 @@ import com.example.data.model.DietaryProfile
 import com.example.data.model.Macro
 import com.example.data.model.WorkoutSchedule
 import com.example.data.model.CardioLog
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.nio.charset.StandardCharsets
@@ -38,7 +40,10 @@ import java.util.Locale
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
-class VirtusRepository(private val dao: AppDao) {
+class VirtusRepository(
+    private val dao: AppDao,
+    private val clearLocalStorage: (() -> Unit)? = null
+) {
 
     val userProfile: Flow<UserProfile?> = dao.getUserProfile()
     val allUserProfiles: Flow<List<UserProfile>> = dao.getAllUserProfiles()
@@ -80,6 +85,18 @@ class VirtusRepository(private val dao: AppDao) {
 
     suspend fun deleteAllUserProfiles() {
         dao.deleteAllUserProfiles()
+    }
+
+    /**
+     * Removes every local table when a session ends or an account is deleted.
+     * Keeping health data from one account on a shared device could expose it to
+     * the next user, so profile-only deletion is intentionally not sufficient.
+     */
+    suspend fun clearAllLocalData() = withContext(Dispatchers.IO) {
+        val clear = checkNotNull(clearLocalStorage) {
+            "Local database clearing is not configured."
+        }
+        clear()
     }
 
     suspend fun getUserProfileDirect(id: Int = 1): UserProfile? {

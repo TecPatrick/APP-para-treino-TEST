@@ -46,6 +46,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -112,7 +113,7 @@ class MainActivity : FragmentActivity() {
 fun MainAppScreen(viewModel: VirtusViewModel) {
     val context = LocalContext.current
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
-    var currentScreen by remember { mutableStateOf(AppNavigationScreen.DASHBOARD) }
+    var currentScreen by rememberSaveable { mutableStateOf(AppNavigationScreen.DASHBOARD) }
     val snackbarHostState = remember { SnackbarHostState() }
     val toastMessage by viewModel.toastMessage.collectAsStateWithLifecycle()
 
