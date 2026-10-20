@@ -138,11 +138,6 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
     val workoutLogs by viewModel.workoutLogs.collectAsStateWithLifecycle()
     val activeWorkout by viewModel.activeWorkout.collectAsStateWithLifecycle()
     val userProfile by viewModel.userProfile.collectAsStateWithLifecycle()
-    val selectedDateMillis by viewModel.selectedDateMillis.collectAsStateWithLifecycle()
-    val selectedDateKey = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(selectedDateMillis))
-    val selectedWorkoutLogs = workoutLogs.filter {
-        SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(it.dateMillis)) == selectedDateKey
-    }
 
     var selectedFilter by remember { mutableStateOf(WorkoutDivisionFilter.ALL) }
 
@@ -217,7 +212,7 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
             item {
                 GrowthHeader(
                     title = "Fichas de Treino",
-                    subtitle = "Dia ativo: ${SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR")).format(Date(selectedDateMillis))}",
+                    subtitle = "Sua rotina personalizada de treinos",
                     badgeText = "FICHAS",
                     trailingContent = {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -648,7 +643,7 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
     // 5. Workout History Modal
     if (showHistoryDialog) {
         WorkoutHistoryModal(
-            workoutLogs = selectedWorkoutLogs,
+            workoutLogs = workoutLogs,
             onDismiss = { showHistoryDialog = false },
             onDeleteLog = { viewModel.deleteWorkoutLog(it) }
         )

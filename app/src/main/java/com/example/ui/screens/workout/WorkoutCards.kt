@@ -373,8 +373,12 @@ fun ExerciseExecutionCard(
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             // Exercise Title and Muscle Tag
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                     Surface(
                         color = GrowthOrange.copy(alpha = 0.2f),
                         shape = CircleShape,
@@ -385,13 +389,12 @@ fun ExerciseExecutionCard(
                         }
                     }
                     Spacer(modifier = Modifier.width(8.dp))
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column {
                         Text(
                             text = exercise.exerciseName,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            maxLines = 3
+                            color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
                             text = exercise.muscleGroup,
@@ -401,18 +404,13 @@ fun ExerciseExecutionCard(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     // Quick Substitute button (1-tap swap)
                     Surface(
                         color = CarbonCardElevated,
                         shape = RoundedCornerShape(6.dp),
                         border = BorderStroke(1.dp, CarbonBorder),
-                        modifier = Modifier.weight(1f).clickable { onSubstitute() }
+                        modifier = Modifier.clickable { onSubstitute() }
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
@@ -428,11 +426,10 @@ fun ExerciseExecutionCard(
                     Surface(
                         color = GrowthCyan.copy(alpha = 0.15f),
                         shape = RoundedCornerShape(6.dp),
-                        modifier = Modifier.weight(1f).clickable { onOpenGuide() }
+                        modifier = Modifier.clickable { onOpenGuide() }
                     ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text("💡 Postura & GIF", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GrowthCyan)

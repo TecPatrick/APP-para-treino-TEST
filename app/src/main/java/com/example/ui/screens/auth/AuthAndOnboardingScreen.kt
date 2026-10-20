@@ -332,11 +332,7 @@ fun AuthAndOnboardingScreen(
                             // Biometric Sign In Option (Fingerprint / Face Unlock)
                             if (!isRegisterMode) {
                                 val fragmentActivity = context as? FragmentActivity
-                                val hasConfiguredEmail = userProfile.email.isNotBlank() &&
-                                    userProfile.email.contains("@") &&
-                                    userProfile.email.contains(".") &&
-                                    !userProfile.email.endsWith("@growth.local") &&
-                                    !userProfile.firebaseUid.startsWith("guest_")
+                                val hasConfiguredEmail = userProfile.email.isNotBlank() && userProfile.email.contains("@") && userProfile.email.contains(".")
                                 val hasConfiguredProfile = userProfile.hasCompletedOnboarding && userProfile.weightKg > 30f && userProfile.name.isNotBlank() && userProfile.name != "Atleta"
                                 val isBiometricsReady = hasConfiguredEmail && hasConfiguredProfile
 
@@ -418,11 +414,7 @@ fun AuthAndOnboardingScreen(
                                             } catch (_: GetCredentialCancellationException) {
                                                 // user cancelled
                                             } catch (e: Exception) {
-                                                val detail = e.message?.take(120)?.takeIf { it.isNotBlank() }
-                                                viewModel.showToast(
-                                                    if (detail != null) "Falha no Google Sign-In: $detail"
-                                                    else "Google Sign-In indisponível. Verifique a configuração Firebase."
-                                                )
+                                                viewModel.showToast("Google Sign-In indisponível. Utilize seu e-mail/senha ou o Acesso Rápido abaixo.")
                                             }
                                         }
                                     } else {

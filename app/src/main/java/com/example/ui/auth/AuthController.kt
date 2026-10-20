@@ -22,18 +22,13 @@ class AuthController(
 ) {
     private val _isAuthLoading = MutableStateFlow(false)
     val isAuthLoading = _isAuthLoading.asStateFlow()
-
     private val _authError = MutableStateFlow<String?>(null)
     val authError = _authError.asStateFlow()
-
-    fun clearAuthError() {
-        _authError.value = null
-    }
+    fun clearAuthError() { _authError.value = null }
 
     private suspend fun localProfileForUser(uid: String): UserProfile {
         val current = profile()
         val previousUid = current.firebaseUid
-
         return if (
             previousUid.isNotBlank() &&
             !previousUid.startsWith("guest_") &&
@@ -48,11 +43,7 @@ class AuthController(
 
     private suspend fun localProfileForGuest(): UserProfile {
         val current = profile()
-
-        return if (
-            current.firebaseUid.isNotBlank() &&
-            !current.firebaseUid.startsWith("guest_")
-        ) {
+        return if (current.firebaseUid.isNotBlank() && !current.firebaseUid.startsWith("guest_")) {
             repository.clearAllLocalData()
             UserProfile()
         } else {
@@ -62,7 +53,6 @@ class AuthController(
 
     private fun launchAuth(block: suspend CoroutineScope.() -> Unit) {
         if (!_isAuthLoading.compareAndSet(false, true)) return
-
         scope.launch {
             try {
                 _authError.value = null
@@ -70,9 +60,7 @@ class AuthController(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                val message =
-                    "Não foi possível concluir a operação. Tente novamente."
-
+                val message = "Não foi possível concluir a operação. Tente novamente."
                 _authError.value = message
                 showMessage(message)
             } finally {
@@ -81,22 +69,17 @@ class AuthController(
         }
     }
 
-    // Login state is persisted before notifying the UI.
     fun loginWithGoogleCredential(
         credential: com.google.firebase.auth.AuthCredential,
         onSuccess: () -> Unit
     ) {
         launchAuth {
             _authError.value = null
-
             val result = authService.signInWithGoogle(credential)
 
             result.onSuccess { user ->
                 val current = localProfileForUser(user.uid)
-
-                // A conta autenticada pode entrar imediatamente no aplicativo.
-                val hasOnboarded = true
-
+                val hasOnboarded = current.hasCompletedOnboarding || current.weightKg > 30f
                 val updated = current.copy(
                     isLoggedIn = true,
                     hasCompletedOnboarding = hasOnboarded,
@@ -104,20 +87,12 @@ class AuthController(
                     name = user.displayName ?: current.name,
                     firebaseUid = user.uid
                 )
-
                 repository.saveUserProfile(updated)
                 firestoreSync.syncProfileToCloud(updated)
-
-                showMessage(
-                    "Login com Google realizado com sucesso! " +
-                        "Bem-vindo, ${user.displayName ?: current.name}."
-                )
-
+                showMessage("Login com Google realizado com sucesso! Bem-vindo, ${user.displayName ?: current.name}.")
                 onSuccess()
             }.onFailure { ex ->
-                val errorMsg =
-                    ex.message ?: "Erro ao realizar login com Google."
-
+                val errorMsg = ex.message ?: "Erro ao realizar login com Google."
                 _authError.value = errorMsg
                 showMessage(errorMsg)
             }
@@ -131,50 +106,29 @@ class AuthController(
     ) {
         launchAuth {
             _authError.value = null
-
             val result = authService.login(emailInput, passwordInput)
-
+            
             result.onSuccess { user ->
                 val current = localProfileForUser(user.uid)
-
-                // A conta autenticada pode entrar imediatamente no aplicativo.
-                val hasOnboarded = true
-
-                val fallbackName =
-                    if (current.name.isNotBlank() && current.name != "Atleta") {
-                        current.name
-                    } else {
-                        emailInput
-                            .substringBefore("@")
-                            .replace(".", " ")
-                            .replaceFirstChar { it.uppercase() }
-                    }
-
+                val hasOnboarded = current.hasCompletedOnboarding || current.weightKg > 30f
+                val fallbackName = if (current.name.isNotBlank() && current.name != "Atleta") {
+                    current.name
+                } else {
+                    emailInput.substringBefore("@").replace(".", " ").replaceFirstChar { it.uppercase() }
+                }
                 val updated = current.copy(
                     isLoggedIn = true,
                     hasCompletedOnboarding = hasOnboarded,
                     email = user.email ?: emailInput,
-                    name = user.displayName
-                        ?.takeIf { it.isNotBlank() }
-                        ?: fallbackName,
+                    name = user.displayName?.takeIf { it.isNotBlank() } ?: fallbackName,
                     firebaseUid = user.uid
                 )
-
                 repository.saveUserProfile(updated)
                 firestoreSync.syncProfileToCloud(updated)
-
-                showMessage(
-                    "Login realizado com sucesso! " +
-                        "Bem-vindo, ${updated.name}."
-                )
-
+                showMessage("Login realizado com sucesso! Bem-vindo, ${updated.name}.")
                 onSuccess()
             }.onFailure { ex ->
-                val message =
-                    ex.message
-                        ?: "Não foi possível entrar. " +
-                        "Verifique suas credenciais."
-
+                val message = ex.message ?: "Não foi possível entrar. Verifique suas credenciais."
                 _authError.value = message
                 showMessage(message)
             }
@@ -184,37 +138,17 @@ class AuthController(
     fun enterAsGuest(onSuccess: () -> Unit) {
         launchAuth {
             val current = localProfileForGuest()
-
             authService.signOut()
-
-            val hasOnboarded =
-                current.hasCompletedOnboarding || current.weightKg > 30f
-
+            val hasOnboarded = current.hasCompletedOnboarding || current.weightKg > 30f
             val updated = current.copy(
                 isLoggedIn = true,
                 hasCompletedOnboarding = hasOnboarded,
-                email = if (
-                    current.email.isNotBlank() &&
-                    current.email.contains("@")
-                ) {
-                    current.email
-                } else {
-                    "atleta@growth.local"
-                },
-                name = if (
-                    current.name.isNotBlank() &&
-                    current.name != "Atleta"
-                ) {
-                    current.name
-                } else {
-                    "Atleta Growth"
-                },
+                email = if (current.email.isNotBlank() && current.email.contains("@")) current.email else "atleta@growth.local",
+                name = if (current.name.isNotBlank() && current.name != "Atleta") current.name else "Atleta Growth",
                 firebaseUid = "guest_local",
                 passwordHash = ""
             )
-
             repository.saveUserProfile(updated)
-
             showMessage("Bem-vindo! Modo local ativado.")
             onSuccess()
         }
@@ -223,63 +157,24 @@ class AuthController(
     fun loginWithBiometrics(onSuccess: () -> Unit) {
         launchAuth {
             val current = profile()
-
-            if (current.firebaseUid.startsWith("guest_")) {
-                _authError.value =
-                    "Vincule uma conta com e-mail antes " +
-                        "de ativar o login biométrico."
-
-                showMessage(
-                    "Vincule seu e-mail no Perfil " +
-                        "para usar a biometria."
-                )
-
+            if (!current.firebaseUid.startsWith("guest_") && authService.currentUser?.uid != current.firebaseUid) {
+                _authError.value = "Entre com sua conta antes de usar a biometria."
                 return@launchAuth
             }
-
-            if (
-                current.email.isBlank() ||
-                !current.email.contains("@")
-            ) {
-                _authError.value =
-                    "Perfil sem e-mail válido vinculado. " +
-                        "Todo perfil precisa ter um e-mail válido."
-
-                showMessage(
-                    "Erro: E-mail obrigatório para acesso via biometria."
-                )
-
+            if (current.email.isBlank() || !current.email.contains("@")) {
+                _authError.value = "Perfil sem e-mail válido vinculado. Todo perfil precisa ter um e-mail válido."
+                showMessage("Erro: E-mail obrigatório para acesso via biometria.")
                 return@launchAuth
             }
-
-            val hasValidProfile =
-                current.hasCompletedOnboarding &&
-                    current.weightKg > 30f &&
-                    current.name.isNotBlank() &&
-                    current.name != "Atleta"
-
+            val hasValidProfile = current.hasCompletedOnboarding && current.weightKg > 30f && current.name.isNotBlank() && current.name != "Atleta"
             if (!hasValidProfile) {
-                _authError.value =
-                    "Perfil incompleto. Configure seu perfil " +
-                        "e cadastre suas medidas antes de usar a biometria."
-
-                showMessage(
-                    "Por favor, conclua o cadastro do perfil."
-                )
-
+                _authError.value = "Perfil incompleto. Configure seu perfil e cadastre suas medidas antes de usar a biometria."
+                showMessage("Por favor, conclua o cadastro do perfil.")
                 return@launchAuth
             }
-
             val updated = current.copy(isLoggedIn = true)
-
             repository.saveUserProfile(updated)
-
-            showMessage(
-                "Autenticação biométrica confirmada " +
-                    "(${updated.email})! " +
-                    "Bem-vindo(a), ${updated.name}."
-            )
-
+            showMessage("Autenticação biométrica confirmada (${updated.email})! Bem-vindo(a), ${updated.name}.")
             onSuccess()
         }
     }
@@ -301,26 +196,15 @@ class AuthController(
     ) {
         launchAuth {
             _authError.value = null
-
-            val result = authService.register(
-                email,
-                password,
-                name
-            )
+            val result = authService.register(email, password, name)
 
             val user = result.getOrElse { error ->
-                val message =
-                    error.message
-                        ?: "Não foi possível criar a conta."
-
+                val message = error.message ?: "Não foi possível criar a conta."
                 _authError.value = message
                 showMessage(message)
-
                 return@launchAuth
             }
-
             localProfileForUser(user.uid)
-
             val plan = MacroCalculator.computeFullPlan(
                 weightKg = weightKg,
                 heightCm = heightCm,
@@ -357,43 +241,25 @@ class AuthController(
                 targetCarbsGrams = plan.carbsGrams,
                 targetFatGrams = plan.fatGrams,
                 targetWaterMl = plan.waterMl,
-                monthlyTargetWeightKg =
-                    if (goal.calorieAdjustment > 0) {
-                        weightKg + 2.0f
-                    } else if (goal.calorieAdjustment < 0) {
-                        weightKg - 2.5f
-                    } else {
-                        weightKg
-                    }
+                monthlyTargetWeightKg = if (goal.calorieAdjustment > 0) weightKg + 2.0f else if (goal.calorieAdjustment < 0) weightKg - 2.5f else weightKg
             )
 
             repository.saveUserProfile(updated)
             firestoreSync.syncProfileToCloud(updated)
-
             showMessage("Conta criada com sucesso! Protocolo gerado.")
             onSuccess()
         }
     }
 
-    fun sendPasswordResetEmail(
-        email: String,
-        onComplete: (Boolean, String) -> Unit
-    ) {
+    fun sendPasswordResetEmail(email: String, onComplete: (Boolean, String) -> Unit) {
         launchAuth {
             val result = authService.sendPasswordReset(email)
-
             result.onSuccess {
-                val message =
-                    "Se existir uma conta para esse e-mail, " +
-                        "enviaremos as instruções de recuperação."
-
-                showMessage(message)
-                onComplete(true, message)
+                val msg = "Se existir uma conta para esse e-mail, enviaremos as instruções de recuperação."
+                showMessage(msg)
+                onComplete(true, msg)
             }.onFailure { ex ->
-                val errorMsg =
-                    ex.message
-                        ?: "Falha ao enviar e-mail de recuperação."
-
+                val errorMsg = ex.message ?: "Falha ao enviar e-mail de recuperação."
                 showMessage(errorMsg)
                 onComplete(false, errorMsg)
             }

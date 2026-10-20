@@ -15,34 +15,6 @@ data class ExerciseVisualGuide(
     val postureTip: String
 )
 
-/** Centralized primary-muscle classification used by every workout catalog/filter. */
-object ExerciseMuscleClassifier {
-    fun matches(guide: ExerciseVisualGuide, filter: String): Boolean {
-        if (filter == "Todos" || filter == "⭐ Populares") return true
-        val name = guide.exerciseName.lowercase()
-        val muscle = guide.muscleGroup.lowercase()
-        fun hasAny(text: String, vararg terms: String) = terms.any { text.contains(it) }
-        return when (filter) {
-            "Tríceps" -> muscle.startsWith("tríceps") || muscle.startsWith("triceps") || hasAny(name, "tríceps", "triceps", "pushdown", "skull crusher")
-            "Bíceps" -> muscle.startsWith("bíceps") || muscle.startsWith("biceps") || hasAny(name, "rosca", "curl")
-            "Peitoral" -> (muscle.startsWith("peitoral") || muscle.startsWith("chest") || hasAny(name, "supino", "bench press", "crossover", "pec deck", "push-up", "flexão", "pullover")) && !hasAny(name, "inverso", "reverse fly", "rear delt")
-            "Dorsal" -> muscle.startsWith("dorsal") || muscle.startsWith("costas") || muscle.startsWith("latíssimo") || hasAny(name, "puxada", "pulldown", "remada", " row", "barra fixa", "pull-up", "pull up")
-            "Deltoide" -> muscle.startsWith("deltoide") || muscle.startsWith("ombro") || muscle.startsWith("shoulder") || hasAny(name, "desenvolvimento", "elevação lateral", "elevação frontal", "lateral raise", "front raise", "face pull", "overhead press", "military press", "shoulder press", "arnold press", "rear delt")
-            "Quadríceps" -> muscle.startsWith("quadríceps") || muscle.startsWith("quadriceps") || hasAny(name, "agachamento", "squat", "leg press", "extensora", "leg extension", "hack squat", "afundo", "lunge")
-            "Posterior / Glúteos" -> muscle.startsWith("isquiotibiais") || muscle.startsWith("posterior") || muscle.startsWith("glúteo") || muscle.startsWith("glute") || muscle.startsWith("cadeia posterior") || hasAny(name, "flexora", "leg curl", "stiff", "rdl", "romanian deadlift", "hip thrust", "elevação pélvica", "good morning")
-            "Panturrilha" -> muscle.startsWith("panturrilha") || muscle.startsWith("gastrocnêmio") || muscle.startsWith("calf") || hasAny(name, "panturrilha", "calf raise")
-            "Antebraço" -> muscle.startsWith("antebraço") || muscle.startsWith("forearm") || hasAny(name, "wrist", "punho", "rosca inversa")
-            "Trapézio" -> muscle.startsWith("trapézio") || muscle.startsWith("trapezius") || hasAny(name, "encolhimento", "shrug")
-            "Abdômen" -> muscle.startsWith("abdominal") || muscle.startsWith("abdômen") || muscle.startsWith("core") || hasAny(name, "abdominal", "crunch", "plank", "prancha")
-            else -> false
-        }
-    }
-
-    fun primaryFilter(guide: ExerciseVisualGuide): String =
-        listOf("Tríceps", "Bíceps", "Peitoral", "Dorsal", "Deltoide", "Quadríceps", "Posterior / Glúteos", "Panturrilha", "Antebraço", "Trapézio", "Abdômen")
-            .firstOrNull { matches(guide, it) } ?: "Todos"
-}
-
 object ExerciseGifMapper {
 
     private var applicationContext: Context? = null
