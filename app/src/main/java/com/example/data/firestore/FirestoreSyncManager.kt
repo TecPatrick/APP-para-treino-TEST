@@ -422,7 +422,7 @@ class FirestoreSyncManager(private val context: Context) {
 
             val logs = querySnapshot.documents.mapNotNull { doc ->
                 val d = doc.data ?: return@mapNotNull null
-                val idLong = doc.id.toLongOrNull() ?: 0L
+                val idLong = doc.id.substringAfter("_", doc.id).toLongOrNull() ?: 0L
                 WorkoutLog(
                     id = idLong,
                     routineId = (d["routineId"] as? Number)?.toLong() ?: 0L,
@@ -466,7 +466,7 @@ class FirestoreSyncManager(private val context: Context) {
                 if (snapshot != null) {
                     val logs = snapshot.documents.mapNotNull { doc ->
                         val d = doc.data ?: return@mapNotNull null
-                        val idLong = doc.id.toLongOrNull() ?: 0L
+                        val idLong = doc.id.substringAfter("_", doc.id).toLongOrNull() ?: 0L
                         WorkoutLog(
                             id = idLong,
                             routineId = (d["routineId"] as? Number)?.toLong() ?: 0L,
