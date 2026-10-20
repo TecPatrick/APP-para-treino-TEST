@@ -220,32 +220,32 @@ fun AnalyticsScreen(viewModel: VirtusViewModel) {
 
                 // Stats Grid Summary
                 item {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         MetricCard(
                             label = "Variação de Peso",
                             value = "${if (weightDelta >= 0) "+" else ""}${String.format("%.1f", weightDelta)} kg",
                             subtext = "Desde o início",
                             valueColor = if (weightDelta >= 0) GrowthGreen else GrowthCyan,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.fillMaxWidth()
                         )
                         MetricCard(
                             label = "Volume Total",
                             value = "${(totalVolumeLifted / 1000f).toInt()} tons",
                             subtext = "${workoutLogs.size} treinos feitos",
                             valueColor = GrowthOrange,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.fillMaxWidth()
                         )
                         MetricCard(
                             label = "Aderência",
                             value = "94%",
                             subtext = "Consistência macros",
                             valueColor = GrowthCyan,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
@@ -367,12 +367,11 @@ fun AnalyticsScreen(viewModel: VirtusViewModel) {
                         }
                     }
 
-                    Row(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
                             text = "HISTÓRICO DE MEDIDAS & PESAGENS",
@@ -386,7 +385,9 @@ fun AnalyticsScreen(viewModel: VirtusViewModel) {
                             onClick = { showAddMeasurementDialog = true },
                             shape = RoundedCornerShape(8.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
-                            modifier = Modifier.testTag("add_measurement_btn")
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("add_measurement_btn")
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, tint = GrowthCyan, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(4.dp))
