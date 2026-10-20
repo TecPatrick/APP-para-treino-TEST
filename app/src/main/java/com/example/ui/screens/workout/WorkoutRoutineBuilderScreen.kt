@@ -1,5 +1,6 @@
 package com.example.ui.screens.workout
 
+import android.os.Build
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -37,6 +38,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -55,12 +57,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.ImageLoader
+import coil.compose.SubcomposeAsyncImage
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
+import coil.request.ImageRequest
 import com.example.data.model.WorkoutExercise
 import com.example.data.model.WorkoutRoutine
 import com.example.data.model.WorkoutSplitType
@@ -393,6 +403,18 @@ private fun WorkoutExercisePickerScreen(
     onBack: () -> Unit,
     onConfirm: (List<String>) -> Unit
 ) {
+    val context = LocalContext.current
+    val gifImageLoader = remember(context) {
+        ImageLoader.Builder(context)
+            .components {
+                if (Build.VERSION.SDK_INT >= 28) {
+                    add(ImageDecoderDecoder.Factory())
+                } else {
+                    add(GifDecoder.Factory())
+                }
+            }
+            .build()
+    }
     var query by remember { mutableStateOf("") }
     var selectedGroup by remember { mutableStateOf("Todos") }
     val selected = remember { mutableStateListOf<String>() }
@@ -482,10 +504,32 @@ private fun WorkoutExercisePickerScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
-                                modifier = Modifier.size(42.dp).background(CarbonCardElevated, RoundedCornerShape(10.dp)),
+                                modifier = Modifier
+                                    .size(width = 76.dp, height = 64.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(CarbonCardElevated),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = GrowthOrange)
+                                SubcomposeAsyncImage(
+                                    model = ImageRequest.Builder(context)
+                                        .data(guide.gifUrl)
+                                        .crossfade(true)
+                                        .build(),
+                                    imageLoader = gifImageLoader,
+                                    contentDescription = "Demonstração de ${guide.exerciseName}",
+                                    contentScale = ContentScale.Crop,
+                                    loading = {
+                                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                            CircularProgressIndicator(color = GrowthOrange, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                        }
+                                    },
+                                    error = {
+                                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                            Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = GrowthOrange)
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxSize()
+                                )
                             }
                             Spacer(Modifier.size(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
