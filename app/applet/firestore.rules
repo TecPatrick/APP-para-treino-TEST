@@ -1,0 +1,42 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return request.auth.uid == userId; }
+    function incoming() { return request.resource.data; }
+
+    function isValidDiet(data) {
+      return data.userId is string &&
+             data.date is timestamp &&
+             data.calories is number &&
+             data.protein is number &&
+             data.carbs is number &&
+             data.fat is number &&
+             data.description is string;
+    }
+
+    function isValidWorkout(data) {
+      return data.userId is string &&
+             data.date is timestamp &&
+             data.exerciseName is string &&
+             data.sets is number &&
+             data.reps is number &&
+             data.weight is number;
+    }
+
+    match /users/{userId} {
+      match /diets/{dietId} {
+        allow get, list: if isSignedIn() && isOwner(userId);
+        allow create: if isSignedIn() && isOwner(userId) && incoming().userId == userId && isValidDiet(incoming());
+        allow update: if isSignedIn() && isOwner(userId) && incoming().userId == userId && isValidDiet(incoming());
+        allow delete: if isSignedIn() && isOwner(userId);
+      }
+      match /workouts/{workoutId} {
+        allow get, list: if isSignedIn() && isOwner(userId);
+        allow create: if isSignedIn() && isOwner(userId) && incoming().userId == userId && isValidWorkout(incoming());
+        allow update: if isSignedIn() && isOwner(userId) && incoming().userId == userId && isValidWorkout(incoming());
+        allow delete: if isSignedIn() && isOwner(userId);
+      }
+    }
+  }
+}

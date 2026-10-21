@@ -1,0 +1,43 @@
+{
+  "entities": {
+    "Diet": {
+      "title": "Diet",
+      "description": "Daily diet log",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "calories": { "type": "number" },
+        "protein": { "type": "number" },
+        "carbs": { "type": "number" },
+        "fat": { "type": "number" },
+        "description": { "type": "string" }
+      },
+      "required": ["userId", "date"]
+    },
+    "Workout": {
+      "title": "Workout",
+      "description": "Daily workout log",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "exerciseName": { "type": "string" },
+        "sets": { "type": "number" },
+        "reps": { "type": "number" },
+        "weight": { "type": "number" }
+      },
+      "required": ["userId", "date", "exerciseName"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/diets/{dietId}": {
+      "schema": "Diet",
+      "description": "User diet records"
+    },
+    "/users/{userId}/workouts/{workoutId}": {
+      "schema": "Workout",
+      "description": "User workout records"
+    }
+  }
+}
