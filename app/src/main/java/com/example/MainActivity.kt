@@ -21,17 +21,17 @@ import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.ReceiptLong
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.ShoppingCart
-import androidx.compose.material.icons.outlined.TrendingUp
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -67,8 +67,8 @@ import com.example.ui.screens.profile.UserProfileScreen
 import com.example.ui.screens.receipts.ReceiptsInflationScreen
 import com.example.ui.screens.shopping.ShoppingListScreen
 import com.example.ui.screens.workout.WorkoutScreen
-import androidx.compose.material.icons.filled.DirectionsRun
-import androidx.compose.material.icons.outlined.DirectionsRun
+import androidx.compose.material.icons.automirrored.filled.DirectionsRun
+import androidx.compose.material.icons.automirrored.outlined.DirectionsRun
 import com.example.ui.screens.gps.GpsTrackerScreen
 import com.example.ui.theme.CarbonCard
 import com.example.ui.theme.CarbonDark
@@ -85,10 +85,10 @@ enum class AppNavigationScreen(
     DASHBOARD("Início", Icons.Filled.LocalFireDepartment, Icons.Outlined.LocalFireDepartment, "nav_dashboard"),
     DIET("Dieta", Icons.Filled.Restaurant, Icons.Outlined.Restaurant, "nav_diet"),
     WORKOUT("Treinos", Icons.Filled.FitnessCenter, Icons.Outlined.FitnessCenter, "nav_workout"),
-    GPS("Corrida", Icons.Filled.DirectionsRun, Icons.Outlined.DirectionsRun, "nav_running"),
+    GPS("Corrida", Icons.AutoMirrored.Filled.DirectionsRun, Icons.AutoMirrored.Outlined.DirectionsRun, "nav_running"),
     SHOPPING("Mercado", Icons.Filled.ShoppingCart, Icons.Outlined.ShoppingCart, "nav_shopping"),
-    RECEIPTS("Preços/NF", Icons.Filled.ReceiptLong, Icons.Outlined.ReceiptLong, "nav_receipts"),
-    ANALYTICS("Evolução", Icons.Filled.TrendingUp, Icons.Outlined.TrendingUp, "nav_analytics"),
+    RECEIPTS("Preços/NF", Icons.AutoMirrored.Filled.ReceiptLong, Icons.AutoMirrored.Outlined.ReceiptLong, "nav_receipts"),
+    ANALYTICS("Evolução", Icons.AutoMirrored.Filled.TrendingUp, Icons.AutoMirrored.Outlined.TrendingUp, "nav_analytics"),
     CALCULATOR("Macros", Icons.Filled.Calculate, Icons.Filled.Calculate, "nav_calculator"),
     PROFILE("Perfil", Icons.Filled.Person, Icons.Outlined.Person, "nav_profile"),
     AUTH("Conta", Icons.Filled.LocalFireDepartment, Icons.Outlined.LocalFireDepartment, "nav_auth")
