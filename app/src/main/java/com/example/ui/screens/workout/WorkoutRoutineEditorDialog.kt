@@ -634,7 +634,7 @@ fun MultiExerciseLibraryPickerModal(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(320.dp),
+                        .weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(filteredCatalog) { guide ->
