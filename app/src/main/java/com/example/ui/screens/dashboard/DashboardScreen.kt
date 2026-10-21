@@ -77,6 +77,8 @@ import com.example.data.model.MealPlanItem
 import com.example.data.model.MealType
 import com.example.ui.VirtusViewModel
 import com.example.ui.components.CircularCalorieGauge
+import com.example.ui.components.DailyHistoryHeader
+import com.example.ui.components.DailyHistorySummary
 import com.example.ui.components.GrowthHeader
 import com.example.ui.components.MacroProgressBar
 import com.example.ui.components.WeightProgressionChart
@@ -170,6 +172,61 @@ fun DashboardScreen(
                     }
                 }
             )
+        }
+
+        // --- Diário & Calendário ---
+        item {
+            val workoutLogs by viewModel.workoutLogs.collectAsStateWithLifecycle()
+            val cardioLogs by viewModel.allCardioLogs.collectAsStateWithLifecycle()
+            val gpsLogs by viewModel.allGpsRouteLogs.collectAsStateWithLifecycle()
+            val intakeHistory by viewModel.recentIntakeHistory.collectAsStateWithLifecycle()
+
+            val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US) }
+            fun sameSelectedDay(time: Long): Boolean = dateFormatter.format(Date(time)) == selectedDateKey
+            val selectedWorkouts = workoutLogs.filter { sameSelectedDay(it.dateMillis) }
+            val selectedCardio = cardioLogs.filter { sameSelectedDay(it.dateMillis) }
+            val selectedRuns = gpsLogs.filter { sameSelectedDay(it.dateMillis) }
+            val selectedIntake = intakeHistory.firstOrNull { it.dateString == selectedDateKey }
+            val selectedProgress = progressLogs.filter { sameSelectedDay(it.dateMillis) }.maxByOrNull { it.dateMillis }
+            val gymCalories = selectedWorkouts.sumOf {
+                (it.durationMinutes.coerceAtLeast(1) * (profile.weightKg * 0.08f)).toInt().coerceIn(80, 800)
+            }
+            val selectedExerciseCalories = gymCalories + selectedCardio.sumOf { it.caloriesBurned } +
+                selectedRuns.sumOf { it.caloriesBurned.toDouble() }.toInt()
+
+            val daysWithData = remember(foodRecords, workoutLogs, cardioLogs, gpsLogs, intakeHistory) {
+                buildSet {
+                    addAll(foodRecords.map { it.dateString })
+                    addAll(workoutLogs.map { dateFormatter.format(Date(it.dateMillis)) })
+                    addAll(cardioLogs.map { dateFormatter.format(Date(it.dateMillis)) })
+                    addAll(gpsLogs.map { dateFormatter.format(Date(it.dateMillis)) })
+                    addAll(intakeHistory.map { it.dateString })
+                }
+            }
+
+            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                DailyHistoryHeader(
+                    selectedDateMillis = selectedDateMillis,
+                    onDateSelected = viewModel::selectAppDate,
+                    daysWithData = daysWithData,
+                    summary = DailyHistorySummary(
+                        caloriesConsumed = consumedCalories.toInt(),
+                        targetCalories = profile.targetCalories,
+                        protein = consumedProtein.toInt(),
+                        proteinTarget = profile.targetProteinGrams,
+                        carbs = consumedCarbs.toInt(),
+                        carbsTarget = profile.targetCarbsGrams,
+                        fat = consumedFat.toInt(),
+                        fatTarget = profile.targetFatGrams,
+                        waterMl = selectedIntake?.waterDrankMl ?: 0,
+                        waterTargetMl = profile.targetWaterMl,
+                        workouts = selectedWorkouts.size,
+                        cardioSessions = selectedCardio.size + selectedRuns.size,
+                        exerciseCalories = selectedExerciseCalories,
+                        weightKg = selectedProgress?.weightKg
+                    )
+                )
+            }
         }
 
         // --- Core Dashboard Elements ---

@@ -291,30 +291,7 @@ fun DietScreen(
                         .padding(horizontal = 16.dp),
                     contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp)
                 ) {
-                    item {
-                        DailyHistoryHeader(
-                            selectedDateMillis = selectedDateMillis,
-                            onDateSelected = viewModel::selectAppDate,
-                            daysWithData = daysWithData,
-                            summary = DailyHistorySummary(
-                                caloriesConsumed = selectedFoods.sumOf { it.calories.toDouble() }.toInt(),
-                                targetCalories = profile.targetCalories,
-                                protein = selectedFoods.sumOf { it.protein.toDouble() }.toInt(),
-                                proteinTarget = profile.targetProteinGrams,
-                                carbs = selectedFoods.sumOf { it.carbs.toDouble() }.toInt(),
-                                carbsTarget = profile.targetCarbsGrams,
-                                fat = selectedFoods.sumOf { it.fat.toDouble() }.toInt(),
-                                fatTarget = profile.targetFatGrams,
-                                waterMl = selectedIntake?.waterDrankMl ?: 0,
-                                waterTargetMl = profile.targetWaterMl,
-                                workouts = selectedWorkouts.size,
-                                cardioSessions = selectedCardio.size + selectedRuns.size,
-                                exerciseCalories = selectedExerciseCalories,
-                                weightKg = selectedProgress?.weightKg
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                    }
+
                     // Gasto Calórico Diário & TMB Card (Regra: Parado = TMB; Treino soma gasto)
                     item {
                         Card(

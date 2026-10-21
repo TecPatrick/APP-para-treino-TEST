@@ -19,12 +19,24 @@ interface VoiceProvider {
     fun narrateMetrics(distanceMeters: Float, elapsedSeconds: Long, paceSecondsPerKm: Long)
     fun narrateMilestone(kmNumber: Int, elapsedSeconds: Long, paceSecondsPerKm: Long)
     fun narrateDistanceMilestone(distanceMeters: Float, elapsedSeconds: Long, paceSecondsPerKm: Long)
+    fun narratePaceAlert(currentPaceSecondsPerKm: Long, targetPaceSecondsPerKm: Long) {
+        speak(formatPaceAlertSpeech(currentPaceSecondsPerKm, targetPaceSecondsPerKm))
+    }
     fun formatDistanceSpeech(distanceMeters: Float): String
     fun formatTimeSpeech(elapsedSeconds: Long): String
     fun formatPaceSpeech(paceSecondsPerKm: Long): String
     fun formatFullWorkoutSpeech(distanceMeters: Float, elapsedSeconds: Long, paceSecondsPerKm: Long): String
     fun formatMilestoneSpeech(kmNumber: Int, elapsedSeconds: Long, paceSecondsPerKm: Long): String
     fun formatDistanceMilestoneSpeech(distanceMeters: Float, elapsedSeconds: Long, paceSecondsPerKm: Long): String
+    fun formatPaceAlertSpeech(currentPaceSecondsPerKm: Long, targetPaceSecondsPerKm: Long): String {
+        val curM = currentPaceSecondsPerKm / 60
+        val curS = currentPaceSecondsPerKm % 60
+        val tarM = targetPaceSecondsPerKm / 60
+        val tarS = targetPaceSecondsPerKm % 60
+        val curText = if (curS > 0) "$curM minutos e $curS segundos" else "$curM minutos"
+        val tarText = if (tarS > 0) "$tarM minutos e $tarS segundos" else "$tarM minutos"
+        return "Atenção: ritmo abaixo da meta. Ritmo atual: $curText por quilômetro, limite de $tarText. Acelere o passo!"
+    }
     fun stop()
     fun shutdown()
 }

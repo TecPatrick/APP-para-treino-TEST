@@ -91,12 +91,15 @@ data class ActiveWorkoutSession(
 data class ActiveGpsSession(
     val isRunning: Boolean = false,
     val isPaused: Boolean = false,
+    val isAutoPaused: Boolean = false,
     val elapsedSeconds: Int = 0,
     val distanceMeters: Float = 0f,
     val stepsCount: Int = 0,
     val caloriesBurned: Float = 0f,
     val currentSpeedKmh: Float = 0f,
     val paceSecondsPerKm: Long = 0L,
+    val targetPaceSecondsPerKm: Long = 0L,
+    val isPaceAlertEnabled: Boolean = false,
     val routePoints: List<Pair<Double, Double>> = emptyList()
 )
 
@@ -954,10 +957,20 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         initialLat: Double? = null,
         initialLng: Double? = null,
         voiceEnabled: Boolean = true,
-        narrationIntervalMeters: Float = 1000f
+        narrationIntervalMeters: Float = 1000f,
+        targetPaceSecondsPerKm: Long = 0L,
+        isPaceAlertEnabled: Boolean = false
     ) {
         if (_activeGpsSession.value.isRunning && !_activeGpsSession.value.isPaused) return
-        RunningForegroundService.start(getApplication(), initialLat, initialLng, voiceEnabled, narrationIntervalMeters)
+        RunningForegroundService.start(
+            getApplication(),
+            initialLat,
+            initialLng,
+            voiceEnabled,
+            narrationIntervalMeters,
+            targetPaceSecondsPerKm,
+            isPaceAlertEnabled
+        )
         _toastMessage.value = "Rastreamento de corrida iniciado!"
     }
 
@@ -1061,9 +1074,20 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         _toastMessage.value = "Sessão GPS cancelada."
     }
 
-    fun configureBackgroundRunningVoice(enabled: Boolean, intervalMeters: Float) {
+    fun configureBackgroundRunningVoice(
+        enabled: Boolean,
+        intervalMeters: Float,
+        targetPaceSecondsPerKm: Long = 0L,
+        isPaceAlertEnabled: Boolean = false
+    ) {
         if (_activeGpsSession.value.isRunning) {
-            RunningForegroundService.configureVoice(getApplication(), enabled, intervalMeters)
+            RunningForegroundService.configureVoice(
+                getApplication(),
+                enabled,
+                intervalMeters,
+                targetPaceSecondsPerKm,
+                isPaceAlertEnabled
+            )
         }
     }
 

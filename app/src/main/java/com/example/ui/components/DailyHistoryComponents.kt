@@ -1,4 +1,4 @@
-package com.example.ui.screens.diet
+package com.example.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -47,7 +47,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-internal data class DailyHistorySummary(
+data class DailyHistorySummary(
     val caloriesConsumed: Int,
     val targetCalories: Int,
     val protein: Int,
@@ -66,7 +66,7 @@ internal data class DailyHistorySummary(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun DailyHistoryHeader(
+fun DailyHistoryHeader(
     selectedDateMillis: Long,
     onDateSelected: (Long) -> Unit,
     daysWithData: Set<String>,

@@ -121,13 +121,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-enum class WorkoutDivisionFilter(val label: String, val splitType: WorkoutSplitType?, val expectedLetters: List<String>) {
-    ALL("Todas As Fichas", null, emptyList()),
-    AB("Divisão AB", WorkoutSplitType.AB, listOf("A", "B")),
-    ABC("Divisão ABC", WorkoutSplitType.ABC, listOf("A", "B", "C")),
-    ABCDE("Divisão ABCDE", WorkoutSplitType.ABCDE, listOf("A", "B", "C", "D", "E")),
-    CUSTOM("Personalizadas", WorkoutSplitType.CUSTOM, emptyList())
-}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,7 +138,7 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
         SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(it.dateMillis)) == selectedDateKey
     }
 
-    var selectedFilter by remember { mutableStateOf(WorkoutDivisionFilter.ALL) }
+
 
     // Screen State: null = Routine List Screen; non-null = Viewing/Executing specific Routine Detail Screen
     var viewingRoutineDetail by remember { mutableStateOf<WorkoutRoutine?>(null) }
@@ -356,57 +350,10 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
                 }
             }
 
-            // Division Filter Selector (Todas, AB, ABC, ABCDE, Personalizadas)
-            item {
-                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                    Text(
-                        text = "DIVISÕES DE TREINO",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        color = GrowthOrangeLight
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(WorkoutDivisionFilter.values()) { filter ->
-                            val isSelected = selectedFilter == filter
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { selectedFilter = filter },
-                                label = {
-                                    Text(
-                                        filter.label,
-                                        fontSize = 12.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = GrowthOrange,
-                                    selectedLabelColor = Color.White,
-                                    containerColor = CarbonCard,
-                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                ),
-                                border = FilterChipDefaults.filterChipBorder(
-                                    enabled = true,
-                                    selected = isSelected,
-                                    borderColor = CarbonBorder,
-                                    selectedBorderColor = GrowthOrange
-                                ),
-                                shape = RoundedCornerShape(20.dp)
-                            )
-                        }
-                    }
-                }
-            }
+            
+// ROUTINE CARDS / SLOTS LIST
 
-            // ROUTINE CARDS / SLOTS LIST
-            when (selectedFilter) {
-                WorkoutDivisionFilter.ALL -> {
                     item { Spacer(modifier = Modifier.height(8.dp)) }
-
                     if (allRoutines.isEmpty()) {
                         item {
                             EmptyWorkoutGroupCard(
@@ -450,121 +397,8 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
                             )
                         }
                     }
-                }
-
-                WorkoutDivisionFilter.AB, WorkoutDivisionFilter.ABC, WorkoutDivisionFilter.ABCDE -> {
-                    val expectedType = selectedFilter.splitType!!
-                    val expectedLetters = selectedFilter.expectedLetters
-                    val routinesForFilter = allRoutines.filter { it.splitType == expectedType }
-
-                    item {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "GRUPO ${selectedFilter.label.uppercase()}",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = GrowthCyan,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-                        )
-                    }
-
-                    expectedLetters.forEach { letter ->
-                        val existingForLetter = routinesForFilter.find { it.letter.equals(letter, ignoreCase = true) }
-                        if (existingForLetter != null) {
-                            item(key = "routine_${existingForLetter.id}") {
-                                val exercisesForRoutine = allExercises.filter { it.routineId == existingForLetter.id }
-                                RoutineCardItem(
-                                    routine = existingForLetter,
-                                    exerciseCount = exercisesForRoutine.size,
-                                    onOpenRoutine = { viewingRoutineDetail = existingForLetter },
-                                    onStartClick = {
-                                        viewModel.startActiveWorkout(existingForLetter, exercisesForRoutine)
-                                        viewingRoutineDetail = existingForLetter
-                                    },
-                                    onEditClick = {
-                                        routineToEdit = existingForLetter
-                                        showRoutineEditorDialog = true
-                                    },
-                                    onShareClick = {
-                                        val text = viewModel.formatRoutineForSharing(existingForLetter)
-                                        val sendIntent = Intent().apply {
-                                            action = Intent.ACTION_SEND
-                                            putExtra(Intent.EXTRA_TEXT, text)
-                                            type = "text/plain"
-                                        }
-                                        context.startActivity(Intent.createChooser(sendIntent, "Compartilhar Ficha"))
-                                    },
-                                    onDeleteClick = { routineToDelete = existingForLetter }
-                                )
-                            }
-                        } else {
-                            item(key = "empty_slot_$letter") {
-                                EmptySlotRoutineCard(
-                                    letter = letter,
-                                    divisionName = selectedFilter.label,
-                                    onCreateClick = {
-                                        routineToEdit = null
-                                        presetLetterForNewRoutine = letter
-                                        presetSplitForNewRoutine = expectedType
-                                        showRoutineEditorDialog = true
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                WorkoutDivisionFilter.CUSTOM -> {
-                    val customRoutines = allRoutines.filter { it.splitType == WorkoutSplitType.CUSTOM }
-                    if (customRoutines.isEmpty()) {
-                        item {
-                            EmptyWorkoutGroupCard(
-                                title = "Nenhum Treino Personalizado",
-                                subtitle = "Crie fichas customizadas de acordo com suas preferências.",
-                                onCreateClick = {
-                                    routineToEdit = null
-                                    presetLetterForNewRoutine = "A"
-                                    presetSplitForNewRoutine = WorkoutSplitType.CUSTOM
-                                    showRoutineEditorDialog = true
-                                }
-                            )
-                        }
-                    } else {
-                        items(customRoutines) { routine ->
-                            val exercisesForRoutine = allExercises.filter { it.routineId == routine.id }
-                            RoutineCardItem(
-                                routine = routine,
-                                exerciseCount = exercisesForRoutine.size,
-                                onOpenRoutine = { viewingRoutineDetail = routine },
-                                onStartClick = {
-                                    viewModel.startActiveWorkout(routine, exercisesForRoutine)
-                                    viewingRoutineDetail = routine
-                                },
-                                onEditClick = {
-                                    routineToEdit = routine
-                                    showRoutineEditorDialog = true
-                                },
-                                onShareClick = {
-                                    val text = viewModel.formatRoutineForSharing(routine)
-                                    val sendIntent = Intent().apply {
-                                        action = Intent.ACTION_SEND
-                                        putExtra(Intent.EXTRA_TEXT, text)
-                                        type = "text/plain"
-                                    }
-                                    context.startActivity(Intent.createChooser(sendIntent, "Compartilhar Ficha"))
-                                },
-                                onDeleteClick = { routineToDelete = routine }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // --- MODAL DIALOGS ---
-
-    // 1. Routine Editor Dialog
+}
+// 1. Routine Editor Dialog
     if (showRoutineEditorDialog) {
         WorkoutRoutineEditorDialog(
             existingRoutine = routineToEdit,
@@ -718,6 +552,4 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
             }
         )
     }
-}
-
-// --- SCREEN VIEW 2: DEDICATED ROUTINE DETAIL & EXERCISES EXECUTION VIEW ---
+}}

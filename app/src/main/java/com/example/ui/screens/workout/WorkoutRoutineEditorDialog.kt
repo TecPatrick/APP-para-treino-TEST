@@ -209,45 +209,15 @@ fun WorkoutRoutineEditorDialog(
                             border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
+                            Column(modifier = Modifier.padding(16.dp)) {
                                 Text("📋 Dados Gerais do Treino", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = GrowthOrange)
                                 Spacer(modifier = Modifier.height(10.dp))
 
-                                Text("Divisão do Treino:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = GrowthCyan)
-                                Spacer(modifier = Modifier.height(4.dp))
 
-                                LazyRow(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    items(WorkoutSplitType.values()) { st ->
-                                        FilterChip(
-                                            selected = (splitType == st),
-                                            onClick = { splitType = st },
-                                            label = {
-                                                Text(
-                                                    text = when (st) {
-                                                        WorkoutSplitType.AB -> "Modelo AB"
-                                                        WorkoutSplitType.ABC -> "Modelo ABC"
-                                                        WorkoutSplitType.ABCDE -> "Modelo ABCDE"
-                                                        WorkoutSplitType.CUSTOM -> "Livre / Customizado"
-                                                    },
-                                                    fontSize = 11.sp
-                                                )
-                                            },
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = GrowthOrange,
-                                                selectedLabelColor = Color.White
-                                            )
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(10.dp))
 
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
                                     OutlinedTextField(
                                         value = letter,

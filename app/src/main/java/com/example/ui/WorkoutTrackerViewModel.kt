@@ -33,6 +33,7 @@ import kotlin.math.sqrt
 data class ActiveWorkoutGpsState(
     val isRunning: Boolean = false,
     val isPaused: Boolean = false,
+    val isAutoPaused: Boolean = false,
     val elapsedSeconds: Long = 0L,
     val distanceMeters: Float = 0f,
     val caloriesBurned: Float = 0f,
@@ -40,6 +41,8 @@ data class ActiveWorkoutGpsState(
     val routePoints: List<Pair<Double, Double>> = emptyList(),
     val currentSpeedKmh: Float = 0f,
     val paceSecondsPerKm: Long = 0L,
+    val targetPaceSecondsPerKm: Long = 360L,
+    val isPaceAlertEnabled: Boolean = false,
     val formattedPace: String = "--'--\" /km",
     val isTtsEnabled: Boolean = true,
     val narrationIntervalMeters: Float = 1000f,
@@ -213,6 +216,27 @@ class WorkoutTrackerViewModel(application: Application) : AndroidViewModel(appli
             "${validInterval.toInt()} metros"
         }
         ttsService.speak("Intervalo de voz ajustado para a cada $intervalLabel.")
+    }
+
+    fun setTargetPaceSecondsPerKm(seconds: Long) {
+        val validPace = seconds.coerceIn(120L, 1200L)
+        _uiState.value = _uiState.value.copy(targetPaceSecondsPerKm = validPace)
+        val min = validPace / 60
+        val sec = validPace % 60
+        val secText = if (sec > 0) " e $sec segundos" else ""
+        ttsService.speak("Meta de ritmo ajustada para $min minutos$secText por quilômetro.")
+    }
+
+    fun setPaceAlertEnabled(enabled: Boolean) {
+        val changed = _uiState.value.isPaceAlertEnabled != enabled
+        _uiState.value = _uiState.value.copy(isPaceAlertEnabled = enabled)
+        if (enabled && changed) {
+            val pace = _uiState.value.targetPaceSecondsPerKm
+            val min = pace / 60
+            val sec = pace % 60
+            val secText = if (sec > 0) " e $sec segundos" else ""
+            ttsService.speak("Alerta de ritmo mínimo ativado. Meta: $min minutos$secText por quilômetro.")
+        }
     }
 
     /**

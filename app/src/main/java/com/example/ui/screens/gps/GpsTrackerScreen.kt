@@ -60,6 +60,8 @@ import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PauseCircle
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import com.example.ui.WorkoutTrackerViewModel
@@ -120,6 +122,8 @@ fun GpsTrackerScreen(
     val voiceState by workoutTrackerViewModel.uiState.collectAsStateWithLifecycle()
     val ttsIntervalMeters = voiceState.narrationIntervalMeters
     val isTtsVoiceCoachEnabled = voiceState.isTtsEnabled
+    val targetPaceSecondsPerKm = voiceState.targetPaceSecondsPerKm
+    val isPaceAlertEnabled = voiceState.isPaceAlertEnabled
     val lastSpokenMessage = voiceState.lastNarratedMessage
     var showFinishDialog by remember { mutableStateOf(false) }
     var routeNameInput by remember { mutableStateOf("Corrida ao Ar Livre") }
@@ -160,7 +164,9 @@ fun GpsTrackerScreen(
                         location.latitude,
                         location.longitude,
                         isTtsVoiceCoachEnabled,
-                        ttsIntervalMeters
+                        ttsIntervalMeters,
+                        targetPaceSecondsPerKm,
+                        isPaceAlertEnabled
                     )
                 }
                 .addOnFailureListener {
@@ -507,8 +513,18 @@ fun GpsTrackerScreen(
                         Spacer(modifier = Modifier.width(8.dp))
 
                         if (activeSession.isRunning) {
+                            val badgeBg = when {
+                                activeSession.isAutoPaused -> GrowthOrange.copy(alpha = 0.25f)
+                                activeSession.isPaused -> GrowthYellow.copy(alpha = 0.2f)
+                                else -> GrowthGreen.copy(alpha = 0.2f)
+                            }
+                            val badgeColor = when {
+                                activeSession.isAutoPaused -> GrowthOrangeLight
+                                activeSession.isPaused -> GrowthYellow
+                                else -> GrowthGreen
+                            }
                             Surface(
-                                color = if (activeSession.isPaused) GrowthYellow.copy(alpha = 0.2f) else GrowthGreen.copy(alpha = 0.2f),
+                                color = badgeBg,
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Row(
@@ -519,16 +535,20 @@ fun GpsTrackerScreen(
                                         modifier = Modifier
                                             .size(8.dp)
                                             .background(
-                                                if (activeSession.isPaused) GrowthYellow else GrowthGreen,
+                                                badgeColor,
                                                 CircleShape
                                             )
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = if (activeSession.isPaused) "PAUSADO" else "GRAVANDO",
+                                        text = when {
+                                            activeSession.isAutoPaused -> "PAUSA AUTOMÁTICA"
+                                            activeSession.isPaused -> "PAUSADO"
+                                            else -> "GRAVANDO"
+                                        },
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (activeSession.isPaused) GrowthYellow else GrowthGreen,
+                                        color = badgeColor,
                                         maxLines = 1
                                     )
                                 }
@@ -805,7 +825,12 @@ fun GpsTrackerScreen(
                                     checked = isTtsVoiceCoachEnabled,
                                     onCheckedChange = { enabled ->
                                         workoutTrackerViewModel.setTtsEnabled(enabled)
-                                        viewModel.configureBackgroundRunningVoice(enabled, ttsIntervalMeters)
+                                        viewModel.configureBackgroundRunningVoice(
+                                            enabled,
+                                            ttsIntervalMeters,
+                                            targetPaceSecondsPerKm,
+                                            isPaceAlertEnabled
+                                        )
                                     },
                                     colors = SwitchDefaults.colors(
                                         checkedThumbColor = Color.White,
@@ -888,7 +913,12 @@ fun GpsTrackerScreen(
                                                     .weight(1f)
                                                     .clickable {
                                                         workoutTrackerViewModel.setNarrationIntervalMeters(dist)
-                                                        viewModel.configureBackgroundRunningVoice(isTtsVoiceCoachEnabled, dist)
+                                                        viewModel.configureBackgroundRunningVoice(
+                                                            isTtsVoiceCoachEnabled,
+                                                            dist,
+                                                            targetPaceSecondsPerKm,
+                                                            isPaceAlertEnabled
+                                                        )
                                                     }
                                             ) {
                                                 Text(
@@ -897,6 +927,98 @@ fun GpsTrackerScreen(
                                                     fontWeight = if (ttsIntervalMeters == dist) FontWeight.Black else FontWeight.Normal,
                                                     color = if (ttsIntervalMeters == dist) Color.Black else Color.White,
                                                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 7.dp),
+                                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                                    maxLines = 1
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Alerta de Ritmo Mínimo",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                        Text(
+                                            text = "Avisa por voz quando o ritmo cair abaixo da meta",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Switch(
+                                        checked = isPaceAlertEnabled,
+                                        onCheckedChange = { enabled ->
+                                            workoutTrackerViewModel.setPaceAlertEnabled(enabled)
+                                            viewModel.configureBackgroundRunningVoice(
+                                                isTtsVoiceCoachEnabled,
+                                                ttsIntervalMeters,
+                                                targetPaceSecondsPerKm,
+                                                enabled
+                                            )
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = Color.White,
+                                            checkedTrackColor = GrowthGreen,
+                                            uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            uncheckedTrackColor = CarbonCard
+                                        ),
+                                        modifier = Modifier.testTag("pace_alert_toggle_switch")
+                                    )
+                                }
+
+                                if (isPaceAlertEnabled) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "Meta de ritmo (alerta se correr mais devagar):",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        listOf(
+                                            300L to "5:00",
+                                            330L to "5:30",
+                                            360L to "6:00",
+                                            390L to "6:30",
+                                            420L to "7:00"
+                                        ).forEach { (paceSec, label) ->
+                                            val isSelected = targetPaceSecondsPerKm == paceSec
+                                            Surface(
+                                                color = if (isSelected) GrowthGreen else CarbonCardElevated,
+                                                shape = RoundedCornerShape(6.dp),
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .clickable {
+                                                        workoutTrackerViewModel.setTargetPaceSecondsPerKm(paceSec)
+                                                        viewModel.configureBackgroundRunningVoice(
+                                                            isTtsVoiceCoachEnabled,
+                                                            ttsIntervalMeters,
+                                                            paceSec,
+                                                            isPaceAlertEnabled
+                                                        )
+                                                    }
+                                            ) {
+                                                Text(
+                                                    text = label,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Black else FontWeight.Normal,
+                                                    color = if (isSelected) Color.Black else Color.White,
+                                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 6.dp),
                                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                                     maxLines = 1
                                                 )

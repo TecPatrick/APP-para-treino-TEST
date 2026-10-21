@@ -220,4 +220,21 @@ class WorkoutTtsService(private val context: Context) : TextToSpeech.OnInitListe
 
         return "$distText completados! Tempo total: $timeText. $paceText."
     }
+
+    override fun narratePaceAlert(currentPaceSecondsPerKm: Long, targetPaceSecondsPerKm: Long) {
+        val speech = formatPaceAlertSpeech(currentPaceSecondsPerKm, targetPaceSecondsPerKm)
+        speak(speech)
+    }
+
+    override fun formatPaceAlertSpeech(currentPaceSecondsPerKm: Long, targetPaceSecondsPerKm: Long): String {
+        val curMinutes = currentPaceSecondsPerKm / 60
+        val curSeconds = currentPaceSecondsPerKm % 60
+        val tarMinutes = targetPaceSecondsPerKm / 60
+        val tarSeconds = targetPaceSecondsPerKm % 60
+
+        val curText = if (curSeconds > 0) "$curMinutes minutos e $curSeconds segundos" else "$curMinutes minutos"
+        val tarText = if (tarSeconds > 0) "$tarMinutes minutos e $tarSeconds segundos" else "$tarMinutes minutos"
+
+        return "Atenção: ritmo abaixo da meta. Seu ritmo atual é de $curText por quilômetro, abaixo do limite de $tarText. Acelere o passo!"
+    }
 }
