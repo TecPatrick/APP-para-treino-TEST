@@ -1768,6 +1768,18 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         )
     }
 
+    fun adjustRestTimer(secondsDelta: Int) {
+        val current = _activeWorkout.value
+        if (current.isRestTimerRunning) {
+            val newRemaining = (current.restTimerRemainingSeconds + secondsDelta).coerceAtLeast(0)
+            if (newRemaining == 0) {
+                cancelRestTimer()
+            } else {
+                _activeWorkout.value = current.copy(restTimerRemainingSeconds = newRemaining)
+            }
+        }
+    }
+
     fun finishActiveWorkout(perceivedExertion: Int, notes: String) {
         val current = _activeWorkout.value
         val routine = current.routine ?: return

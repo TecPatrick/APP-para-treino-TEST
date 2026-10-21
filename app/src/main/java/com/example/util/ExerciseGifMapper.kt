@@ -553,6 +553,289 @@ object ExerciseGifMapper {
             concentricPhase = "Empurre a barra para cima em linha vertical acima da cabeça.",
             eccentricPhase = "Desça a barra até a linha da clavícula sob controle.",
             postureTip = "Glúteos e abdômen contraídos para proteger a lombar."
+        ),
+
+        // === EXERCÍCIOS ADICIONAIS & ROTINAS DE ALONGAMENTO E MOBILIDADE (GYMVISUAL) ===
+        // Advanced Cables & Machines
+        ExerciseVisualGuide(
+            exerciseName = "Pullover na Polia Alta com Barra Reta",
+            muscleGroup = "Dorsal & Peitoral",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/cable-pullover/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Cable-Pullover.gif",
+            concentricPhase = "Puxe a barra em arco até tocar as coxas mantendo braços estendidos.",
+            eccentricPhase = "Retorne lentamente controlando o peso até a altura da cabeça.",
+            postureTip = "Incline ligeiramente o tronco à frente e contraia o abdômen."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Remada Alta na Polia",
+            muscleGroup = "Trapézio & Deltoides",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/cable-upright-row/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Cable-Upright-Row.gif",
+            concentricPhase = "Puxe a barra verticalmente até a altura do peito alto.",
+            eccentricPhase = "Desça a carga de forma controlada.",
+            postureTip = "Mantenha os cotovelos sempre acima da linha das mãos."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Crossover Baixo para Peitoral Superior",
+            muscleGroup = "Peitoral Superior",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/low-cable-crossover/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Low-Cable-Crossover.gif",
+            concentricPhase = "Puxe os cabos de baixo para cima cruzando em direção ao queixo.",
+            eccentricPhase = "Abra os braços alongando o peitoral superior.",
+            postureTip = "Postura firme com um pé à frente para estabilidade."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Tríceps Testa na Polia com Corda",
+            muscleGroup = "Tríceps",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/cable-overhead-triceps-extension/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Cable-Overhead-Triceps-Extension.gif",
+            concentricPhase = "Estenda os braços para frente/cima focando na cabeça longa.",
+            eccentricPhase = "Flexione os cotovelos controlando o estiramento.",
+            postureTip = "Mantenha os cotovelos fixos ao lado da cabeça."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Rosca Concentrada no Banco Scott",
+            muscleGroup = "Bíceps",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/preacher-curl/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Preacher-Curl.gif",
+            concentricPhase = "Flexione o braço contraindo o bíceps no topo.",
+            eccentricPhase = "Desça com controle total.",
+            postureTip = "Apoio total do tríceps no banco inclinado."
+        ),
+
+        // Free Weights & Dumbbells
+        ExerciseVisualGuide(
+            exerciseName = "Supino Reto com Halteres",
+            muscleGroup = "Peitoral Maior",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/dumbbell-bench-press/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Bench-Press.gif",
+            concentricPhase = "Empurre os halteres para cima unindo levemente no topo.",
+            eccentricPhase = "Desça os halteres alongando o peitoral.",
+            postureTip = "Amplitude superior ao supino com barra."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Agachamento Búlgaro com Halteres",
+            muscleGroup = "Quadríceps & Glúteos",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/bulgarian-split-squat/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Bulgarian-Split-Squat.gif",
+            concentricPhase = "Empurre o chão com a perna da frente para subir.",
+            eccentricPhase = "Flexione o joelho da frente descendo o quadril na vertical.",
+            postureTip = "Pé de trás apoiado no banco com estabilidade."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Desenvolvimento Arnold com Halteres",
+            muscleGroup = "Deltoides (Todas as Cabeças)",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/arnold-press/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Arnold-Press.gif",
+            concentricPhase = "Gire os halteres para fora enquanto empurra para cima.",
+            eccentricPhase = "Retorne girando os punhos à posição inicial na altura do peito.",
+            postureTip = "Execução controlada sem pressa na rotação."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "RDL com Halteres",
+            muscleGroup = "Posteriores & Glúteos",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/dumbbell-romanian-deadlift/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Dumbbell-Romanian-Deadlift.gif",
+            concentricPhase = "Estenda o quadril contraindo glúteos e posteriores para subir.",
+            eccentricPhase = "Desça os halteres rente às pernas com quadril para trás.",
+            postureTip = "Mantenha a coluna neutra e joelhos semiflexionados."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Elevação Lateral no Cabo",
+            muscleGroup = "Deltoide Lateral",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/cable-lateral-raise/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Cable-Lateral-Raise.gif",
+            concentricPhase = "Eleve o cabo lateralmente até a altura do ombro.",
+            eccentricPhase = "Desça controlando a tensão contínua do cabo.",
+            postureTip = "Tensão constante em todo o arco de movimento."
+        ),
+
+        // Stretching - Upper (5)
+        ExerciseVisualGuide(
+            exerciseName = "Alongamento de Peitoral na Porta",
+            muscleGroup = "Alongamento • Peitoral",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/chest-stretch/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Chest-Stretch.gif",
+            concentricPhase = "Mantenha a posição estática respirando fundo.",
+            eccentricPhase = "Relaxe gradualmente após 30 segundos.",
+            postureTip = "Apoie o antebraço no batente e gire o tronco para fora."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Alongamento de Dorsal na Grade",
+            muscleGroup = "Alongamento • Costas",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/lat-stretch/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Lat-Stretch.gif",
+            concentricPhase = "Segure uma barra fixa e projete o quadril para trás.",
+            eccentricPhase = "Retorne com cuidado.",
+            postureTip = "Sinta o alongamento profundo ao longo da lateral do tronco."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Alongamento de Tríceps por Trás da Cabeça",
+            muscleGroup = "Alongamento • Tríceps",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/triceps-stretch/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Triceps-Stretch.gif",
+            concentricPhase = "Puxe o cotovelo suavemente para baixo e para dentro.",
+            eccentricPhase = "Relaxe após 20-30 segundos.",
+            postureTip = "Mantenha a coluna reta sem inclinar o tronco."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Alongamento de Bíceps em Extensão",
+            muscleGroup = "Alongamento • Bíceps",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/biceps-stretch/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Biceps-Stretch.gif",
+            concentricPhase = "Apoie a mão estendida na parede com dedos para trás.",
+            eccentricPhase = "Afaste o tronco lentamente.",
+            postureTip = "Evite dor aguda; foque no alívio tensional."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Alongamento de Antebraço e Punho",
+            muscleGroup = "Alongamento • Antebraço",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/forearm-stretch/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Forearm-Stretch.gif",
+            concentricPhase = "Puxe os dedos para trás com o braço estendido.",
+            eccentricPhase = "Inverta a posição para flexores e extensores.",
+            postureTip = "Essencial para prevenir tendinite e fadiga de pegada."
+        ),
+
+        // Stretching - Lower (5)
+        ExerciseVisualGuide(
+            exerciseName = "Alongamento de Isquiotibiais Sentido",
+            muscleGroup = "Alongamento • Posteriores",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/hamstring-stretch/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Hamstring-Stretch.gif",
+            concentricPhase = "Incline o tronco à frente a partir do quadril.",
+            eccentricPhase = "Respire mantendo a coluna ereta.",
+            postureTip = "Não force curvando excessivamente a coluna lombar."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Alongamento de Quadríceps em Pé",
+            muscleGroup = "Alongamento • Quadríceps",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/quad-stretch/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Quadriceps-Stretch.gif",
+            concentricPhase = "Segure o tornozelo aproximando o calcanhar do glúteo.",
+            eccentricPhase = "Troque de perna após 30 segundos.",
+            postureTip = "Mantenha os joelhos alinhados lado a lado."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Alongamento de Glúteo no Solo",
+            muscleGroup = "Alongamento • Glúteos",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/glute-stretch/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Glute-Stretch.gif",
+            concentricPhase = "Cruze a perna sobre a coxa oposta em formato de 4.",
+            eccentricPhase = "Aproxime a perna de apoio do peito.",
+            postureTip = "Excelente para alívio de tensão no nervo ciático e glúteo."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Alongamento de Adutores (Borboleta)",
+            muscleGroup = "Alongamento • Adutores",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/adductor-stretch/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Butterfly-Stretch.gif",
+            concentricPhase = "Una as solas dos pés e deixe os joelhos caírem para os lados.",
+            eccentricPhase = "Pressione levemente com os cotovelos se necessário.",
+            postureTip = "Mantenha a coluna erguida."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Alongamento de Panturrilha na Parede",
+            muscleGroup = "Alongamento • Panturrilha",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/calf-stretch/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Calf-Stretch.gif",
+            concentricPhase = "Apoie as mãos na parede e estenda a perna de trás com calcanhar no chão.",
+            eccentricPhase = "Mantenha o calcanhar apoiado firmemente.",
+            postureTip = "Flexione levemente o joelho de trás para atingir o sóleo."
+        ),
+
+        // Mobility - Upper (5)
+        ExerciseVisualGuide(
+            exerciseName = "Mobilidade de Ombros com Bastão",
+            muscleGroup = "Mobilidade • Ombros",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/shoulder-dislocate/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Shoulder-Dislocate.gif",
+            concentricPhase = "Leve o bastão da frente para trás com braços esticados.",
+            eccentricPhase = "Retorne à frente suavemente.",
+            postureTip = "Abra bem a pegada para evitar desconforto articular."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Rotação Torácica em Quatro Apoios",
+            muscleGroup = "Mobilidade • Torácica",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/thoracic-rotation/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Thoracic-Rotation.gif",
+            concentricPhase = "Gire o tronco elevando o cotovelo em direção ao teto.",
+            eccentricPhase = "Retorne passando o braço por baixo do corpo.",
+            postureTip = "Foque o movimento na coluna torácica, não na lombar."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Círculos com os Braços Dinâmicos",
+            muscleGroup = "Mobilidade • Articulação Glenoumeral",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/arm-circles/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Arm-Circles.gif",
+            concentricPhase = "Realize círculos amplos com os braços estendidos.",
+            eccentricPhase = "Inverta o sentido após 10 repetições.",
+            postureTip = "Excelente aquecimento articular antes de treinos de superiores."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Mobilidade Escapular na Parede",
+            muscleGroup = "Mobilidade • Escápulas",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/wall-slides/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Wall-Slides.gif",
+            concentricPhase = "Deslize os braços para cima mantendo costas coladas na parede.",
+            eccentricPhase = "Retorne os cotovelos à altura dos ombros.",
+            postureTip = "Ativa serrátil e estabilizadores escapulares."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Mobilidade de Punhos e Cotovelos",
+            muscleGroup = "Mobilidade • Punhos",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/wrist-mobility/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Wrist-Circles.gif",
+            concentricPhase = "Gire os punhos em rotação completa.",
+            eccentricPhase = "Inverta o sentido do giro.",
+            postureTip = "Fundamental antes de supino e rosca direta pesada."
+        ),
+
+        // Mobility - Lower (5)
+        ExerciseVisualGuide(
+            exerciseName = "Mobilidade de Quadril 90/90",
+            muscleGroup = "Mobilidade • Quadril",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/90-90-hip-stretch/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/90-90-Hip-Stretch.gif",
+            concentricPhase = "Alterne as pernas em 90 graus no solo abrindo o quadril.",
+            eccentricPhase = "Mantenha o tronco ereto durante a transição.",
+            postureTip = "Melhora a rotação interna e externa do quadril."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Agachamento Profundo com Torção Torácica",
+            muscleGroup = "Mobilidade • Tornozelo & Quadril",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/deep-squat-rotation/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Deep-Squat-Rotation.gif",
+            concentricPhase = "Agache fundo empurrando os joelhos com os cotovelos e torça o tronco.",
+            eccentricPhase = "Alterne os lados mantendo calcanhares no chão.",
+            postureTip = "Excelente para preparar para o agachamento livre."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Mobilidade de Tornozelo na Parede",
+            muscleGroup = "Mobilidade • Tornozelos",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/ankle-mobility/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Ankle-Mobility.gif",
+            concentricPhase = "Toque o joelho na parede sem tirar o calcanhar do chão.",
+            eccentricPhase = "Recue o pé gradualmente.",
+            postureTip = "Aumenta a dorsiflexão para agachamentos perfeitos."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Gato-Vaca para Coluna",
+            muscleGroup = "Mobilidade • Coluna Vertebral",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/cat-cow/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Cat-Cow.gif",
+            concentricPhase = "Arqueie a coluna para cima expirando (gato).",
+            eccentricPhase = "Abaixe o abdômen e olhe para cima inspirando (vaca).",
+            postureTip = "Movimento fluido e sem pressa."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Rotação Externa de Quadril em Decúbito Dorsal",
+            muscleGroup = "Mobilidade • Glúteos & Lombar",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/supine-hip-rotation/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Supine-Hip-Rotation.gif",
+            concentricPhase = "Deitado, deixe os joelhos caírem para os lados alternadamente.",
+            eccentricPhase = "Retorne ao centro com controle.",
+            postureTip = "Alivia tensões lombares pós-treino de pernas."
         )
     )
 

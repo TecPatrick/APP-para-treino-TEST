@@ -155,6 +155,7 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
     var showSingleExerciseAddDialog by remember { mutableStateOf(false) }
     var showFinishWorkoutDialog by remember { mutableStateOf(false) }
     var showHistoryDialog by remember { mutableStateOf(false) }
+    var showExerciseProgressionModal by remember { mutableStateOf(false) }
 
     val gifImageLoader = remember(context) {
         ImageLoader.Builder(context)
@@ -197,7 +198,8 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
             },
             onOpenGuide = { guide -> selectedExerciseGuide = guide },
             onSubstituteExercise = { exercise -> exerciseToSubstitute = exercise },
-            onAddExerciseClick = { showSingleExerciseAddDialog = true }
+            onAddExerciseClick = { showSingleExerciseAddDialog = true },
+            onAdjustRest = { delta -> viewModel.adjustRestTimer(delta) }
         )
     } else {
         // --- VIEW 1: FICHAS DE TREINO LIST & DIVISIONS ---
@@ -347,6 +349,16 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
                     ) {
                         Text("Histórico", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
+
+                    OutlinedButton(
+                        onClick = { showExerciseProgressionModal = true },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = GrowthOrange),
+                        border = BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("📈 Gráfico de Carga por Exercício", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
                 }
             }
 
@@ -485,6 +497,15 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
             workoutLogs = selectedWorkoutLogs,
             onDismiss = { showHistoryDialog = false },
             onDeleteLog = { viewModel.deleteWorkoutLog(it) }
+        )
+    }
+
+    // Exercise Progression Chart Modal
+    if (showExerciseProgressionModal) {
+        ExerciseProgressionModal(
+            exercises = allExercises,
+            workoutLogs = workoutLogs,
+            onDismiss = { showExerciseProgressionModal = false }
         )
     }
 

@@ -135,7 +135,8 @@ fun RoutineDetailView(
     onUpdateWeight: (exercise: WorkoutExercise, newWeight: Float) -> Unit,
     onOpenGuide: (ExerciseVisualGuide) -> Unit,
     onSubstituteExercise: (WorkoutExercise) -> Unit,
-    onAddExerciseClick: () -> Unit
+    onAddExerciseClick: () -> Unit,
+    onAdjustRest: (Int) -> Unit
 ) {
     val isSessionRunningForThisRoutine = activeWorkout.isRunning && activeWorkout.routine?.id == routine.id
 
@@ -233,16 +234,42 @@ fun RoutineDetailView(
                                 shape = RoundedCornerShape(8.dp),
                                 border = BorderStroke(1.dp, GrowthOrange)
                             ) {
-                                Row(
+                                Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .padding(10.dp)
                                 ) {
-                                    Text("⏸️ Descanso: ${activeWorkout.restTimerRemainingSeconds}s", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = GrowthOrange)
-                                    TextButton(onClick = onSkipRest) {
-                                        Text("Pular Descanso", fontSize = 11.sp, color = GrowthOrangeLight, fontWeight = FontWeight.Bold)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text("⏸️ Descanso: ${activeWorkout.restTimerRemainingSeconds}s", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = GrowthOrange)
+                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            OutlinedButton(
+                                                onClick = { onAdjustRest(-15) },
+                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                modifier = Modifier.height(28.dp)
+                                            ) {
+                                                Text("-15s", fontSize = 10.sp, color = GrowthOrange)
+                                            }
+                                            OutlinedButton(
+                                                onClick = { onAdjustRest(15) },
+                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                modifier = Modifier.height(28.dp)
+                                            ) {
+                                                Text("+15s", fontSize = 10.sp, color = GrowthOrange)
+                                            }
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.End
+                                    ) {
+                                        TextButton(onClick = onSkipRest) {
+                                            Text("Pular Descanso", fontSize = 11.sp, color = GrowthOrangeLight, fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }
