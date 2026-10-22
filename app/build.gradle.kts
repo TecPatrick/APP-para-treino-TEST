@@ -1,4 +1,5 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import com.google.firebase.appdistribution.gradle.firebaseAppDistribution
 
 plugins {
   alias(libs.plugins.android.application)
@@ -6,6 +7,7 @@ plugins {
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.secrets)
   alias(libs.plugins.google.services)
+  alias(libs.plugins.firebase.appdistribution)
   kotlin("plugin.serialization") version "2.0.20"
 }
 
@@ -47,8 +49,32 @@ android {
       isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
+      firebaseAppDistribution {
+        appId = "1:204365877775:android:f77650214127790642497a"
+        artifactType = "APK"
+        groups = "alpha"
+        releaseNotes = System.getenv("FIREBASE_RELEASE_NOTES") ?: "Virtus Growth - Release Alpha"
+        val credentialsPath = System.getenv("FIREBASE_APP_DISTRIBUTION_CREDENTIALS")
+          ?: System.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        if (!credentialsPath.isNullOrEmpty()) {
+          serviceCredentialsFile = credentialsPath
+        }
+      }
     }
-    debug { signingConfig = signingConfigs.getByName("debugConfig") }
+    debug {
+      signingConfig = signingConfigs.getByName("debugConfig")
+      firebaseAppDistribution {
+        appId = "1:204365877775:android:f77650214127790642497a"
+        artifactType = "APK"
+        groups = "alpha"
+        releaseNotes = System.getenv("FIREBASE_RELEASE_NOTES") ?: "Virtus Growth - Debug Alpha"
+        val credentialsPath = System.getenv("FIREBASE_APP_DISTRIBUTION_CREDENTIALS")
+          ?: System.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        if (!credentialsPath.isNullOrEmpty()) {
+          serviceCredentialsFile = credentialsPath
+        }
+      }
+    }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -117,7 +143,7 @@ dependencies {
   implementation(libs.googleid)
   implementation(libs.androidx.biometric)
   implementation("com.google.firebase:firebase-appcheck-playintegrity")
-  debugImplementation(libs.firebase.appcheck.debug)
+  implementation(libs.firebase.appcheck.debug)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.logging.interceptor)
@@ -147,3 +173,18 @@ dependencies {
 
 // Keep schemas under version control so future migrations can be reviewed.
 ksp { arg("room.schemaLocation", "$projectDir/schemas") }
+
+// =============================================================================
+// 🚀 Firebase App Distribution Tasks & CI/CD Helpers
+// =============================================================================
+tasks.register("distributeAlpha") {
+  group = "distribution"
+  description = "Builds and uploads the Release APK to Firebase App Distribution for the Alpha test group"
+  dependsOn("appDistributionUploadRelease")
+}
+
+tasks.register("distributeAlphaDebug") {
+  group = "distribution"
+  description = "Builds and uploads the Debug APK to Firebase App Distribution for the Alpha test group"
+  dependsOn("appDistributionUploadDebug")
+}

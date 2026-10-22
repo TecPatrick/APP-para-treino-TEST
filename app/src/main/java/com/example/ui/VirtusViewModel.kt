@@ -294,6 +294,12 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
             initialValue = emptyList()
         )
 
+    private val _isFirestoreSyncing = MutableStateFlow(false)
+    val isFirestoreSyncing: StateFlow<Boolean> = _isFirestoreSyncing.asStateFlow()
+
+    private val _cloudWorkoutLogs = MutableStateFlow<List<WorkoutLog>>(emptyList())
+    val cloudWorkoutLogs: StateFlow<List<WorkoutLog>> = _cloudWorkoutLogs.asStateFlow()
+
     val totalWorkoutVolume: StateFlow<Float> = repository.totalWorkoutVolume
         .map { it ?: 0f }
         .stateIn(
@@ -1476,6 +1482,94 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
             repository.updateWorkoutExercise(
                 exercise.copy(currentWeightKg = newWeight, sets = sets)
             )
+        }
+    }
+
+    fun recordExerciseProgression(
+        exercise: WorkoutExercise,
+        newWeightKg: Float,
+        sets: Int,
+        reps: Int,
+        notes: String = ""
+    ) {
+        viewModelScope.launch {
+            repository.updateWorkoutExercise(
+                exercise.copy(currentWeightKg = newWeightKg, sets = sets, repsMin = reps, repsMax = reps)
+            )
+            val now = System.currentTimeMillis()
+            val volume = sets * reps * newWeightKg
+            val logId = repository.logCompletedWorkout(
+                routineId = exercise.routineId,
+                routineName = "Treino - Progressão de ${exercise.exerciseName}",
+                durationMinutes = 45,
+                totalVolumeKg = volume,
+                totalSetsCompleted = sets,
+                perceivedExertion = 8,
+                notes = if (notes.isNotBlank()) notes else "Carga registrada: ${newWeightKg}kg ($sets x $reps)",
+                dateMillis = now
+            )
+            val wLog = WorkoutLog(
+                id = logId,
+                routineId = exercise.routineId,
+                routineName = "Treino - Progressão de ${exercise.exerciseName}",
+                dateMillis = now,
+                durationMinutes = 45,
+                totalVolumeKg = volume,
+                totalSetsCompleted = sets,
+                perceivedExertion = 8,
+                notes = if (notes.isNotBlank()) notes else "Carga registrada: ${newWeightKg}kg ($sets x $reps)"
+            )
+            firestoreSync.syncWorkoutLogToCloud(wLog, userProfile.value.firebaseUid)
+            _toastMessage.value = "Carga de ${exercise.exerciseName} atualizada para ${newWeightKg} kg!"
+        }
+    }
+
+    fun refreshWorkoutLogsFromFirestore() {
+        viewModelScope.launch {
+            _isFirestoreSyncing.value = true
+            try {
+                val res = firestoreSync.fetchWorkoutLogsFromCloud(userProfile.value.firebaseUid)
+                res.onSuccess { list ->
+                    _cloudWorkoutLogs.value = list
+                    _toastMessage.value = "${list.size} treinos históricos carregados do Firestore (App Check verificado)."
+                }.onFailure { err ->
+                    android.util.Log.w("VirtusViewModel", "Erro ao carregar treinos do Firestore: ${err.message}")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("VirtusViewModel", "Exceção ao buscar treinos do Firestore", e)
+            } finally {
+                _isFirestoreSyncing.value = false
+            }
+        }
+    }
+
+    fun shareExerciseProgression(
+        context: android.content.Context,
+        exerciseName: String,
+        currentWeight: Float,
+        prWeight: Float,
+        delta: Float,
+        oneRepMax: Float
+    ) {
+        try {
+            val text = """
+                💪 Progressão de Carga - Virtus Growth
+                🏋️ Exercício: $exerciseName
+                🔥 Carga Atual: ${currentWeight} kg
+                🏆 Recorde Pessoal (PR): ${prWeight} kg
+                📈 Evolução: ${if (delta >= 0) "+$delta" else "$delta"} kg
+                ⚡ 1RM Estimado: ${oneRepMax.toInt()} kg
+            """.trimIndent()
+            val sendIntent = android.content.Intent().apply {
+                action = android.content.Intent.ACTION_SEND
+                putExtra(android.content.Intent.EXTRA_TEXT, text)
+                type = "text/plain"
+            }
+            val shareIntent = android.content.Intent.createChooser(sendIntent, "Compartilhar Progressão de Carga")
+            shareIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(shareIntent)
+        } catch (e: Exception) {
+            android.util.Log.e("VirtusViewModel", "Error sharing progression", e)
         }
     }
 

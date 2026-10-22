@@ -67,6 +67,7 @@ import com.example.ui.screens.profile.UserProfileScreen
 import com.example.ui.screens.receipts.ReceiptsInflationScreen
 import com.example.ui.screens.shopping.ShoppingListScreen
 import com.example.ui.screens.workout.WorkoutScreen
+import com.example.ui.screens.workout.ExerciseProgressionScreen
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.automirrored.outlined.DirectionsRun
 import com.example.ui.screens.gps.GpsTrackerScreen
@@ -89,6 +90,7 @@ enum class AppNavigationScreen(
     SHOPPING("Mercado", Icons.Filled.ShoppingCart, Icons.Outlined.ShoppingCart, "nav_shopping"),
     RECEIPTS("Preços/NF", Icons.AutoMirrored.Filled.ReceiptLong, Icons.AutoMirrored.Outlined.ReceiptLong, "nav_receipts"),
     ANALYTICS("Evolução", Icons.AutoMirrored.Filled.TrendingUp, Icons.AutoMirrored.Outlined.TrendingUp, "nav_analytics"),
+    EXERCISE_PROGRESSION("Cargas", Icons.AutoMirrored.Filled.TrendingUp, Icons.AutoMirrored.Outlined.TrendingUp, "nav_exercise_progression"),
     CALCULATOR("Macros", Icons.Filled.Calculate, Icons.Filled.Calculate, "nav_calculator"),
     PROFILE("Perfil", Icons.Filled.Person, Icons.Outlined.Person, "nav_profile"),
     AUTH("Conta", Icons.Filled.LocalFireDepartment, Icons.Outlined.LocalFireDepartment, "nav_auth")
@@ -144,7 +146,10 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
         }
     }
 
-    val showBottomBar = currentScreen != AppNavigationScreen.CALCULATOR && currentScreen != AppNavigationScreen.AUTH && currentScreen != AppNavigationScreen.PROFILE
+    val showBottomBar = currentScreen != AppNavigationScreen.CALCULATOR &&
+            currentScreen != AppNavigationScreen.AUTH &&
+            currentScreen != AppNavigationScreen.PROFILE &&
+            currentScreen != AppNavigationScreen.EXERCISE_PROGRESSION
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -234,7 +239,8 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
                         onNavigateToShopping = { currentScreen = AppNavigationScreen.SHOPPING }
                     )
                     AppNavigationScreen.WORKOUT -> WorkoutScreen(
-                        viewModel = viewModel
+                        viewModel = viewModel,
+                        onNavigateToProgression = { currentScreen = AppNavigationScreen.EXERCISE_PROGRESSION }
                     )
                     AppNavigationScreen.GPS -> GpsTrackerScreen(
                         viewModel = viewModel,
@@ -249,7 +255,12 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
                         onNavigateBack = { currentScreen = AppNavigationScreen.DASHBOARD }
                     )
                     AppNavigationScreen.ANALYTICS -> AnalyticsScreen(
-                        viewModel = viewModel
+                        viewModel = viewModel,
+                        onNavigateToProgression = { currentScreen = AppNavigationScreen.EXERCISE_PROGRESSION }
+                    )
+                    AppNavigationScreen.EXERCISE_PROGRESSION -> ExerciseProgressionScreen(
+                        viewModel = viewModel,
+                        onNavigateBack = { currentScreen = AppNavigationScreen.WORKOUT }
                     )
                     AppNavigationScreen.CALCULATOR -> MacroCalculatorScreen(
                         viewModel = viewModel,

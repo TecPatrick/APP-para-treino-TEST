@@ -1,0 +1,55 @@
+name: Firebase App Distribution (Alpha)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: 'Notas da Versão Alpha'
+        required: false
+        default: 'Build Alpha disparada manualmente via GitHub Actions'
+      build_type:
+        description: 'Tipo de Build (release ou debug)'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
+
+jobs:
+  distribute:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Enviar Build para Grupo Alpha no Firebase App Distribution
+        env:
+          FIREBASE_APP_DISTRIBUTION_CREDENTIALS: ${{ secrets.FIREBASE_APP_DISTRIBUTION_CREDENTIALS }}
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          FIREBASE_RELEASE_NOTES: ${{ inputs.release_notes || 'Nova versão Alpha compilada via CI/CD' }}
+        run: |
+          if [ "${{ inputs.build_type }}" = "debug" ]; then
+            gradle :app:distributeAlphaDebug
+          else
+            gradle :app:distributeAlpha
+          fi

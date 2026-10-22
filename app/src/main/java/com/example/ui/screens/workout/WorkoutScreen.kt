@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -125,7 +126,10 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WorkoutScreen(viewModel: VirtusViewModel) {
+fun WorkoutScreen(
+    viewModel: VirtusViewModel,
+    onNavigateToProgression: () -> Unit = {}
+) {
     val context = LocalContext.current
     val allRoutines by viewModel.workoutRoutines.collectAsStateWithLifecycle()
     val allExercises by viewModel.allExercises.collectAsStateWithLifecycle()
@@ -351,13 +355,22 @@ fun WorkoutScreen(viewModel: VirtusViewModel) {
                     }
 
                     OutlinedButton(
-                        onClick = { showExerciseProgressionModal = true },
+                        onClick = onNavigateToProgression,
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = GrowthOrange),
                         border = BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.5f)),
                         shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("workout_progression_chart_btn")
                     ) {
-                        Text("📈 Gráfico de Carga por Exercício", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Icon(
+                            imageVector = Icons.Default.TrendingUp,
+                            contentDescription = null,
+                            tint = GrowthOrange,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Visualizar Progressão de Carga dos Exercícios", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
             }

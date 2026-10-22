@@ -3,9 +3,13 @@ package com.example
 import android.util.Log
 import com.google.firebase.Firebase
 import com.google.firebase.appcheck.appCheck
-import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
 import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
+import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
 
+/**
+ * Utilitário auxiliar para configuração do Firebase App Check
+ * com estratégia de Play Integrity em produção e Debug em desenvolvimento.
+ */
 object AppCheckInitializer {
     private const val TAG = "AppCheckInitializer"
 
@@ -18,9 +22,10 @@ object AppCheckInitializer {
                 PlayIntegrityAppCheckProviderFactory.getInstance()
             }
             firebaseAppCheck.installAppCheckProviderFactory(providerFactory)
-            Log.d(TAG, "Firebase App Check initialized successfully with ${if (BuildConfig.DEBUG) "Debug" else "Play Integrity"} provider.")
+            firebaseAppCheck.setTokenAutoRefreshEnabled(true)
+            Log.i(TAG, "Firebase App Check configurado com sucesso [${if (BuildConfig.DEBUG) "DebugProvider" else "PlayIntegrity"}].")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to initialize Firebase App Check", e)
+            Log.e(TAG, "Falha ao configurar Firebase App Check", e)
         }
     }
 }

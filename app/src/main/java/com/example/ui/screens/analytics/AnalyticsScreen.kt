@@ -85,6 +85,10 @@ import com.example.ui.theme.GrowthOrange
 import com.example.ui.theme.GrowthOrangeLight
 import com.example.ui.theme.GrowthRed
 import com.example.ui.theme.GrowthYellow
+import com.example.ui.screens.workout.ExerciseProgressionContent
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.material.icons.filled.Person
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -105,7 +109,10 @@ private data class ActivityHistoryBucket(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AnalyticsScreen(viewModel: VirtusViewModel) {
+fun AnalyticsScreen(
+    viewModel: VirtusViewModel,
+    onNavigateToProgression: () -> Unit = {}
+) {
     val context = LocalContext.current
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
     val progressLogs by viewModel.progressLogs.collectAsStateWithLifecycle()
@@ -176,7 +183,83 @@ fun AnalyticsScreen(viewModel: VirtusViewModel) {
                 }
             )
 
-            LazyColumn(
+            var selectedAnalyticsTab by remember { mutableIntStateOf(0) }
+
+            // Segmented Tab Selector
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .background(CarbonCardElevated, RoundedCornerShape(12.dp))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Surface(
+                    onClick = { selectedAnalyticsTab = 0 },
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (selectedAnalyticsTab == 0) GrowthOrange else Color.Transparent,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("tab_compound_progression")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.FitnessCenter,
+                            contentDescription = null,
+                            tint = if (selectedAnalyticsTab == 0) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Cargas dos Compostos",
+                            fontSize = 12.sp,
+                            fontWeight = if (selectedAnalyticsTab == 0) FontWeight.Bold else FontWeight.Medium,
+                            color = if (selectedAnalyticsTab == 0) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Surface(
+                    onClick = { selectedAnalyticsTab = 1 },
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (selectedAnalyticsTab == 1) GrowthOrange else Color.Transparent,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("tab_measurements_habits")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.TrendingUp,
+                            contentDescription = null,
+                            tint = if (selectedAnalyticsTab == 1) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Medidas & Hábitos",
+                            fontSize = 12.sp,
+                            fontWeight = if (selectedAnalyticsTab == 1) FontWeight.Bold else FontWeight.Medium,
+                            color = if (selectedAnalyticsTab == 1) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            if (selectedAnalyticsTab == 0) {
+                ExerciseProgressionContent(
+                    viewModel = viewModel,
+                    showTopHeader = false
+                )
+            } else {
+                LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp),
@@ -338,6 +421,91 @@ fun AnalyticsScreen(viewModel: VirtusViewModel) {
                                         }
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+
+                // Exercise Load Progression Hero Card
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CarbonCard),
+                        shape = RoundedCornerShape(14.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                            .testTag("analytics_progression_card")
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.TrendingUp,
+                                        contentDescription = null,
+                                        tint = GrowthOrange,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "PROGRESSÃO DE CARGAS",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = GrowthOrangeLight,
+                                        letterSpacing = 1.sp
+                                    )
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = GrowthOrange.copy(alpha = 0.18f)
+                                ) {
+                                    Text(
+                                        text = "GRÁFICOS D3",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = GrowthOrange,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Text(
+                                text = "Curva de Carga & Força dos Exercícios",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+
+                            Text(
+                                text = "Acompanhe a evolução de peso (kg), 1RM estimado e recordes pessoais (PRs) dos principais exercícios ao longo do tempo com gráficos interativos.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Button(
+                                onClick = onNavigateToProgression,
+                                colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("analytics_view_exercise_progression_btn")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.TrendingUp,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Visualizar Gráficos de Carga", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp)
                             }
                         }
                     }
@@ -591,6 +759,7 @@ fun AnalyticsScreen(viewModel: VirtusViewModel) {
                         }
                     }
                 }
+            }
             }
         }
     }
