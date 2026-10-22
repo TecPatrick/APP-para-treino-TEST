@@ -56,6 +56,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -420,7 +421,10 @@ fun DietScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     Icon(
                                         imageVector = Icons.Default.MenuBook,
                                         contentDescription = null,
@@ -428,17 +432,23 @@ fun DietScreen(
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Column {
+                                    Column(
+                                        modifier = Modifier.weight(1f)
+                                    ) {
                                         Text(
                                             text = "TABELA DE ALIMENTOS & MACROS",
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = GrowthOrangeLight
+                                            color = GrowthOrangeLight,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                         Text(
-                                            text = "Consultar 117+ alimentos, macros oficiais e suplementos Growth",
+                                            text = "Consultar 117+ alimentos e suplementos Growth",
                                             fontSize = 10.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
                                 }

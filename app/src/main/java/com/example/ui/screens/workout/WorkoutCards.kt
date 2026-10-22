@@ -227,12 +227,12 @@ fun RoutineDetailView(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Rest Timer Banner if active
-                        if (activeWorkout.isRestTimerRunning) {
+                        // Rest Timer Banner if active or finished
+                        if (activeWorkout.isRestTimerRunning || activeWorkout.isRestTimerFinished) {
                             Surface(
-                                color = GrowthOrange.copy(alpha = 0.15f),
+                                color = if (activeWorkout.isRestTimerFinished) GrowthGreen.copy(alpha = 0.2f) else GrowthOrange.copy(alpha = 0.15f),
                                 shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, GrowthOrange)
+                                border = BorderStroke(1.dp, if (activeWorkout.isRestTimerFinished) GrowthGreen else GrowthOrange)
                             ) {
                                 Column(
                                     modifier = Modifier
@@ -244,21 +244,29 @@ fun RoutineDetailView(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text("⏸️ Descanso: ${activeWorkout.restTimerRemainingSeconds}s", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = GrowthOrange)
-                                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                            OutlinedButton(
-                                                onClick = { onAdjustRest(-15) },
-                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-                                                modifier = Modifier.height(28.dp)
-                                            ) {
-                                                Text("-15s", fontSize = 10.sp, color = GrowthOrange)
+                                        if (activeWorkout.isRestTimerFinished) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Default.Check, contentDescription = null, tint = GrowthGreen, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("⏱️ Descanso Concluído! Próxima série pronta.", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GrowthGreen)
                                             }
-                                            OutlinedButton(
-                                                onClick = { onAdjustRest(15) },
-                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
-                                                modifier = Modifier.height(28.dp)
-                                            ) {
-                                                Text("+15s", fontSize = 10.sp, color = GrowthOrange)
+                                        } else {
+                                            Text("⏸️ Descanso: ${activeWorkout.restTimerRemainingSeconds}s", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = GrowthOrange)
+                                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                OutlinedButton(
+                                                    onClick = { onAdjustRest(-15) },
+                                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                    modifier = Modifier.height(28.dp)
+                                                ) {
+                                                    Text("-15s", fontSize = 10.sp, color = GrowthOrange)
+                                                }
+                                                OutlinedButton(
+                                                    onClick = { onAdjustRest(15) },
+                                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                    modifier = Modifier.height(28.dp)
+                                                ) {
+                                                    Text("+15s", fontSize = 10.sp, color = GrowthOrange)
+                                                }
                                             }
                                         }
                                     }
@@ -268,7 +276,7 @@ fun RoutineDetailView(
                                         horizontalArrangement = Arrangement.End
                                     ) {
                                         TextButton(onClick = onSkipRest) {
-                                            Text("Pular Descanso", fontSize = 11.sp, color = GrowthOrangeLight, fontWeight = FontWeight.Bold)
+                                            Text(if (activeWorkout.isRestTimerFinished) "Dispensar" else "Pular Descanso", fontSize = 11.sp, color = if (activeWorkout.isRestTimerFinished) GrowthGreen else GrowthOrangeLight, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }

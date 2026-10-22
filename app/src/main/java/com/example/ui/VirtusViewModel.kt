@@ -85,6 +85,7 @@ data class ActiveWorkoutSession(
     val completedSetsCount: Int = 0,
     val restTimerRemainingSeconds: Int = 0,
     val isRestTimerRunning: Boolean = false,
+    val isRestTimerFinished: Boolean = false,
     val loggedExerciseSets: Map<Long, List<Pair<Int, Float>>> = emptyMap()
 )
 
@@ -1811,7 +1812,8 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
             completedSetsCount = current.completedSetsCount + 1,
             loggedExerciseSets = updatedMap,
             restTimerRemainingSeconds = exercise.restSeconds,
-            isRestTimerRunning = true
+            isRestTimerRunning = true,
+            isRestTimerFinished = false
         )
 
         restTimerJob?.cancel()
@@ -1824,7 +1826,10 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                     restTimerRemainingSeconds = remaining
                 )
             }
-            _activeWorkout.value = _activeWorkout.value.copy(isRestTimerRunning = false)
+            _activeWorkout.value = _activeWorkout.value.copy(
+                isRestTimerRunning = false,
+                isRestTimerFinished = true
+            )
             triggerRestFinishedVibration()
         }
     }
@@ -1858,7 +1863,8 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         restTimerJob?.cancel()
         _activeWorkout.value = _activeWorkout.value.copy(
             restTimerRemainingSeconds = 0,
-            isRestTimerRunning = false
+            isRestTimerRunning = false,
+            isRestTimerFinished = false
         )
     }
 

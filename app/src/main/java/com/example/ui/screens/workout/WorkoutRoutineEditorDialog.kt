@@ -288,35 +288,50 @@ fun WorkoutRoutineEditorDialog(
 
                     // Section 2: Seleção e Configuração dos Exercícios
                     item {
-                        Row(
+                        Column(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text(
-                                "🏋️ Exercícios da Ficha (${exerciseList.size})",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "🏋️ Exercícios (${exerciseList.size})",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Text(
+                                    "Adicionar à rotina",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
 
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
                                 Button(
                                     onClick = { showExerciseLibraryPicker = true },
                                     colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
-                                    shape = RoundedCornerShape(8.dp)
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.weight(1f)
                                 ) {
                                     Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Biblioteca", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text("Biblioteca", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
                                 }
 
                                 OutlinedButton(
                                     onClick = { showCustomExerciseAddDialog = true },
                                     shape = RoundedCornerShape(8.dp),
-                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = GrowthCyan)
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = GrowthCyan),
+                                    modifier = Modifier.weight(1f)
                                 ) {
-                                    Text("＋ Custom", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text("＋ Custom", fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                                 }
                             }
                         }

@@ -1,48 +1,46 @@
-# Exercise Catalog Expansion Plan
+# Auditoria e Tradução da Nomenclatura de Exercícios para Português (Padrão Bodybuilding)
 
-This plan details the expansion of the exercise library with curated, high-value exercises from the gymvisual library (focusing on primary compound/isolation movements, free weights, advanced cable/machine variations, and dedicated 20 stretching/mobility exercises), ensuring zero duplication with existing exercises.
+## Resumo Executivo
+Este plano detalha a auditoria e tradução completa de todos os nomes de exercícios, descrições biomecânicas e agrupamentos musculares para o português do Brasil no padrão utilizado no fisiculturismo (Bodybuilding), abrangendo a Biblioteca de Exercícios, Fichas de Treino e o Histórico/Logs na nuvem e local.
 
-## Proposed Additions
+---
 
-1. **Advanced Cable & Machine Variations**:
-   - Pullover na Polia Alta com Barra Reta
-   - Remada Alta na Polia (High Row)
-   - Crossover Baixo para Peitoral Superior
-   - Tríceps Testa na Polia com Corda
-   - Rosca Concentrada no Banco Scott
+## 1. Visão Geral & Escopo
+- **O que será feito**: Revisão de todas as fontes de dados de exercícios (`ExerciseGifMapper`, `PrepopulatedData`, `WorkoutExercise`, rotinas e histórico de treinos salvos no Firestore/Room) para garantir 100% de conformidade com a terminologia brasileira de musculação.
+- **Padrão de Nomenclatura**: Nomes claros e técnicos de fisiculturismo (ex: *Supino Reto com Barra*, *Puxada Alta na Polia*, *Elevação Lateral com Halteres*).
+- **Cobertura**: 
+  1. Mapeamento de GIFs e guias biomecânicos (`ExerciseGifMapper.kt`).
+  2. Fichas padrão e pré-populadas (`PrepopulatedData.kt` / `WorkoutRoutine`).
+  3. Conversão de histórico de treinos e progression logs no Firestore.
 
-2. **Free Weights & Dumbbells**:
-   - Supino Reto com Halteres
-   - Agachamento Búlgaro com Halteres
-   - Desenvolvimento Arnold com Halteres
-   - RDL (Romanian Deadlift) com Halteres
-   - Elevação Lateral no Cabo (Cable Lateral Raise)
+---
 
-3. **Stretching (Alongamento - 5 Upper / 5 Lower)**:
-   - Alongamento de Peitoral na Porta (Upper 1)
-   - Alongamento de Dorsal na Grade / Suspensão (Upper 2)
-   - Alongamento de Tríceps por Trás da Cabeça (Upper 3)
-   - Alongamento de Bíceps em Extensão (Upper 4)
-   - Alongamento de Antebraço e Punho (Upper 5)
-   - Alongamento de Isquiotibiais Sentido (Lower 1)
-   - Alongamento de Quadríceps em Pé (Lower 2)
-   - Alongamento de Glúteo no Solo (Figura 4) (Lower 3)
-   - Alongamento de Adutores em Aposentada / Borboleta (Lower 4)
-   - Alongamento de Panturrilha na Parede (Lower 5)
+## 2. Arquitetura & Mapeamento de Tradução
 
-4. **Mobility (Mobilidade - 5 Upper / 5 Lower)**:
-   - Mobilidade de Ombros com Bastão (Dislocates) (Upper 1)
-   - Rotação Torácica em Quatro Apoios (Upper 2)
-   - Círculos com os Braços (Arm Circles Dinâmicos) (Upper 3)
-   - Mobilidade Escapular na Parede (Wall Slides) (Upper 4)
-   - Mobilidade de Punhos e Cotovelos (Upper 5)
-   - Mobilidade de Quadril 90/90 (Lower 1)
-   - Agachamento Profundo com Torção Torácica (Cossack Squat Dinâmico) (Lower 2)
-   - Mobilidade de Tornozelo na Parede (Lower 3)
-   - Gato-Vaca (Cat-Cow) para Coluna Lombar (Lower 4)
-   - Rotação Externa de Quadril em Decúbito Dorsal (Lower 5)
+```
+┌──────────────────────────────────────────┐
+│        ExerciseGifMapper.kt              │
+│  (Mapeamento de Nomes, Dicas & GIFs)     │
+└────────────────────┬─────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────┐
+│      PrepopulatedData.kt / Routines      │
+│  (Fichas A, B, C padronizadas em PT-BR)  │
+└────────────────────┬─────────────────────┘
+                     │
+                     ▼
+┌──────────────────────────────────────────┐
+│   VirtusRepository & Firestore Sync      │
+│  (Atualização e Normalização do Histórico│
+│   e Cargas dos Compostos em PT-BR)       │
+└──────────────────────────────────────────┘
+```
 
-## Implementation Steps
-- Update `ExerciseGifMapper.kt` `catalogGuides` list with these curated high-value gymvisual exercises.
-- Ensure unique naming so no duplication occurs.
-- Compile and verify app build.
+---
+
+## 3. Passos de Implementação
+1. **Auditoria de `ExerciseGifMapper.kt`**: Garantir que todos os 50+ exercícios cadastrados tenham nome em português brasileiro e dicas biomecânicas nativas.
+2. **Atualização de `PrepopulatedData.kt` e Fichas**: Revisar rotinas iniciais para que todas as fichas venham com nomenclaturas oficiais.
+3. **Migração e Normalização de Histórico**: Assegurar que registros antigos no Firestore/Room mapeiem corretamente para os novos nomes.
+4. **Verificação**: Executar `compile_applet` para validar integridade de compilação.

@@ -1,5 +1,6 @@
 package com.example.ui.screens.workout
 
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -237,10 +238,13 @@ fun ExerciseProgressionContent(
                     val match = Regex("""(\d+(\.\d+)?)kg""").find(log.notes)
                     match?.groupValues?.get(1)?.toFloatOrNull()
                 }
-                val peakWeight = if (extractedWeights.isNotEmpty()) {
-                    extractedWeights.maxOrNull() ?: baseWeight
-                } else {
-                    (baseWeight - (weeksMap.size - weekCounter) * 1.5f).coerceAtLeast(15f)
+                val peakWeight = when {
+                    extractedWeights.isNotEmpty() -> extractedWeights.maxOrNull() ?: baseWeight
+                    logsInWeek.any { it.totalVolumeKg > 0f && it.totalSetsCompleted > 0 } -> {
+                        val avgVol = logsInWeek.map { it.totalVolumeKg / it.totalSetsCompleted.coerceAtLeast(1) }.average().toFloat()
+                        (avgVol / baseReps).coerceAtLeast(baseWeight * 0.7f)
+                    }
+                    else -> (baseWeight - (weeksMap.size - weekCounter) * 1.5f).coerceAtLeast(15f)
                 }
 
                 val estimated1RM = (peakWeight * (36f / (37f - baseReps))).coerceAtLeast(peakWeight)
@@ -340,7 +344,10 @@ fun ExerciseProgressionContent(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
                             Surface(
                                 shape = CircleShape,
                                 color = GrowthGreen.copy(alpha = 0.15f),
@@ -356,18 +363,22 @@ fun ExerciseProgressionContent(
                                 }
                             }
                             Spacer(modifier = Modifier.width(10.dp))
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = "FIREBASE APP CHECK ATIVO",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = GrowthGreen,
-                                    letterSpacing = 0.5.sp
+                                    letterSpacing = 0.5.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "Play Integrity verificado • Backend Firestore protegido",
+                                    text = "Play Integrity • Backend protegido",
                                     fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -457,10 +468,9 @@ fun ExerciseProgressionContent(
 
             // 3. Alternador de Modo de Gráfico (Carga Máxima Semanal vs Volume Semanal)
             item {
-                Row(
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
                         text = "MODO DE VISUALIZAÇÃO",
@@ -469,7 +479,10 @@ fun ExerciseProgressionContent(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         ChartDisplayMode.values().forEach { mode ->
                             val isSelected = selectedChartMode == mode
                             Surface(
@@ -480,15 +493,17 @@ fun ExerciseProgressionContent(
                                     if (isSelected) GrowthOrange else CarbonBorder
                                 ),
                                 modifier = Modifier
+                                    .weight(1f)
                                     .clickable { selectedChartMode = mode }
                                     .testTag("chart_mode_${mode.name.lowercase()}")
                             ) {
                                 Text(
                                     text = mode.title,
-                                    fontSize = 10.sp,
+                                    fontSize = 11.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                     color = if (isSelected) GrowthOrange else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
                                 )
                             }
                         }
@@ -607,6 +622,43 @@ fun ExerciseProgressionContent(
                             }
                         }
                     }
+                }
+            }
+
+            // 4.1 Botão de Compartilhar PR e Evolução (Android Share Intent)
+            item {
+                Button(
+                    onClick = {
+                        val shareText = "🚀 Minha Evolução no Virtus (Padrão Growth):\n" +
+                                "🏋️ Exercício: $selectedExerciseName\n" +
+                                "🏆 Recorde Pessoal (PR): ${allTimePR.toInt()} kg\n" +
+                                "⚡ 1RM Estimado: ${currentOneRepMax.toInt()} kg\n" +
+                                "📈 Evolução Total: ${if (totalGainKg >= 0) "+" else ""}${totalGainKg.toInt()} kg (${String.format(Locale.US, "%.1f", totalGainPercent)}%)\n" +
+                                "🔥 Treine pesado e alcance seus objetivos com o Virtus!"
+                        val intent = Intent().apply {
+                            action = Intent.ACTION_SEND
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, "Meu PR e Evolução no Virtus - $selectedExerciseName")
+                            putExtra(Intent.EXTRA_TEXT, shareText)
+                        }
+                        val chooser = Intent.createChooser(intent, "Compartilhar PR / Evolução")
+                        context.startActivity(chooser)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("share_pr_button")
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null, tint = Color.Black, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "COMPARTILHAR PR E EVOLUÇÃO",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
                 }
             }
 
@@ -743,6 +795,8 @@ fun ExerciseProgressionContent(
                                 val width = size.width
                                 val height = size.height
                                 val count = weeklyProgressionList.size
+
+                                if (width <= 0f || height <= 0f || count == 0) return@Canvas
 
                                 // 1. Linhas guias horizontais
                                 val gridLineSteps = 4
@@ -887,18 +941,24 @@ fun ExerciseProgressionContent(
                                 val isSelected = selectedPointIndex == index
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier.clickable { selectedPointIndex = index }
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { selectedPointIndex = index }
                                 ) {
                                     Text(
-                                        text = "${pt.peakWeightKg.toInt()}k",
+                                        text = "${pt.peakWeightKg.toInt()}kg",
                                         fontSize = 10.sp,
                                         fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
-                                        color = if (isSelected) GrowthOrange else MaterialTheme.colorScheme.onBackground
+                                        color = if (isSelected) GrowthOrange else MaterialTheme.colorScheme.onBackground,
+                                        maxLines = 1,
+                                        textAlign = TextAlign.Center
                                     )
                                     Text(
                                         text = pt.weekLabel,
                                         fontSize = 9.sp,
-                                        color = if (isSelected) GrowthOrange else MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = if (isSelected) GrowthOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        textAlign = TextAlign.Center
                                     )
                                 }
                             }

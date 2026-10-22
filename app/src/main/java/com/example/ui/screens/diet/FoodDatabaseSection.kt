@@ -399,76 +399,91 @@ fun FoodDatabaseItemCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(CarbonDark, RoundedCornerShape(8.dp))
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Calorias
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(
-                        text = "CALORIAS",
+                        text = "CAL",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "${food.calories.toInt()} kcal",
-                        fontSize = 12.sp,
+                        text = "${food.calories.toInt()}",
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                 }
 
                 // Proteína
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(
-                        text = "PROTEÍNA",
+                        text = "PROT",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         color = GrowthCyan
                     )
                     Text(
                         text = "${food.protein}g",
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Black,
                         color = GrowthCyan
                     )
                 }
 
                 // Carbos
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(
-                        text = "CARBO",
+                        text = "CARB",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         color = GrowthYellow
                     )
                     Text(
                         text = "${food.carbs}g",
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Black,
                         color = GrowthYellow
                     )
                 }
 
                 // Gorduras
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(
-                        text = "GORDURA",
+                        text = "GORD",
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold,
                         color = GrowthOrange
                     )
                     Text(
                         text = "${food.fat}g",
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Black,
                         color = GrowthOrange
                     )
                 }
 
                 // Fibras
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(
                         text = "FIBRA",
                         fontSize = 9.sp,
@@ -477,7 +492,7 @@ fun FoodDatabaseItemCard(
                     )
                     Text(
                         text = "${food.fiber}g",
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Black,
                         color = GrowthGreen
                     )
