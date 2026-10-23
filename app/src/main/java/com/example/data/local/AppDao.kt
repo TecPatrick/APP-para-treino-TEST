@@ -163,6 +163,12 @@ interface AppDao {
     @Query("UPDATE meal_plan_items SET isCompletedToday = 0")
     suspend fun resetDailyMealCompletions()
 
+    @Query("DELETE FROM meal_plan_items")
+    suspend fun deleteAllMealPlanItems()
+
+    @Query("UPDATE meal_plan_items SET isFixed = :fixed WHERE id = :id")
+    suspend fun setMealFixed(id: Long, fixed: Boolean)
+
     // =========================================================================
     // 🍎 FoodItem DAO Operations (Catálogo de Alimentos)
     // =========================================================================
@@ -193,6 +199,12 @@ interface AppDao {
     @Query("DELETE FROM food_items WHERE id = :id")
     suspend fun deleteFood(id: Long)
 
+    @Query("UPDATE food_items SET isFavorite = :favorite WHERE id = :id")
+    suspend fun setFoodFavorite(id: Long, favorite: Boolean)
+
+    @Query("UPDATE food_items SET isFavorite = 0")
+    suspend fun clearAllFavorites()
+
     // =========================================================================
     // 📝 FoodRecord DAO Operations (Registros de Consumo Diário de Alimentos)
     // =========================================================================
@@ -222,6 +234,9 @@ interface AppDao {
 
     @Query("DELETE FROM food_records WHERE dateString = :dateString")
     suspend fun deleteFoodRecordsForDate(dateString: String)
+
+    @Query("DELETE FROM food_records")
+    suspend fun deleteAllFoodRecords()
 
     // =========================================================================
     // 📋 WorkoutPlan DAO Operations (Planos de Treino)

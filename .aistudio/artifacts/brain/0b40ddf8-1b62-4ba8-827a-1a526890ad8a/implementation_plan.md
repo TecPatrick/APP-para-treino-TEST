@@ -1,46 +1,37 @@
-# Auditoria e Tradução da Nomenclatura de Exercícios para Português (Padrão Bodybuilding)
+# Implementation Plan: Photo Diary & Auto Rest Timer
 
-## Resumo Executivo
-Este plano detalha a auditoria e tradução completa de todos os nomes de exercícios, descrições biomecânicas e agrupamentos musculares para o português do Brasil no padrão utilizado no fisiculturismo (Bodybuilding), abrangendo a Biblioteca de Exercícios, Fichas de Treino e o Histórico/Logs na nuvem e local.
+## 1. Overview
+This plan outlines the implementation of a weekly Photo Diary for physical progress tracking and an automated, flexible Rest Timer for workout sessions.
 
----
+## 2. Feature: Photo Diary
+- **Data Model**: `PhotoEntry` (id, date, goalPhase, imagePath/uri, note).
+- **Persistence**: Room for local storage, Firestore for cloud backup/sync.
+- **Permissions**: `CAMERA` (runtime permission) + `READ_MEDIA_IMAGES` (if picking older photos) or just `TakePicture` via camera.
+- **UI**:
+    - **Photo Capture Screen**: Simple UI to take a new photo.
+    - **Comparison Screen**: List/Gallery view with a date range picker to select two dates for side-by-side comparison.
 
-## 1. Visão Geral & Escopo
-- **O que será feito**: Revisão de todas as fontes de dados de exercícios (`ExerciseGifMapper`, `PrepopulatedData`, `WorkoutExercise`, rotinas e histórico de treinos salvos no Firestore/Room) para garantir 100% de conformidade com a terminologia brasileira de musculação.
-- **Padrão de Nomenclatura**: Nomes claros e técnicos de fisiculturismo (ex: *Supino Reto com Barra*, *Puxada Alta na Polia*, *Elevação Lateral com Halteres*).
-- **Cobertura**: 
-  1. Mapeamento de GIFs e guias biomecânicos (`ExerciseGifMapper.kt`).
-  2. Fichas padrão e pré-populadas (`PrepopulatedData.kt` / `WorkoutRoutine`).
-  3. Conversão de histórico de treinos e progression logs no Firestore.
+## 3. Feature: Auto Rest Timer
+- **Logic**:
+    - `VirtusViewModel` will manage `restTimerState` (isRunning, remainingTime, duration).
+    - `lastSetCompletedTimestamp` in `ActiveWorkoutSession` triggers countdown.
+- **Configuration**:
+    - **Global**: App-wide default rest time in User Profile/Settings.
+    - **Per-Exercise**: Optional override in the workout routine definition.
+    - **Active Session**: In-session UI element to adjust/skip the timer.
+- **UI**:
+    - Integration into `ExerciseExecutionCard` / `WorkoutScreen` as an overlay or dedicated area during the rest interval.
 
----
+## 4. UI/UX Considerations
+- **Material 3**: Use `DatePickerDialog` for date range selection, `FloatingActionButton` for photo taking.
+- **Timer UI**: Clear, prominent countdown display during rest, with options to "Skip" or "Add 30s".
+- **Accessibility**: All buttons > 48dp.
+- **Growth App Aesthetic**: `GrowthOrange` for primary actions/timers, `CarbonDark` for backgrounds.
 
-## 2. Arquitetura & Mapeamento de Tradução
-
-```
-┌──────────────────────────────────────────┐
-│        ExerciseGifMapper.kt              │
-│  (Mapeamento de Nomes, Dicas & GIFs)     │
-└────────────────────┬─────────────────────┘
-                     │
-                     ▼
-┌──────────────────────────────────────────┐
-│      PrepopulatedData.kt / Routines      │
-│  (Fichas A, B, C padronizadas em PT-BR)  │
-└────────────────────┬─────────────────────┘
-                     │
-                     ▼
-┌──────────────────────────────────────────┐
-│   VirtusRepository & Firestore Sync      │
-│  (Atualização e Normalização do Histórico│
-│   e Cargas dos Compostos em PT-BR)       │
-└──────────────────────────────────────────┘
-```
-
----
-
-## 3. Passos de Implementação
-1. **Auditoria de `ExerciseGifMapper.kt`**: Garantir que todos os 50+ exercícios cadastrados tenham nome em português brasileiro e dicas biomecânicas nativas.
-2. **Atualização de `PrepopulatedData.kt` e Fichas**: Revisar rotinas iniciais para que todas as fichas venham com nomenclaturas oficiais.
-3. **Migração e Normalização de Histórico**: Assegurar que registros antigos no Firestore/Room mapeiem corretamente para os novos nomes.
-4. **Verificação**: Executar `compile_applet` para validar integridade de compilação.
+## 5. Verification Plan
+1. **Compilation**: `compile_applet`.
+2. **Feature Tests**:
+    - Capture a photo, verify it saves and syncs.
+    - Select two photos via range picker and verify comparison UI.
+    - Complete a set, verify timer starts with the correct duration.
+    - Adjust timer during active session and verify responsiveness.

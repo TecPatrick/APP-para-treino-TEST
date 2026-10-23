@@ -1,109 +1,24 @@
 {
-  "entities": {
-    "UserProfile": {
-      "collection": "users",
-      "fields": {
-        "userId": { "type": "string", "required": true },
-        "name": { "type": "string", "required": true },
-        "email": { "type": "string", "required": true },
-        "gender": { "type": "string", "required": true },
-        "age": { "type": "number", "required": true },
-        "weightKg": { "type": "number", "required": true },
-        "heightCm": { "type": "number", "required": true },
-        "biotype": { "type": "string", "required": true },
-        "trainingDaysPerWeek": { "type": "number", "required": true },
-        "activityLevel": { "type": "string", "required": true },
-        "goal": { "type": "string", "required": true },
-        "targetCalories": { "type": "number", "required": true },
-        "targetProteinGrams": { "type": "number", "required": true },
-        "targetCarbsGrams": { "type": "number", "required": true },
-        "targetFatGrams": { "type": "number", "required": true },
-        "targetWaterMl": { "type": "number", "required": true },
-        "updatedAt": { "type": "timestamp", "required": false }
-      }
-    },
-    "MealPlan": {
-      "collection": "users/{userId}/mealPlans",
-      "fields": {
-        "userId": { "type": "string", "required": true },
-        "mealType": { "type": "string", "required": true },
-        "name": { "type": "string", "required": true },
-        "portionGrams": { "type": "number", "required": true },
-        "calories": { "type": "number", "required": true },
-        "protein": { "type": "number", "required": true },
-        "carbs": { "type": "number", "required": true },
-        "fat": { "type": "number", "required": true },
-        "isCompletedToday": { "type": "boolean", "required": false },
-        "updatedAt": { "type": "timestamp", "required": false }
-      }
-    },
-    "ShoppingItem": {
-      "collection": "users/{userId}/shoppingItems",
-      "fields": {
-        "userId": { "type": "string", "required": true },
-        "name": { "type": "string", "required": true },
-        "category": { "type": "string", "required": true },
-        "totalQuantityGrams": { "type": "number", "required": true },
-        "unit": { "type": "string", "required": true },
-        "estimatedPrice": { "type": "number", "required": true },
-        "isBought": { "type": "boolean", "required": true },
-        "updatedAt": { "type": "timestamp", "required": false }
-      }
-    },
-    "ProgressLog": {
-      "collection": "users/{userId}/progressLogs",
-      "fields": {
-        "userId": { "type": "string", "required": true },
-        "dateMillis": { "type": "number", "required": true },
-        "weightKg": { "type": "number", "required": true },
-        "bodyFatPercent": { "type": "number", "required": false },
-        "caloriesConsumed": { "type": "number", "required": false },
-        "waterMlConsumed": { "type": "number", "required": false },
-        "notes": { "type": "string", "required": false },
-        "updatedAt": { "type": "timestamp", "required": false }
-      }
-    },
-    "CalorieGoal": {
-      "collection": "users/{userId}/calorieGoals",
-      "fields": {
-        "userId": { "type": "string", "required": true },
-        "targetCalories": { "type": "number", "required": true },
-        "targetProteinGrams": { "type": "number", "required": true },
-        "targetCarbsGrams": { "type": "number", "required": true },
-        "targetFatGrams": { "type": "number", "required": true },
-        "targetWaterMl": { "type": "number", "required": true },
-        "updatedAt": { "type": "timestamp", "required": false }
-      }
-    },
-    "WorkoutLog": {
-      "collection": "users/{userId}/workoutLogs",
-      "fields": {
-        "userId": { "type": "string", "required": true },
-        "routineId": { "type": "number", "required": true },
-        "routineName": { "type": "string", "required": true },
-        "dateMillis": { "type": "number", "required": true },
-        "durationMinutes": { "type": "number", "required": true },
-        "totalVolumeKg": { "type": "number", "required": true },
-        "totalSetsCompleted": { "type": "number", "required": true },
-        "perceivedExertion": { "type": "number", "required": false },
-        "notes": { "type": "string", "required": false },
-        "updatedAt": { "type": "timestamp", "required": false }
-      }
-    },
-    "GpsRouteLog": {
-      "collection": "users/{userId}/gpsRouteLogs",
-      "fields": {
-        "userId": { "type": "string", "required": true },
-        "routeName": { "type": "string", "required": true },
-        "activityType": { "type": "string", "required": true },
-        "dateMillis": { "type": "number", "required": true },
-        "durationSeconds": { "type": "number", "required": true },
-        "distanceMeters": { "type": "number", "required": true },
-        "stepsCount": { "type": "number", "required": true },
-        "caloriesBurned": { "type": "number", "required": true },
-        "averagePaceMinPerKm": { "type": "number", "required": true },
-        "notes": { "type": "string", "required": false },
-        "updatedAt": { "type": "timestamp", "required": false }
+  "collections": {
+    "users": {
+      "documents": {
+        "{userId}": {
+          "collections": {
+            "favorite_foods": {
+              "documents": {
+                "{foodId}": {
+                  "fields": {
+                    "foodId": "number",
+                    "foodName": "string",
+                    "category": "string",
+                    "isFavorite": "boolean",
+                    "updatedAt": "timestamp"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
   }

@@ -74,37 +74,84 @@ class DietShoppingSyncService(private val context: Context) {
                 val (category, dailyGrams) = categoryAndAmount
                 val totalPeriodGrams = dailyGrams * periodDays
 
-                val (displayQty, unit, estimatedPrice) = when {
+                // 💡 Smart Conversion: Convert tracked 'Cooked/Grilled' weights to 'Raw' shopping quantities
+                val rawConversionFactor = when {
+                    foodName.contains("Arroz", true) && foodName.contains("Cozido", true) -> 0.4f
+                    foodName.contains("Feijão", true) && foodName.contains("Cozido", true) -> 0.5f
+                    foodName.contains("Frango", true) && (foodName.contains("Grelhado", true) || foodName.contains("Cozido", true)) -> 1.35f
+                    foodName.contains("Carne", true) && (foodName.contains("Grelhado", true) || foodName.contains("Assado", true)) -> 1.4f
+                    foodName.contains("Patinho", true) && (foodName.contains("Grelhado", true) || foodName.contains("Moído", true)) -> 1.4f
+                    foodName.contains("Tilápia", true) || foodName.contains("Peixe", true) -> 1.25f
+                    else -> 1.0f
+                }
+
+                val adjustedTotalGrams = totalPeriodGrams * rawConversionFactor
+                val shoppingName = foodName
+                    .replace("Cozido", "", ignoreCase = true)
+                    .replace("Grelhado", "", ignoreCase = true)
+                    .replace("Assado", "", ignoreCase = true)
+                    .replace("Grelhada", "", ignoreCase = true)
+                    .replace("Cozida", "", ignoreCase = true)
+                    .replace("Moído", "", ignoreCase = true)
+                    .replace("Moída", "", ignoreCase = true)
+                    .trim()
+
+                val (displayQty, unit) = when {
                     foodName.contains("Whey", ignoreCase = true) -> {
-                        val pots = ceil((totalPeriodGrams / 1000f).toDouble()).coerceAtLeast(1.0).toFloat()
-                        Triple(pots, "pct (1kg)", pots * 105f)
+                        val pots = ceil((adjustedTotalGrams / 1000f).toDouble()).coerceAtLeast(1.0).toFloat()
+                        pots to "pct (1kg)"
                     }
                     foodName.contains("Creatina", ignoreCase = true) -> {
-                        val pots = ceil((totalPeriodGrams / 250f).toDouble()).coerceAtLeast(1.0).toFloat()
-                        Triple(pots, "pote (250g)", pots * 89f)
+                        val pots = ceil((adjustedTotalGrams / 250f).toDouble()).coerceAtLeast(1.0).toFloat()
+                        pots to "pote (250g)"
                     }
                     foodName.contains("Pasta de Amendoim", ignoreCase = true) -> {
-                        val pots = ceil((totalPeriodGrams / 1000f).toDouble()).coerceAtLeast(1.0).toFloat()
-                        Triple(pots, "pote (1kg)", pots * 29f)
+                        val pots = ceil((adjustedTotalGrams / 1000f).toDouble()).coerceAtLeast(1.0).toFloat()
+                        pots to "pote (1kg)"
                     }
                     foodName.contains("Ovo", ignoreCase = true) -> {
-                        val dozens = ceil((totalPeriodGrams / 600f).toDouble()).coerceAtLeast(1.0).toFloat()
-                        Triple(dozens, "cartelas (30un)", dozens * 22f)
+                        val cartelas = ceil((adjustedTotalGrams / 1500f).toDouble()).coerceAtLeast(1.0).toFloat()
+                        cartelas to "cartelas (30un)"
                     }
                     category == FoodCategory.FRUITS_VEGETABLES || category == FoodCategory.PROTEIN -> {
-                        val kg = (totalPeriodGrams / 1000f).coerceAtLeast(0.5f)
-                        Triple(kg, "kg", kg * (if (category == FoodCategory.PROTEIN) 35f else 10f))
+                        val kg = (adjustedTotalGrams / 1000f).coerceAtLeast(0.5f)
+                        kg to "kg"
+                    }
+                    category == FoodCategory.CARBOHYDRATE -> {
+                        val kg = (adjustedTotalGrams / 1000f).coerceAtLeast(0.5f)
+                        kg to "kg"
                     }
                     else -> {
-                        val kg = (totalPeriodGrams / 1000f).coerceAtLeast(0.5f)
-                        Triple(kg, "kg / un", kg * 12f)
+                        val kg = (adjustedTotalGrams / 1000f).coerceAtLeast(0.5f)
+                        kg to "kg / un"
                     }
+                }
+
+                val pricePerKgOrUnit = when {
+                    foodName.contains("Whey", ignoreCase = true) -> 105.0f
+                    foodName.contains("Creatina", ignoreCase = true) -> 89.0f
+                    foodName.contains("Pasta de Amendoim", ignoreCase = true) -> 29.0f
+                    foodName.contains("Ovo", ignoreCase = true) -> 21.0f
+                    else -> when (category) {
+                        FoodCategory.PROTEIN -> 28.0f
+                        FoodCategory.CARBOHYDRATE -> 6.5f
+                        FoodCategory.FAT -> 45.0f
+                        FoodCategory.FRUITS_VEGETABLES -> 9.5f
+                        FoodCategory.DAIRY -> 7.5f
+                        else -> 12.0f
+                    }
+                }
+
+                val estimatedPrice = if (unit == "g" || unit == "ml") {
+                    (displayQty / 1000f) * pricePerKgOrUnit
+                } else {
+                    displayQty * pricePerKgOrUnit
                 }
 
                 val shoppingItemDoc = shoppingCollection.document()
                 val shoppingItemMap = mapOf(
                     "id" to shoppingItemDoc.id.hashCode().toLong(),
-                    "name" to foodName,
+                    "name" to shoppingName,
                     "category" to category.name,
                     "quantity" to displayQty,
                     "unit" to unit,

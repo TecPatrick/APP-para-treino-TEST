@@ -1,17 +1,21 @@
 {
-  "firestore": [
-    {
-      "database": "ai-studio-android-growthdi-0b40ddf8-1b62-4ba8-827a-1a526890ad8a",
-      "rules": "firestore.rules"
-    }
-  ],
-  "auth": {
-    "providers": {
-      "emailPassword": true,
-      "googleSignIn": {
-        "oAuthBrandDisplayName": "Virtus",
-        "supportEmail": "patrickpqno@gmail.com"
+  "firestore": {
+    "rules": "firestore.rules",
+    "databases": {
+      "ai-studio-android-growthdi-0b40ddf8-1b62-4ba8-827a-1a526890ad8a": {
+        "rules": "firestore.rules"
       }
+    }
+  },
+  "emulators": {
+    "auth": {
+      "port": 9099
+    },
+    "firestore": {
+      "port": 8085
+    },
+    "ui": {
+      "enabled": true
     }
   }
 }

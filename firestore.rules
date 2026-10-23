@@ -124,7 +124,7 @@ service cloud.firestore {
     }
 
     function isValidMeal(data, userId) {
-      let fields = ['userId', 'mealType', 'name', 'portionGrams', 'calories', 'protein', 'carbs', 'fat', 'isCompletedToday', 'updatedAt'];
+      let fields = ['userId', 'mealType', 'name', 'portionGrams', 'calories', 'protein', 'carbs', 'fat', 'isCompletedToday', 'isFixed', 'updatedAt'];
       return data.keys().hasAll(fields) && data.keys().hasOnly(fields) &&
              uidUnchanged(data, userId) &&
              validText(data.mealType, 50) && validText(data.name, 200) &&
@@ -133,7 +133,8 @@ service cloud.firestore {
              validNumber(data.protein, 0, 10000) &&
              validNumber(data.carbs, 0, 10000) &&
              validNumber(data.fat, 0, 10000) &&
-             data.isCompletedToday is bool && validUpdatedAt(data);
+             data.isCompletedToday is bool &&
+             data.isFixed is bool && validUpdatedAt(data);
     }
 
     function isValidShoppingItem(data, userId) {
@@ -186,6 +187,13 @@ service cloud.firestore {
              validNumber(data.waterDrankMl, 0, 20000) && validUpdatedAt(data);
     }
 
+    function isValidFavoriteFood(data, userId) {
+      let fields = ['userId', 'foodId', 'foodName', 'category', 'isFavorite', 'updatedAt'];
+      return data.keys().hasAll(fields) && data.keys().hasOnly(fields) && uidUnchanged(data, userId) &&
+             validNumber(data.foodId, 0, 9999999999999) && validText(data.foodName, 200) &&
+             validText(data.category, 50) && data.isFavorite is bool && validUpdatedAt(data);
+    }
+
     match /users/{userId} {
       allow read, delete: if isOwner(userId);
       allow create: if isOwner(userId) && isValidUser(request.resource.data, userId);
@@ -201,6 +209,11 @@ service cloud.firestore {
           validNumber(request.resource.data.targetWaterMl, 0, 20000) &&
           validUpdatedAt(request.resource.data)));
 
+      match /favoriteFoods/{foodId} {
+        allow read, delete: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidFavoriteFood(request.resource.data, userId);
+        allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) && isValidFavoriteFood(request.resource.data, userId);
+      }
       match /calorieGoals/{goalId} {
         allow read, delete: if isOwner(userId);
         allow create: if isOwner(userId) && isValidCalorieGoal(request.resource.data, userId);

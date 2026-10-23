@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocalMall
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.AlertDialog
@@ -117,11 +118,15 @@ fun DietScreen(
     val intakeHistory by viewModel.recentIntakeHistory.collectAsStateWithLifecycle()
     val progressLogs by viewModel.progressLogs.collectAsStateWithLifecycle()
     val selectedDateMillis by viewModel.selectedDateMillis.collectAsStateWithLifecycle()
+    val isAiDietLoading by viewModel.isAiDietLoading.collectAsStateWithLifecycle()
+    val aiDietSuggestions by viewModel.aiDietSuggestions.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     var showAddFoodDialog by remember { mutableStateOf(false) }
     var selectedMealTypeForAdd by remember { mutableStateOf(MealType.BREAKFAST) }
     var showCustomFoodDialog by remember { mutableStateOf(false) }
+    var showAiDietSetupDialog by remember { mutableStateOf(false) }
+    var showAiPlanPreviewDialog by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf(0) } // 0: Refeições Diárias, 1: Base de Alimentos, 2: Dieta Mensal, 3: Configuração
     val dateFormatter = remember { SimpleDateFormat("yyyy-MM-dd", Locale.US) }
     val selectedDateKey = dateFormatter.format(Date(selectedDateMillis))
@@ -569,18 +574,34 @@ fun DietScreen(
                                             )
                                         }
 
-                                        IconButton(
-                                            onClick = {
-                                                selectedMealTypeForAdd = type
-                                                showAddFoodDialog = true
-                                            },
-                                            modifier = Modifier.testTag("add_food_btn_${type.name}")
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Add,
-                                                contentDescription = "Adicionar Alimento",
-                                                tint = GrowthOrange
-                                            )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            IconButton(
+                                                onClick = {
+                                                    viewModel.suggestAIMealItems(type)
+                                                    showAiPlanPreviewDialog = true
+                                                },
+                                                modifier = Modifier.testTag("ai_suggest_meal_btn_${type.name}")
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.AutoAwesome,
+                                                    contentDescription = "Sugestão IA",
+                                                    tint = GrowthCyan
+                                                )
+                                            }
+
+                                            IconButton(
+                                                onClick = {
+                                                    selectedMealTypeForAdd = type
+                                                    showAddFoodDialog = true
+                                                },
+                                                modifier = Modifier.testTag("add_food_btn_${type.name}")
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Add,
+                                                    contentDescription = "Adicionar Alimento",
+                                                    tint = GrowthOrange
+                                                )
+                                            }
                                         }
                                     }
 
@@ -605,12 +626,23 @@ fun DietScreen(
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
                                                 Column(modifier = Modifier.weight(1f)) {
-                                                    Text(
-                                                        text = item.foodName,
-                                                        fontSize = 13.sp,
-                                                        fontWeight = FontWeight.SemiBold,
-                                                        color = MaterialTheme.colorScheme.onBackground
-                                                    )
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        if (item.isFixed) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.PushPin,
+                                                                contentDescription = "Item Fixo",
+                                                                tint = GrowthOrange,
+                                                                modifier = Modifier.size(12.dp)
+                                                            )
+                                                            Spacer(modifier = Modifier.width(4.dp))
+                                                        }
+                                                        Text(
+                                                            text = item.foodName,
+                                                            fontSize = 13.sp,
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = MaterialTheme.colorScheme.onBackground
+                                                        )
+                                                    }
                                                     Text(
                                                         text = "${item.amount.toInt()} ${item.unit} • ${item.calories.toInt()} kcal (P: ${item.protein.toInt()}g, C: ${item.carbs.toInt()}g, G: ${item.fat.toInt()}g)",
                                                         fontSize = 11.sp,
@@ -619,6 +651,18 @@ fun DietScreen(
                                                 }
 
                                                 Row {
+                                                    IconButton(
+                                                        onClick = { viewModel.toggleMealItemFixed(item) },
+                                                        modifier = Modifier.size(32.dp).testTag("fix_meal_${item.id}")
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.PushPin,
+                                                            contentDescription = if (item.isFixed) "Desafixar item" else "Fixar item (repetir todo dia)",
+                                                            tint = if (item.isFixed) GrowthOrange else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                    }
+
                                                     IconButton(
                                                         onClick = {
                                                             viewModel.toggleMealItemCompleted(item, selectedDateKey, completedForDate)
@@ -707,12 +751,14 @@ fun DietScreen(
                         viewModel.addFoodToMeal(mealType, food, amount, notes)
                     },
                     onOpenCustomFoodDialog = { showCustomFoodDialog = true },
-                    onReloadDefaults = { viewModel.reloadFoodDatabase() }
+                    onReloadDefaults = { viewModel.reloadFoodDatabase() },
+                    onToggleFavorite = { viewModel.toggleFoodFavorite(it) }
                 )
             } else if (selectedTab == 2) {
                 MonthlyDietOverviewSection(
                     profile = profile,
-                    onNavigateToConfig = { selectedTab = 3 }
+                    onNavigateToConfig = { selectedTab = 3 },
+                    onGenerateAiDiet = { showAiDietSetupDialog = true }
                 )
             } else {
                 // Monthly Diet Configuration Screen
@@ -742,6 +788,32 @@ fun DietScreen(
                     }
                 )
             }
+        }
+
+        if (showAiDietSetupDialog) {
+            AIDietSetupDialog(
+                onDismiss = { showAiDietSetupDialog = false },
+                onConfirm = { prefs ->
+                    showAiDietSetupDialog = false
+                    viewModel.generateAIDietPlan(prefs)
+                    showAiPlanPreviewDialog = true
+                }
+            )
+        }
+
+        if (showAiPlanPreviewDialog) {
+            AIPlanPreviewDialog(
+                isLoading = isAiDietLoading,
+                suggestions = aiDietSuggestions,
+                onDismiss = { 
+                    showAiPlanPreviewDialog = false
+                    viewModel.clearAiSuggestions()
+                },
+                onApply = {
+                    viewModel.applyAiDiet()
+                    showAiPlanPreviewDialog = false
+                }
+            )
         }
     }
 
@@ -774,7 +846,8 @@ fun DietScreen(
 @Composable
 fun MonthlyDietOverviewSection(
     profile: com.example.data.model.UserProfile,
-    onNavigateToConfig: () -> Unit
+    onNavigateToConfig: () -> Unit,
+    onGenerateAiDiet: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -846,6 +919,20 @@ fun MonthlyDietOverviewSection(
 
         item {
             Spacer(modifier = Modifier.height(16.dp))
+            Button(
+                onClick = onGenerateAiDiet,
+                colors = ButtonDefaults.buttonColors(containerColor = GrowthCyan),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .testTag("generate_ai_diet_btn")
+            ) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("GERAR DIETA COMPLETA COM IA", fontWeight = FontWeight.Bold, color = Color.White)
+            }
+            Spacer(modifier = Modifier.height(12.dp))
             Button(
                 onClick = onNavigateToConfig,
                 colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
@@ -1071,6 +1158,7 @@ fun AddFoodToMealDialog(
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<FoodCategory?>(null) }
+    var showOnlyFavorites by remember { mutableStateOf(false) }
     var selectedFood by remember { mutableStateOf<FoodItem?>(null) }
     var amountText by remember { mutableStateOf("100") }
     var notesText by remember { mutableStateOf("") }
@@ -1078,7 +1166,8 @@ fun AddFoodToMealDialog(
     val filteredFoods = foods.filter { food ->
         val matchesQuery = food.name.contains(searchQuery, ignoreCase = true)
         val matchesCategory = selectedCategory == null || food.category == selectedCategory
-        matchesQuery && matchesCategory
+        val matchesFavorite = !showOnlyFavorites || food.isFavorite
+        matchesQuery && matchesCategory && matchesFavorite
     }
 
     AlertDialog(
@@ -1119,6 +1208,17 @@ fun AddFoodToMealDialog(
                                 selected = selectedCategory == null,
                                 onClick = { selectedCategory = null },
                                 label = { Text("Todos", fontSize = 10.sp) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = GrowthOrange,
+                                    selectedLabelColor = Color.White
+                                )
+                            )
+                        }
+                        item {
+                            FilterChip(
+                                selected = showOnlyFavorites,
+                                onClick = { showOnlyFavorites = !showOnlyFavorites },
+                                label = { Text("Favoritos", fontSize = 10.sp) },
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = GrowthOrange,
                                     selectedLabelColor = Color.White
@@ -1463,6 +1563,151 @@ fun CustomFoodRegistrationDialog(
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    )
+}
+
+@Composable
+fun AIDietSetupDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (com.example.ui.DietAiPreferences) -> Unit
+) {
+    var restrictions by remember { mutableStateOf("") }
+    var preferences by remember { mutableStateOf("") }
+    var mealsCount by remember { mutableStateOf(5) }
+    var includeFavs by remember { mutableStateOf(true) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = CarbonCard,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = GrowthCyan)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Configurar Dieta IA", fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text("A IA criará um plano baseado no seu objetivo atual e nas suas preferências abaixo.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                OutlinedTextField(
+                    value = restrictions,
+                    onValueChange = { restrictions = it },
+                    label = { Text("Restrições (Ex: Vegano, Sem Lactose)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = GrowthCyan, unfocusedBorderColor = CarbonBorder)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                OutlinedTextField(
+                    value = preferences,
+                    onValueChange = { preferences = it },
+                    label = { Text("Preferências (Ex: Gosto de Aveia, Ovos)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = GrowthCyan, unfocusedBorderColor = CarbonBorder)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Text("Número de Refeições: $mealsCount", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                androidx.compose.material3.Slider(
+                    value = mealsCount.toFloat(),
+                    onValueChange = { mealsCount = it.toInt() },
+                    valueRange = 3f..7f,
+                    steps = 3,
+                    colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = GrowthCyan, activeTrackColor = GrowthCyan)
+                )
+                
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.Checkbox(
+                        checked = includeFavs,
+                        onCheckedChange = { includeFavs = it },
+                        colors = androidx.compose.material3.CheckboxDefaults.colors(checkedColor = GrowthCyan)
+                    )
+                    Text("Priorizar meus Alimentos Favoritos", fontSize = 12.sp)
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(com.example.ui.DietAiPreferences(restrictions, preferences, mealsCount, includeFavs)) },
+                colors = ButtonDefaults.buttonColors(containerColor = GrowthCyan)
+            ) {
+                Text("Gerar Dieta", color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    )
+}
+
+@Composable
+fun AIPlanPreviewDialog(
+    isLoading: Boolean,
+    suggestions: List<com.example.ui.AiDietSuggestion>,
+    onDismiss: () -> Unit,
+    onApply: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = CarbonCard,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = GrowthCyan)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(if (isLoading) "Gerando Plano..." else "Sugestão da IA", fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Box(modifier = Modifier.fillMaxWidth().height(400.dp)) {
+                if (isLoading) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center),
+                        color = GrowthCyan
+                    )
+                } else if (suggestions.isEmpty()) {
+                    Text("Nenhuma sugestão gerada. Tente novamente.", modifier = Modifier.align(Alignment.Center))
+                } else {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(suggestions) { item ->
+                            Surface(
+                                color = CarbonCardElevated,
+                                shape = RoundedCornerShape(8.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Text(item.mealType.title, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GrowthCyan)
+                                    Text(item.foodName, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text("${item.amount.toInt()} ${item.unit} • ${item.calories.toInt()} kcal", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    if (item.notes.isNotBlank()) {
+                                        Text(item.notes, fontSize = 10.sp, color = GrowthOrangeLight, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            if (!isLoading && suggestions.isNotEmpty()) {
+                Button(
+                    onClick = onApply,
+                    colors = ButtonDefaults.buttonColors(containerColor = GrowthGreen)
+                ) {
+                    Text("Aplicar Dieta", color = Color.White)
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(if (isLoading) "Cancelar" else "Fechar", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )

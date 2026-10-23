@@ -37,7 +37,8 @@ data class FoodItem(
     val fat: Float,
     val fiber: Float = 0f,
     val isGrowthProduct: Boolean = false,
-    val isCustom: Boolean = false
+    val isCustom: Boolean = false,
+    val isFavorite: Boolean = false
 ) {
     fun calculateMacrosForAmount(amount: Float): MacroValues {
         val factor = if (baseServingAmount > 0f) amount / baseServingAmount else 1f
@@ -155,6 +156,7 @@ data class MealPlanItem(
     val fat: Float,
     val fiber: Float = 0f,
     val isCompletedToday: Boolean = false,
+    val isFixed: Boolean = false,
     val notes: String = ""
 )
 

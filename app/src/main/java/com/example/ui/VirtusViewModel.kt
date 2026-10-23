@@ -2,10 +2,14 @@ package com.example.ui
 
 import android.app.Application
 import android.content.Context
+import android.util.Log
+import com.example.BuildConfig
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import org.json.JSONArray
+import org.json.JSONObject
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.VirtusApplication
@@ -104,6 +108,25 @@ data class ActiveGpsSession(
     val routePoints: List<Pair<Double, Double>> = emptyList()
 )
 
+data class DietAiPreferences(
+    val restrictions: String = "",
+    val preferences: String = "",
+    val mealsCount: Int = 5,
+    val includePreferredFoods: Boolean = true
+)
+
+data class AiDietSuggestion(
+    val mealType: MealType,
+    val foodName: String,
+    val amount: Float,
+    val unit: String,
+    val calories: Float,
+    val protein: Float,
+    val carbs: Float,
+    val fat: Float,
+    val notes: String = ""
+)
+
 class VirtusViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: VirtusRepository =
@@ -132,6 +155,150 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     
     fun clearAdvice() {
         _aiAdvice.value = null
+    }
+
+    private val _isAiDietLoading = MutableStateFlow(false)
+    val isAiDietLoading: StateFlow<Boolean> = _isAiDietLoading.asStateFlow()
+
+    private val _aiDietSuggestions = MutableStateFlow<List<AiDietSuggestion>>(emptyList())
+    val aiDietSuggestions: StateFlow<List<AiDietSuggestion>> = _aiDietSuggestions.asStateFlow()
+
+    fun generateAIDietPlan(preferences: DietAiPreferences) {
+        viewModelScope.launch {
+            _isAiDietLoading.value = true
+            try {
+                val profile = userProfile.value
+                val foods = allFoods.value
+                val favs = foods.filter { it.isFavorite }.joinToString { it.name }
+                val contextFoods = if (preferences.includePreferredFoods && favs.isNotBlank()) {
+                    "Preferidos: $favs. Outros: ${foods.take(30).joinToString { it.name }}"
+                } else {
+                    foods.take(50).joinToString { it.name }
+                }
+
+                val json = GeminiRepository.generateDietPlan(
+                    calories = profile.targetCalories,
+                    protein = profile.targetProteinGrams,
+                    carbs = profile.targetCarbsGrams,
+                    fat = profile.targetFatGrams,
+                    mealsCount = preferences.mealsCount,
+                    restrictions = preferences.restrictions,
+                    preferences = preferences.preferences,
+                    availableFoods = contextFoods
+                )
+
+                if (json != null) {
+                    val list = mutableListOf<AiDietSuggestion>()
+                    val array = JSONArray(json)
+                    for (i in 0 until array.length()) {
+                        val obj = array.getJSONObject(i)
+                        list.add(
+                            AiDietSuggestion(
+                                mealType = MealType.valueOf(obj.getString("mealType")),
+                                foodName = obj.getString("foodName"),
+                                amount = obj.getDouble("amount").toFloat(),
+                                unit = obj.getString("unit"),
+                                calories = obj.getDouble("calories").toFloat(),
+                                protein = obj.getDouble("protein").toFloat(),
+                                carbs = obj.getDouble("carbs").toFloat(),
+                                fat = obj.getDouble("fat").toFloat(),
+                                notes = obj.optString("notes")
+                            )
+                        )
+                    }
+                    _aiDietSuggestions.value = list
+                } else {
+                    _toastMessage.value = "Falha ao gerar dieta com IA. Tente novamente."
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _toastMessage.value = "Erro na IA: ${e.message}"
+            } finally {
+                _isAiDietLoading.value = false
+            }
+        }
+    }
+
+    fun applyAiDiet() {
+        viewModelScope.launch {
+            val suggestions = _aiDietSuggestions.value
+            if (suggestions.isEmpty()) return@launch
+            
+            // Opcionalmente podemos limpar a dieta atual ou apenas adicionar
+            // Para "Gerar Dieta" faz sentido limpar e aplicar a nova.
+            // Mas talvez o usuário queira confirmar item a item.
+            // Por enquanto, vamos aplicar tudo.
+            
+            suggestions.forEach { suggestion ->
+                val matchingFood = allFoods.value.find { it.name.contains(suggestion.foodName, ignoreCase = true) }
+                val mealItem = MealPlanItem(
+                    mealType = suggestion.mealType,
+                    foodItemId = matchingFood?.id ?: 0,
+                    foodName = suggestion.foodName,
+                    foodCategory = matchingFood?.category ?: FoodCategory.OTHER,
+                    amount = suggestion.amount,
+                    unit = suggestion.unit,
+                    calories = suggestion.calories,
+                    protein = suggestion.protein,
+                    carbs = suggestion.carbs,
+                    fat = suggestion.fat,
+                    notes = suggestion.notes
+                )
+                repository.addMealPlanItem(mealItem)
+            }
+            _aiDietSuggestions.value = emptyList()
+            _toastMessage.value = "Plano alimentar IA aplicado com sucesso!"
+        }
+    }
+
+    fun suggestAIMealItems(mealType: MealType, restrictions: String = "", preferences: String = "") {
+        viewModelScope.launch {
+            _isAiDietLoading.value = true
+            try {
+                val profile = userProfile.value
+                // Estimativa calórica da refeição (ex: 20-30% do total)
+                val mealTargetCals = (profile.targetCalories / 5) 
+                
+                val foods = allFoods.value
+                val contextFoods = foods.take(40).joinToString { it.name }
+
+                val json = GeminiRepository.suggestMealItems(
+                    mealType = mealType.name,
+                    targetCalories = mealTargetCals,
+                    restrictions = restrictions,
+                    preferences = preferences,
+                    availableFoods = contextFoods
+                )
+
+                if (json != null) {
+                    val array = JSONArray(json)
+                    val list = mutableListOf<AiDietSuggestion>()
+                    for (i in 0 until array.length()) {
+                        val obj = array.getJSONObject(i)
+                        list.add(AiDietSuggestion(
+                            mealType = mealType,
+                            foodName = obj.getString("foodName"),
+                            amount = obj.getDouble("amount").toFloat(),
+                            unit = obj.getString("unit"),
+                            calories = obj.getDouble("calories").toFloat(),
+                            protein = obj.getDouble("protein").toFloat(),
+                            carbs = obj.getDouble("carbs").toFloat(),
+                            fat = obj.getDouble("fat").toFloat(),
+                            notes = obj.optString("notes")
+                        ))
+                    }
+                    _aiDietSuggestions.value = list
+                }
+            } catch (e: Exception) {
+                _toastMessage.value = "Erro ao sugerir alimentos: ${e.message}"
+            } finally {
+                _isAiDietLoading.value = false
+            }
+        }
+    }
+
+    fun clearAiSuggestions() {
+        _aiDietSuggestions.value = emptyList()
     }
 
     init {
@@ -197,6 +364,7 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                                 } else {
                                     profile.copy(firebaseUid = firebaseUser.uid)
                                 }
+                                viewModelScope.launch { syncDataFromCloud() }
                                 fallback.value = syncedProfile
                             } else {
                                 fallback.value = profile.copy(
@@ -501,8 +669,10 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
             val today = currentDateKey()
             if (preferences.getString("meal_completion_date", null) != today) {
                 repository.resetDailyMeals()
+                autoLogFixedItems()
                 preferences.edit().putString("meal_completion_date", today).apply()
             }
+            autoLogFixedItems() // Also call on init to ensure everything is synced
             combine(repository.recentIntakeHistory, _selectedDateMillis) { history, _ -> history }
                 .collect { history ->
                     _waterDrankMl.value = history.firstOrNull { it.dateString == selectedDateKey() }?.waterDrankMl ?: 0
@@ -1234,6 +1404,74 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun toggleMealItemFixed(item: MealPlanItem) {
+        viewModelScope.launch {
+            val nextState = !item.isFixed
+            repository.toggleMealFixed(item.id, item.isFixed)
+            
+            // Se o usuário fixou o item HOJE, vamos logar ele imediatamente
+            if (nextState) {
+                autoLogFixedItems()
+            } else {
+                // Se o usuário DESFIXOU, talvez queiramos remover o log? 
+                // Provavelmente não, deixa o registro de hoje. 
+                // Mas para o futuro ele não será mais auto-logado.
+            }
+        }
+    }
+
+    private fun autoLogFixedItems() {
+        viewModelScope.launch {
+            val items = repository.mealPlanItems.firstOrNull().orEmpty()
+            val fixedItems = items.filter { it.isFixed }
+            if (fixedItems.isEmpty()) return@launch
+
+            val today = currentDateKey()
+            val recordsToday = repository.getFoodRecordsForDate(today).firstOrNull().orEmpty()
+            val profile = userProfile.value
+
+            var anyNewLog = false
+            fixedItems.forEach { item ->
+                val alreadyLogged = recordsToday.any { 
+                    it.foodItemId == item.foodItemId && it.mealType == item.mealType && it.amount == item.amount 
+                }
+                
+                if (!alreadyLogged) {
+                    val recordDate = System.currentTimeMillis()
+                    val record = FoodRecord(
+                        dateString = today,
+                        dateMillis = recordDate,
+                        mealType = item.mealType,
+                        foodItemId = item.foodItemId,
+                        foodName = item.foodName,
+                        foodCategory = item.foodCategory,
+                        amount = item.amount,
+                        unit = item.unit,
+                        calories = item.calories,
+                        protein = item.protein,
+                        carbs = item.carbs,
+                        fat = item.fat,
+                        fiber = item.fiber,
+                        notes = item.notes
+                    )
+                    val insertedId = repository.addFoodRecord(record)
+                    firestoreSync.syncFoodRecordToCloud(record.copy(id = insertedId), profile.firebaseUid)
+                    
+                    // Mark the meal plan item as completed for today in UI
+                    if (!item.isCompletedToday) {
+                        repository.toggleMealCompletion(item.id, false)
+                    }
+                    anyNewLog = true
+                }
+            }
+            
+            if (anyNewLog) {
+                persistIntakeForDate(today)
+                _toastMessage.value = "Itens fixos registrados automaticamente para hoje!"
+            }
+        }
+    }
+
     private fun currentDateKey(): String =
         SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
 
@@ -1296,6 +1534,61 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
             )
             repository.addFoodItem(newFood)
             _toastMessage.value = "Alimento '$name' salvo na sua tabela!"
+        }
+    }
+
+    fun toggleFoodFavorite(food: FoodItem) {
+        viewModelScope.launch {
+            val nextState = !food.isFavorite
+            repository.toggleFoodFavorite(food, userProfile.value.firebaseUid)
+            
+            // Sincroniza com a nuvem imediatamente
+            firestoreSync.syncFavoriteFoodToCloud(food.copy(isFavorite = nextState), userProfile.value.firebaseUid)
+            
+            val msg = if (nextState) "adicionado aos favoritos" else "removido dos favoritos"
+            _toastMessage.value = "'${food.name}' $msg"
+        }
+    }
+
+    suspend fun syncDataFromCloud() {
+        val uid = userProfile.value.firebaseUid
+        if (uid.isNotBlank()) {
+            // Sincroniza Alimentos Favoritos
+            syncFavoritesFromCloud()
+            // Sincroniza Plano de Refeições
+            firestoreSync.fetchMealPlansFromCloud(uid).onSuccess { cloudItems ->
+                repository.clearMealPlanItems()
+                repository.insertMealPlanItems(cloudItems)
+            }
+            // Sincroniza Histórico de Alimentação
+            firestoreSync.fetchFoodRecordsFromCloud(uid).onSuccess { cloudRecords ->
+                repository.clearFoodRecords()
+                repository.insertFoodRecords(cloudRecords)
+            }
+        }
+    }
+
+    fun syncFavoritesFromCloud() {
+        viewModelScope.launch {
+            val uid = userProfile.value.firebaseUid
+            if (uid.isNotBlank()) {
+                val result = firestoreSync.fetchFavoriteFoodsFromCloud(uid)
+                result.onSuccess { favoriteIds ->
+                    repository.clearAllFavorites()
+                    val allFoodsList = allFoods.value
+                    favoriteIds.forEach { id ->
+                        val food = allFoodsList.find { it.id == id }
+                        if (food != null) {
+                            repository.toggleFoodFavorite(food, uid)
+                        }
+                    }
+                    if (favoriteIds.isNotEmpty()) {
+                        _toastMessage.value = "${favoriteIds.size} favoritos sincronizados da nuvem!"
+                    }
+                }.onFailure {
+                    if (BuildConfig.DEBUG) Log.e("VirtusViewModel", "Erro ao sincronizar favoritos: ${it.message}")
+                }
+            }
         }
     }
 

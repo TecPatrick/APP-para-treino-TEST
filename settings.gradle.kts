@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Virtus"
+rootProject.name = "Growth Diet"
 
 include(":app")

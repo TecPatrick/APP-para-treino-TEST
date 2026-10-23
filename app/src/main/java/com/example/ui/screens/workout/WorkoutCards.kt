@@ -492,26 +492,45 @@ fun ExerciseExecutionCard(
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Carga: ", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    
+                    // Increment 1kg
                     IconButton(
-                        onClick = { onUpdateWeight((exercise.currentWeightKg - 2.5f).coerceAtLeast(0f)) },
-                        modifier = Modifier.size(26.dp)
+                        onClick = { onUpdateWeight((exercise.currentWeightKg - 1f).coerceAtLeast(0f)) },
+                        modifier = Modifier.size(24.dp)
                     ) {
-                        Icon(Icons.Default.Remove, contentDescription = "Diminuir", tint = GrowthOrange, modifier = Modifier.size(14.dp))
+                        Text("-1", fontSize = 10.sp, color = GrowthOrangeLight)
                     }
+                    
+                    // Increment 5kg
+                    IconButton(
+                        onClick = { onUpdateWeight((exercise.currentWeightKg - 5f).coerceAtLeast(0f)) },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Text("-5", fontSize = 10.sp, color = GrowthOrange)
+                    }
+
                     Text(
                         text = "${exercise.currentWeightKg.toInt()} kg",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        color = GrowthOrange
+                        color = GrowthOrange,
+                        modifier = Modifier.padding(horizontal = 4.dp)
                     )
+
                     IconButton(
-                        onClick = { onUpdateWeight(exercise.currentWeightKg + 2.5f) },
-                        modifier = Modifier.size(26.dp)
+                        onClick = { onUpdateWeight(exercise.currentWeightKg + 5f) },
+                        modifier = Modifier.size(24.dp)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "Aumentar", tint = GrowthOrange, modifier = Modifier.size(14.dp))
+                        Text("+5", fontSize = 10.sp, color = GrowthOrange)
+                    }
+
+                    IconButton(
+                        onClick = { onUpdateWeight(exercise.currentWeightKg + 1f) },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Text("+1", fontSize = 10.sp, color = GrowthOrangeLight)
                     }
                 }
             }

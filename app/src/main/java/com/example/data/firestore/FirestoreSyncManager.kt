@@ -553,6 +553,33 @@ open class FirestoreSyncManager(private val context: Context) {
         } catch (e: CancellationException) { throw e } catch (e: Exception) { Result.failure(e) }
     }
 
+    suspend fun fetchFoodRecordsFromCloud(customUid: String? = null): Result<List<FoodRecord>> {
+        val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado"))
+        return try {
+            val snapshot = firestore.collection("users").document(uid).collection("foodRecords").get(Source.DEFAULT).await()
+            val records = snapshot.documents.map { doc ->
+                val d = doc.data ?: emptyMap()
+                FoodRecord(
+                    id = doc.id.toLongOrNull() ?: 0L,
+                    dateString = d["dateString"] as? String ?: "",
+                    dateMillis = (d["dateMillis"] as? Number)?.toLong() ?: 0L,
+                    mealType = com.example.data.model.MealType.valueOf(d["mealType"] as? String ?: "BREAKFAST"),
+                    foodItemId = (d["foodItemId"] as? Number)?.toLong() ?: 0L,
+                    foodName = d["foodName"] as? String ?: "",
+                    amount = (d["amount"] as? Number)?.toFloat() ?: 0f,
+                    unit = d["unit"] as? String ?: "g",
+                    calories = (d["calories"] as? Number)?.toFloat() ?: 0f,
+                    protein = (d["protein"] as? Number)?.toFloat() ?: 0f,
+                    carbs = (d["carbs"] as? Number)?.toFloat() ?: 0f,
+                    fat = (d["fat"] as? Number)?.toFloat() ?: 0f,
+                    fiber = (d["fiber"] as? Number)?.toFloat() ?: 0f,
+                    notes = d["notes"] as? String ?: ""
+                )
+            }
+            Result.success(records)
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
     suspend fun syncCardioLogToCloud(log: CardioLog, customUid: String? = null): Result<Unit> {
         val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado"))
         return try {
@@ -583,6 +610,42 @@ open class FirestoreSyncManager(private val context: Context) {
         } catch (e: CancellationException) { throw e } catch (e: Exception) { Result.failure(e) }
     }
 
+    suspend fun syncFavoriteFoodToCloud(food: com.example.data.model.FoodItem, customUid: String? = null): Result<Unit> {
+        val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado"))
+        return try {
+            val docRef = firestore.collection("users").document(uid).collection("favoriteFoods").document(food.id.toString())
+            val data = mapOf(
+                "userId" to uid,
+                "foodId" to food.id,
+                "foodName" to food.name,
+                "category" to food.category.name,
+                "isFavorite" to food.isFavorite,
+                "updatedAt" to FieldValue.serverTimestamp()
+            )
+            awaitCloudWrite(docRef.set(data, SetOptions.merge()))
+            Result.success(Unit)
+        } catch (e: CancellationException) { throw e } catch (e: Exception) { Result.failure(e) }
+    }
+
+    suspend fun deleteFavoriteFoodFromCloud(foodId: Long, customUid: String? = null): Result<Unit> {
+        val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado"))
+        return try {
+            awaitCloudWrite(firestore.collection("users").document(uid).collection("favoriteFoods").document(foodId.toString()).delete())
+            Result.success(Unit)
+        } catch (e: CancellationException) { throw e } catch (e: Exception) { Result.failure(e) }
+    }
+
+    suspend fun fetchFavoriteFoodsFromCloud(customUid: String? = null): Result<List<Long>> {
+        val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado"))
+        return try {
+            val snapshot = firestore.collection("users").document(uid).collection("favoriteFoods")
+                .whereEqualTo("isFavorite", true)
+                .get(Source.DEFAULT).await()
+            val ids = snapshot.documents.mapNotNull { (it.data?.get("foodId") as? Number)?.toLong() }
+            Result.success(ids)
+        } catch (e: CancellationException) { throw e } catch (e: Exception) { Result.failure(e) }
+    }
+
     // =========================================================================
     // 4. ITENS ADICIONAIS EXISTENTES (MealPlan, Shopping, Progress)
     // =========================================================================
@@ -602,6 +665,7 @@ open class FirestoreSyncManager(private val context: Context) {
                 "carbs" to mealPlan.carbs.toDouble(),
                 "fat" to mealPlan.fat.toDouble(),
                 "isCompletedToday" to mealPlan.isCompletedToday,
+                "isFixed" to mealPlan.isFixed,
                 "updatedAt" to FieldValue.serverTimestamp()
             )
             awaitCloudWrite(doc.set(data, SetOptions.merge()))
@@ -609,9 +673,33 @@ open class FirestoreSyncManager(private val context: Context) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao sincronizar refeição: ${e.message}", e)
             Result.failure(e)
         }
+    }
+
+    suspend fun fetchMealPlansFromCloud(customUid: String? = null): Result<List<MealPlanItem>> {
+        val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado"))
+        return try {
+            val snapshot = firestore.collection("users").document(uid).collection("mealPlans").get(Source.DEFAULT).await()
+            val mealPlans = snapshot.documents.map { doc ->
+                val d = doc.data ?: emptyMap()
+                MealPlanItem(
+                    id = doc.id.toLongOrNull() ?: 0L,
+                    mealType = com.example.data.model.MealType.valueOf(d["mealType"] as? String ?: "BREAKFAST"),
+                    foodItemId = (d["foodItemId"] as? Number)?.toLong() ?: 0L,
+                    foodName = d["name"] as? String ?: "",
+                    foodCategory = com.example.data.model.FoodCategory.OTHER,
+                    amount = (d["portionGrams"] as? Number)?.toFloat() ?: 0f,
+                    unit = "g",
+                    calories = (d["calories"] as? Number)?.toFloat() ?: 0f,
+                    protein = (d["protein"] as? Number)?.toFloat() ?: 0f,
+                    carbs = (d["carbs"] as? Number)?.toFloat() ?: 0f,
+                    fat = (d["fat"] as? Number)?.toFloat() ?: 0f,
+                    isFixed = (d["isFixed"] as? Boolean) ?: false
+                )
+            }
+            Result.success(mealPlans)
+        } catch (e: Exception) { Result.failure(e) }
     }
 
     suspend fun syncShoppingItemToCloud(item: ShoppingItem): Result<Unit> {
@@ -672,7 +760,8 @@ open class FirestoreSyncManager(private val context: Context) {
         // Included defensively for newer clients so account deletion remains complete.
         "foodRecords",
         "cardioLogs",
-        "dailyIntake"
+        "dailyIntake",
+        "favoriteFoods"
     )
 
     private suspend fun deleteCollectionFromServer(
@@ -732,7 +821,8 @@ open class FirestoreSyncManager(private val context: Context) {
         gpsLogs: List<GpsRouteLog> = emptyList(),
         foodRecords: List<FoodRecord> = emptyList(),
         cardioLogs: List<CardioLog> = emptyList(),
-        dailyIntakes: List<DailyIntakeHistory> = emptyList()
+        dailyIntakes: List<DailyIntakeHistory> = emptyList(),
+        favoriteFoods: List<com.example.data.model.FoodItem> = emptyList()
     ): Result<SyncReport> {
         val uid = resolveUserId(profile?.firebaseUid)
             ?: return Result.failure(IllegalStateException("Entre na sua conta para sincronizar. Os dados locais continuam no aparelho."))
@@ -750,6 +840,7 @@ open class FirestoreSyncManager(private val context: Context) {
         foodRecords.forEach { log -> operations.add { syncFoodRecordToCloud(log, uid) } }
         cardioLogs.forEach { log -> operations.add { syncCardioLogToCloud(log, uid) } }
         dailyIntakes.forEach { log -> operations.add { syncDailyIntakeToCloud(log, uid) } }
+        favoriteFoods.forEach { food -> operations.add { syncFavoriteFoodToCloud(food, uid) } }
         return Result.success(collectSyncResults(operations))
     }
 }

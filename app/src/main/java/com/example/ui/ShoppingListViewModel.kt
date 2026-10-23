@@ -126,70 +126,112 @@ class ShoppingListViewModel(application: Application) : AndroidViewModel(applica
                     val (category, dailyAmount) = categoryAndAmount
                     val totalPeriodAmount = dailyAmount * periodDays
 
-                    val (displayQty, displayUnit, estimatedPrice) = when {
+                    // 💡 Smart Conversion: Convert tracked 'Cooked/Grilled' weights to 'Raw' shopping quantities
+                    // Factors: Rice (0.4), Beans (0.5), Chicken/Meat (1.35), Potato (1.0)
+                    val rawConversionFactor = when {
+                        foodName.contains("Arroz", true) && foodName.contains("Cozido", true) -> 0.4f
+                        foodName.contains("Feijão", true) && foodName.contains("Cozido", true) -> 0.5f
+                        foodName.contains("Frango", true) && (foodName.contains("Grelhado", true) || foodName.contains("Cozido", true)) -> 1.35f
+                        foodName.contains("Carne", true) && (foodName.contains("Grelhado", true) || foodName.contains("Assado", true)) -> 1.4f
+                        foodName.contains("Patinho", true) && (foodName.contains("Grelhado", true) || foodName.contains("Moído", true)) -> 1.4f
+                        foodName.contains("Tilápia", true) || foodName.contains("Peixe", true) -> 1.25f
+                        else -> 1.0f
+                    }
+
+                    val adjustedTotalAmount = totalPeriodAmount * rawConversionFactor
+                    val shoppingName = foodName
+                        .replace("Cozido", "", ignoreCase = true)
+                        .replace("Grelhado", "", ignoreCase = true)
+                        .replace("Assado", "", ignoreCase = true)
+                        .replace("Grelhada", "", ignoreCase = true)
+                        .replace("Cozida", "", ignoreCase = true)
+                        .replace("Moído", "", ignoreCase = true)
+                        .replace("Moída", "", ignoreCase = true)
+                        .trim()
+
+                    val (displayQty, displayUnit) = when {
                         // Growth Supplements
                         foodName.contains("Whey", ignoreCase = true) -> {
-                            val pots = ceil((totalPeriodAmount / 1000f).toDouble()).coerceAtLeast(1.0).toFloat()
-                            Triple(pots, "pct (1kg)", pots * 105.0f)
+                            val pots = ceil((adjustedTotalAmount / 1000f).toDouble()).coerceAtLeast(1.0).toFloat()
+                            pots to "pct (1kg)"
                         }
                         foodName.contains("Creatina", ignoreCase = true) -> {
-                            val pots = ceil((totalPeriodAmount / 250f).toDouble()).coerceAtLeast(1.0).toFloat()
-                            Triple(pots, "pote (250g)", pots * 89.0f)
+                            val pots = ceil((adjustedTotalAmount / 250f).toDouble()).coerceAtLeast(1.0).toFloat()
+                            pots to "pote (250g)"
                         }
                         foodName.contains("Pasta de Amendoim", ignoreCase = true) -> {
-                            val pots = ceil((totalPeriodAmount / 1000f).toDouble()).coerceAtLeast(1.0).toFloat()
-                            Triple(pots, "pote (1kg)", pots * 29.0f)
+                            val pots = ceil((adjustedTotalAmount / 1000f).toDouble()).coerceAtLeast(1.0).toFloat()
+                            pots to "pote (1kg)"
                         }
                         foodName.contains("Glutamina", ignoreCase = true) -> {
-                            val pots = ceil((totalPeriodAmount / 300f).toDouble()).coerceAtLeast(1.0).toFloat()
-                            Triple(pots, "pote (300g)", pots * 75.0f)
+                            val pots = ceil((adjustedTotalAmount / 300f).toDouble()).coerceAtLeast(1.0).toFloat()
+                            pots to "pote (300g)"
                         }
                         foodName.contains("Multivitamínico", ignoreCase = true) || foodName.contains("Ômega", ignoreCase = true) -> {
-                            Triple(1f, "frasco (120 caps)", 45.0f)
+                            1f to "frasco (120 caps)"
                         }
                         // Eggs & Egg Whites
                         foodName.contains("Ovo", ignoreCase = true) -> {
-                            val totalEggs = (totalPeriodAmount / 50f).roundToInt()
+                            val totalEggs = (adjustedTotalAmount / 50f).roundToInt()
                             val cartelas = ceil(totalEggs / 30.0).toFloat()
                             if (cartelas >= 1f) {
-                                Triple(cartelas, "cartela (30un)", cartelas * 21.0f)
+                                cartelas to "cartela (30un)"
                             } else {
-                                Triple(totalEggs.toFloat(), "unidades", totalEggs * 0.75f)
+                                totalEggs.toFloat() to "unidades"
                             }
                         }
                         foodName.contains("Clara", ignoreCase = true) -> {
-                            val liters = ceil(totalPeriodAmount / 1000f).coerceAtLeast(1f)
-                            Triple(liters, "garrafa (1L)", liters * 18.0f)
+                            val liters = ceil(adjustedTotalAmount / 1000f).coerceAtLeast(1f)
+                            liters to "garrafa (1L)"
                         }
                         // Oils & Condiments
                         foodName.contains("Azeite", ignoreCase = true) -> {
-                            val bottles = ceil((totalPeriodAmount / 500f).toDouble()).coerceAtLeast(1.0).toFloat()
-                            Triple(bottles, "garrafa (500ml)", bottles * 38.0f)
+                            val bottles = ceil((adjustedTotalAmount / 500f).toDouble()).coerceAtLeast(1.0).toFloat()
+                            bottles to "garrafa (500ml)"
                         }
                         // Bulk Foods (over 1000g)
-                        totalPeriodAmount >= 1000f -> {
-                            val kg = totalPeriodAmount / 1000f
+                        adjustedTotalAmount >= 1000f -> {
+                            val kg = adjustedTotalAmount / 1000f
                             val roundedKg = (Math.round(kg * 10f) / 10f)
-                            val pricePerKg = when (category) {
-                                FoodCategory.PROTEIN -> 24.0f
-                                FoodCategory.CARBOHYDRATE -> 6.5f
-                                FoodCategory.FAT -> 45.0f
-                                FoodCategory.FRUITS_VEGETABLES -> 8.5f
-                                FoodCategory.DAIRY -> 7.0f
-                                else -> 12.0f
-                            }
-                            Triple(roundedKg, "kg", roundedKg * pricePerKg)
+                            roundedKg to "kg"
                         }
                         // Small portions (under 1kg)
                         else -> {
-                            val roundedGrams = (Math.round(totalPeriodAmount / 10f) * 10).toFloat()
-                            val unitPrice = if (category == FoodCategory.DAIRY) "L" else "g"
-                            Triple(roundedGrams, unitPrice, (roundedGrams / 1000f) * 16.0f)
+                            val roundedGrams = (Math.round(adjustedTotalAmount / 10f) * 10).toFloat()
+                            val unitLabel = if (category == FoodCategory.DAIRY) "L" else "g"
+                            roundedGrams to unitLabel
                         }
                     }
 
+                    // 💡 Refined Price Calculation: Consolidates price per KG and ensures precise conversion
+                    val pricePerKgOrUnit = when {
+                        foodName.contains("Whey", ignoreCase = true) -> 105.0f
+                        foodName.contains("Creatina", ignoreCase = true) -> 89.0f
+                        foodName.contains("Pasta de Amendoim", ignoreCase = true) -> 29.0f
+                        foodName.contains("Glutamina", ignoreCase = true) -> 75.0f
+                        foodName.contains("Multivitamínico", ignoreCase = true) || foodName.contains("Ômega", ignoreCase = true) -> 45.0f
+                        foodName.contains("Ovo", ignoreCase = true) -> if (displayUnit.contains("cartela")) 21.0f else 0.75f
+                        foodName.contains("Clara", ignoreCase = true) -> 18.0f
+                        foodName.contains("Azeite", ignoreCase = true) -> 38.0f
+                        else -> when (category) {
+                            FoodCategory.PROTEIN -> 28.0f
+                            FoodCategory.CARBOHYDRATE -> 6.5f
+                            FoodCategory.FAT -> 45.0f
+                            FoodCategory.FRUITS_VEGETABLES -> 9.5f
+                            FoodCategory.DAIRY -> 7.5f
+                            else -> 12.0f
+                        }
+                    }
+
+                    // Final price calculation with gram-to-kilogram conversion where applicable
+                    val estimatedPrice = if (displayUnit == "g" || displayUnit == "ml") {
+                        (displayQty / 1000f) * pricePerKgOrUnit
+                    } else {
+                        displayQty * pricePerKgOrUnit
+                    }
+
                     ShoppingItem(
-                        name = foodName,
+                        name = shoppingName,
                         category = category,
                         quantity = displayQty,
                         unit = displayUnit,
@@ -199,7 +241,7 @@ class ShoppingListViewModel(application: Application) : AndroidViewModel(applica
                         myEstimatedPrice = estimatedPrice,
                         partnerEstimatedPrice = 0f,
                         isAutoGenerated = true,
-                        notes = "Dieta: ${dailyAmount.toInt()}g/dia para $periodDays dias"
+                        notes = "Dieta: ${dailyAmount.toInt()}g/dia de item ${if (rawConversionFactor != 1.0f) "preparado" else "fresco"}"
                     )
                 }
 

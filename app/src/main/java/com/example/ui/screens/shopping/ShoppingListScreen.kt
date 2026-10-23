@@ -5,11 +5,16 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -299,6 +304,64 @@ fun ShoppingListScreen(
                                             }
                                         }
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2. Gráfico de Distribuição de Custos (Native Bar Chart)
+                if (shoppingList.isNotEmpty()) {
+                    item {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = CarbonCard),
+                            shape = RoundedCornerShape(14.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                                .testTag("cost_distribution_chart_card")
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            "DISTRIBUIÇÃO DE CUSTOS",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = GrowthOrangeLight,
+                                            letterSpacing = 1.sp
+                                        )
+                                        Text(
+                                            "Investimento mensal por grupo alimentar",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = GrowthOrange, modifier = Modifier.size(16.dp))
+                                }
+
+                                Spacer(modifier = Modifier.height(20.dp))
+
+                                // Native Bar Chart Implementation
+                                val categoryCosts = remember(shoppingList) {
+                                    shoppingList.groupBy { it.category }
+                                        .mapValues { entry -> entry.value.sumOf { it.estimatedPrice.toDouble() }.toFloat() }
+                                        .toList()
+                                        .sortedByDescending { it.second }
+                                }
+
+                                if (categoryCosts.isNotEmpty()) {
+                                    CostDistributionBarChart(
+                                        data = categoryCosts,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(180.dp)
+                                    )
                                 }
                             }
                         }
@@ -950,3 +1013,134 @@ fun AddManualShoppingItemDialog(
         }
     )
 }
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun CostDistributionBarChart(
+    data: List<Pair<FoodCategory, Float>>,
+    modifier: Modifier = Modifier
+) {
+    if (data.isEmpty()) return
+    
+    val maxCost = remember(data) { data.maxOf { it.second }.coerceAtLeast(1f) }
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val onBackground = MaterialTheme.colorScheme.onBackground
+    
+    val categoryColors = data.associate { (category, _) ->
+        category to when (category) {
+            FoodCategory.PROTEIN -> GrowthCyan
+            FoodCategory.CARBOHYDRATE -> GrowthYellow
+            FoodCategory.FAT -> GrowthOrange
+            FoodCategory.GROWTH_SUPPLEMENT -> GrowthOrangeLight
+            FoodCategory.FRUITS_VEGETABLES -> GrowthGreen
+            FoodCategory.DAIRY -> GrowthCyan.copy(alpha = 0.7f)
+            else -> onSurfaceVariant
+        }
+    }
+
+    Column(modifier = modifier) {
+        Box(modifier = Modifier.fillMaxWidth().height(160.dp)) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val canvasWidth = size.width
+                val canvasHeight = size.height
+                val barSpacing = 24.dp.toPx()
+                val barWidth = (canvasWidth - (data.size - 1) * barSpacing) / data.size
+                
+                // Draw Y-axis grid lines (optional but adds "recharts" feel)
+                val gridLines = 4
+                for (i in 0..gridLines) {
+                    val y = canvasHeight - (i * (canvasHeight / gridLines))
+                    drawLine(
+                        color = onSurfaceVariant.copy(alpha = 0.1f),
+                        start = Offset(0f, y),
+                        end = Offset(canvasWidth, y),
+                        strokeWidth = 1.dp.toPx()
+                    )
+                }
+
+                data.forEachIndexed { index, (category, cost) ->
+                    val barHeight = (cost / maxCost) * canvasHeight
+                    val x = index * (barWidth + barSpacing)
+                    val y = canvasHeight - barHeight
+
+                    val color = categoryColors[category] ?: onSurfaceVariant
+
+                    // Draw Bar Background (Track)
+                    drawRoundRect(
+                        color = color.copy(alpha = 0.05f),
+                        topLeft = Offset(x, 0f),
+                        size = Size(barWidth, canvasHeight),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx())
+                    )
+
+                    // Draw Active Bar with Gradient-like effect (simulated)
+                    drawRoundRect(
+                        color = color,
+                        topLeft = Offset(x, y),
+                        size = Size(barWidth, barHeight),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx())
+                    )
+                    
+                    // Value label on top of bar if it's large enough
+                    if (barHeight > 30.dp.toPx()) {
+                        // Drawing text in Canvas is tricky without NativeCanvas, 
+                        // so we usually overlay with Box or just skip for simplicity in Canvas.
+                        // But for "polish", let's focus on the legend below.
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Legend with refined layout
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            data.forEach { (cat, cost) ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(categoryColors[cat] ?: onSurfaceVariant)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column {
+                        Text(
+                            text = cat.label,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = onSurfaceVariant
+                        )
+                        Text(
+                            text = "R$ ${String.format("%.2f", cost)}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Black,
+                            color = onBackground
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FlowRow(
+    modifier: Modifier = Modifier,
+    horizontalArrangement: Arrangement.Horizontal = Arrangement.Start,
+    verticalArrangement: Arrangement.Vertical = Arrangement.Top,
+    content: @Composable () -> Unit
+) {
+    androidx.compose.foundation.layout.FlowRow(
+        modifier = modifier,
+        horizontalArrangement = horizontalArrangement,
+        verticalArrangement = verticalArrangement,
+        content = { content() }
+    )
+}
+

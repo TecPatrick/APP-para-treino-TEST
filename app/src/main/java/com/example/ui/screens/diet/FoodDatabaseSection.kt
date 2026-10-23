@@ -23,6 +23,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Refresh
@@ -75,19 +77,22 @@ fun FoodDatabaseSection(
     foods: List<FoodItem>,
     onAddFoodToMeal: (FoodItem, MealType, Float, String) -> Unit,
     onOpenCustomFoodDialog: () -> Unit,
-    onReloadDefaults: () -> Unit
+    onReloadDefaults: () -> Unit,
+    onToggleFavorite: (FoodItem) -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf<FoodCategory?>(null) }
     var foodToAddToMeal by remember { mutableStateOf<FoodItem?>(null) }
+    var showOnlyFavorites by remember { mutableStateOf(false) }
 
-    val filteredFoods = remember(foods, searchQuery, selectedCategory) {
+    val filteredFoods = remember(foods, searchQuery, selectedCategory, showOnlyFavorites) {
         foods.filter { food ->
             val matchesQuery = searchQuery.isBlank() ||
                 food.name.contains(searchQuery, ignoreCase = true) ||
                 food.category.label.contains(searchQuery, ignoreCase = true)
             val matchesCategory = selectedCategory == null || food.category == selectedCategory
-            matchesQuery && matchesCategory
+            val matchesFavorite = !showOnlyFavorites || food.isFavorite
+            matchesQuery && matchesCategory && matchesFavorite
         }
     }
 
@@ -98,136 +103,196 @@ fun FoodDatabaseSection(
     ) {
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Search Input
-        OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
-            placeholder = { Text("Buscar alimento ou suplemento (ex: peito, whey, arroz...)", fontSize = 12.sp) },
-            leadingIcon = {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = null,
-                    tint = GrowthOrange
-                )
-            },
-            trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { searchQuery = "" }) {
-                        Icon(
-                            imageVector = Icons.Default.Clear,
-                            contentDescription = "Limpar busca",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+        // 🔍 Modern Real-time Search Bar
+        Surface(
+            color = CarbonCard,
+            shape = RoundedCornerShape(14.dp),
+            border = BorderStroke(1.dp, CarbonBorder),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { 
+                    Text(
+                        "Buscar por nome ou categoria (ex: frango, suplemento...)", 
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    ) 
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = GrowthOrange,
+                        modifier = Modifier.size(20.dp)
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(
+                                imageVector = Icons.Default.Clear,
+                                contentDescription = "Limpar busca",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
-                }
-            },
-            singleLine = true,
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("food_database_search_input"),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = GrowthOrange,
-                unfocusedBorderColor = CarbonBorder,
-                focusedContainerColor = CarbonCard,
-                unfocusedContainerColor = CarbonCard
-            ),
-            shape = RoundedCornerShape(12.dp)
+                },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("food_database_search_input"),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = GrowthOrange.copy(alpha = 0.5f),
+                    unfocusedBorderColor = Color.Transparent,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    cursorColor = GrowthOrange
+                ),
+                shape = RoundedCornerShape(14.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 🏷️ Dynamic Category Filter Chips
+        Text(
+            text = "FILTRAR POR CATEGORIA",
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+            letterSpacing = 1.sp
         )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Category filter chips
+        
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(bottom = 4.dp)
         ) {
             item {
                 FilterChip(
                     selected = selectedCategory == null,
                     onClick = { selectedCategory = null },
-                    label = { Text("Todos (${foods.size})", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
+                    label = { Text("Todos", fontSize = 11.sp, fontWeight = FontWeight.Bold) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = GrowthOrange,
-                        selectedLabelColor = Color.White,
+                        selectedLabelColor = Color.Black,
                         containerColor = CarbonCard,
                         labelColor = MaterialTheme.colorScheme.onSurfaceVariant
                     ),
                     border = BorderStroke(1.dp, if (selectedCategory == null) GrowthOrange else CarbonBorder),
+                    shape = RoundedCornerShape(8.dp),
                     modifier = Modifier.testTag("filter_all_foods")
+                )
+            }
+            item {
+                val favCount = foods.count { it.isFavorite }
+                FilterChip(
+                    selected = showOnlyFavorites,
+                    onClick = { showOnlyFavorites = !showOnlyFavorites },
+                    label = { 
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (showOnlyFavorites) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = if (showOnlyFavorites) Color.White else GrowthOrange
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Favoritos ($favCount)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = GrowthOrange,
+                        selectedLabelColor = Color.White,
+                        containerColor = CarbonCard,
+                        labelColor = GrowthOrange
+                    ),
+                    border = BorderStroke(1.dp, GrowthOrange),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.testTag("filter_favorites")
                 )
             }
             items(FoodCategory.values()) { cat ->
                 val count = foods.count { it.category == cat }
-                FilterChip(
-                    selected = selectedCategory == cat,
-                    onClick = { selectedCategory = cat },
-                    label = { Text("${cat.label} ($count)", fontSize = 11.sp, fontWeight = FontWeight.Medium) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = if (cat == FoodCategory.GROWTH_SUPPLEMENT) GrowthOrange else GrowthCyan,
-                        selectedLabelColor = Color.White,
-                        containerColor = CarbonCard,
-                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    ),
-                    border = BorderStroke(1.dp, if (selectedCategory == cat) GrowthOrange else CarbonBorder),
-                    modifier = Modifier.testTag("filter_category_${cat.name}")
-                )
+                if (count > 0) {
+                    FilterChip(
+                        selected = selectedCategory == cat,
+                        onClick = { selectedCategory = cat },
+                        label = { Text(cat.label, fontSize = 11.sp, fontWeight = FontWeight.Medium) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = if (cat == FoodCategory.GROWTH_SUPPLEMENT) GrowthOrange else GrowthCyan,
+                            selectedLabelColor = Color.Black,
+                            containerColor = CarbonCard,
+                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        border = BorderStroke(1.dp, if (selectedCategory == cat) (if (cat == FoodCategory.GROWTH_SUPPLEMENT) GrowthOrange else GrowthCyan) else CarbonBorder),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.testTag("filter_category_${cat.name}")
+                    )
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // Action Toolbar
+        // 📊 Results Summary & Action Toolbar
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "${filteredFoods.size} ALIMENTOS DISPONÍVEIS",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = GrowthOrangeLight,
-                letterSpacing = 1.sp
-            )
-
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedButton(
-                    onClick = onReloadDefaults,
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, CarbonBorder),
-                    modifier = Modifier.testTag("reload_default_foods_btn")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = null,
-                        tint = GrowthCyan,
-                        modifier = Modifier.size(14.dp)
+            Column {
+                Text(
+                    text = "${filteredFoods.size} ITENS ENCONTRADOS",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    color = if (filteredFoods.isEmpty()) GrowthOrange else GrowthGreen,
+                    letterSpacing = 0.5.sp
+                )
+                if (searchQuery.isNotEmpty() || selectedCategory != null) {
+                    Text(
+                        text = "Filtro ativo: ${if (searchQuery.isNotEmpty()) "\"$searchQuery\" " else ""}${selectedCategory?.label ?: ""}",
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Restaurar", fontSize = 10.sp, color = GrowthCyan)
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Quick Action: Clear Filters
+                if (searchQuery.isNotEmpty() || selectedCategory != null) {
+                    TextButton(
+                        onClick = { 
+                            searchQuery = ""
+                            selectedCategory = null
+                            showOnlyFavorites = false
+                        },
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Text("Limpar", fontSize = 11.sp, color = GrowthOrange)
+                    }
                 }
 
                 Button(
                     onClick = onOpenCustomFoodDialog,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                     shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
-                    modifier = Modifier.testTag("add_custom_food_top_btn")
+                    colors = ButtonDefaults.buttonColors(containerColor = GrowthCyan),
+                    modifier = Modifier.height(32.dp).testTag("add_custom_food_top_btn")
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(14.dp)
-                    )
+                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Novo", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("Novo", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
         // List of food items
         if (filteredFoods.isEmpty()) {
@@ -275,7 +340,8 @@ fun FoodDatabaseSection(
                 items(filteredFoods, key = { it.id }) { food ->
                     FoodDatabaseItemCard(
                         food = food,
-                        onAddToMealClick = { foodToAddToMeal = food }
+                        onAddToMealClick = { foodToAddToMeal = food },
+                        onToggleFavorite = { onToggleFavorite(food) }
                     )
                 }
             }
@@ -298,7 +364,8 @@ fun FoodDatabaseSection(
 @Composable
 fun FoodDatabaseItemCard(
     food: FoodItem,
-    onAddToMealClick: () -> Unit
+    onAddToMealClick: () -> Unit,
+    onToggleFavorite: () -> Unit
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = CarbonCard),
@@ -368,27 +435,43 @@ fun FoodDatabaseItemCard(
                     )
                 }
 
-                Button(
-                    onClick = onAddToMealClick,
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange.copy(alpha = 0.15f)),
-                    border = BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.6f)),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                    modifier = Modifier.testTag("add_to_meal_btn_${food.id}")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = null,
-                        tint = GrowthOrange,
-                        modifier = Modifier.size(14.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onToggleFavorite,
+                        modifier = Modifier.size(36.dp).testTag("toggle_favorite_${food.id}")
+                    ) {
+                        Icon(
+                            imageVector = if (food.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = if (food.isFavorite) "Remover dos favoritos" else "Adicionar aos favoritos",
+                            tint = if (food.isFavorite) GrowthOrange else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Refeição",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GrowthOrangeLight
-                    )
+
+                    Button(
+                        onClick = onAddToMealClick,
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange.copy(alpha = 0.15f)),
+                        border = BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.6f)),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.testTag("add_to_meal_btn_${food.id}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            tint = GrowthOrange,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Refeição",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = GrowthOrangeLight
+                        )
+                    }
                 }
             }
 

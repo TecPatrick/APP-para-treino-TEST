@@ -29,7 +29,7 @@ import com.example.data.model.*
     Macro::class,
     WorkoutSchedule::class,
     CardioLog::class
-], version = 2, exportSchema = true)
+], version = 3, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun appDao(): AppDao
     fun growthDao(): AppDao = appDao()
@@ -47,6 +47,15 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add isFixed to meal_plan_items (fixes Turn 1 error)
+                db.execSQL("ALTER TABLE meal_plan_items ADD COLUMN isFixed INTEGER NOT NULL DEFAULT 0")
+                // Add isFavorite to food_items (for New Feature)
+                db.execSQL("ALTER TABLE food_items ADD COLUMN isFavorite INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -57,7 +66,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "app_database"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .addCallback(object : RoomDatabase.Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) {
                             // Older versions stored the raw password in this legacy column.
