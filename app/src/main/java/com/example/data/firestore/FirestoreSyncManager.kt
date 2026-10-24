@@ -17,6 +17,8 @@ import com.example.data.model.ProgressLog
 import com.example.data.model.ShoppingItem
 import com.example.data.model.UserProfile
 import com.example.data.model.WorkoutLog
+import com.example.data.model.WorkoutRoutine
+import com.example.data.model.WorkoutExercise
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -750,6 +752,53 @@ open class FirestoreSyncManager(private val context: Context) {
         }
     }
 
+    suspend fun syncWorkoutRoutineToCloud(routine: WorkoutRoutine, customUid: String? = null): Result<Unit> {
+        val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado"))
+        return try {
+            val docRef = firestore.collection("users").document(uid)
+                .collection("workoutRoutines").document(routine.id.toString())
+            val data = mapOf(
+                "userId" to uid,
+                "splitType" to routine.splitType.name,
+                "letter" to routine.letter,
+                "title" to routine.title,
+                "dayOfWeekLabel" to routine.dayOfWeekLabel,
+                "targetMuscleGroups" to routine.targetMuscleGroups,
+                "estimatedDurationMinutes" to routine.estimatedDurationMinutes,
+                "updatedAt" to FieldValue.serverTimestamp()
+            )
+            awaitCloudWrite(docRef.set(data, SetOptions.merge()))
+            Result.success(Unit)
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+    suspend fun syncWorkoutExerciseToCloud(exercise: WorkoutExercise, workoutId: String? = null, customUid: String? = null): Result<Unit> {
+        val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado"))
+        val wid = workoutId ?: "free"
+        return try {
+            val docRef = firestore.collection("users").document(uid)
+                .collection("workouts").document(wid)
+                .collection("exercises").document(exercise.id.toString())
+            val data = mapOf(
+                "userId" to uid,
+                "workoutId" to wid,
+                "routineId" to exercise.routineId,
+                "exerciseName" to exercise.exerciseName,
+                "muscleGroup" to exercise.muscleGroup,
+                "sets" to exercise.sets,
+                "repsMin" to exercise.repsMin,
+                "repsMax" to exercise.repsMax,
+                "currentWeightKg" to exercise.currentWeightKg.toDouble(),
+                "restSeconds" to exercise.restSeconds,
+                "orderIndex" to exercise.orderIndex,
+                "updatedAt" to FieldValue.serverTimestamp()
+            )
+            awaitCloudWrite(docRef.set(data, SetOptions.merge()))
+            Result.success(Unit)
+        } catch (e: Exception) { Result.failure(e) }
+    }
+
+
     private val userOwnedCollections = listOf(
         "calorieGoals",
         "workoutLogs",
@@ -761,13 +810,16 @@ open class FirestoreSyncManager(private val context: Context) {
         "foodRecords",
         "cardioLogs",
         "dailyIntake",
-        "favoriteFoods"
+        "favoriteFoods",
+        "workoutRoutines",
+        "workoutExercises"
     )
 
     private suspend fun deleteCollectionFromServer(
         userRef: com.google.firebase.firestore.DocumentReference,
         collectionName: String
     ) {
+
         while (true) {
             val page = userRef.collection(collectionName)
                 .limit(450)

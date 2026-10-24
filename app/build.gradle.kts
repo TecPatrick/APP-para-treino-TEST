@@ -52,8 +52,8 @@ android {
       firebaseAppDistribution {
         appId = "1:204365877775:android:f77650214127790642497a"
         artifactType = "APK"
-        groups = "alpha"
-        releaseNotes = System.getenv("FIREBASE_RELEASE_NOTES") ?: "Virtus Growth - Release Alpha"
+        groups = "alpha, beta"
+        releaseNotes = System.getenv("FIREBASE_RELEASE_NOTES") ?: "Virtus Growth - Release Alpha & Beta"
         val credentialsPath = System.getenv("FIREBASE_APP_DISTRIBUTION_CREDENTIALS")
           ?: System.getenv("GOOGLE_APPLICATION_CREDENTIALS")
         if (!credentialsPath.isNullOrEmpty()) {
@@ -66,8 +66,8 @@ android {
       firebaseAppDistribution {
         appId = "1:204365877775:android:f77650214127790642497a"
         artifactType = "APK"
-        groups = "alpha"
-        releaseNotes = System.getenv("FIREBASE_RELEASE_NOTES") ?: "Virtus Growth - Debug Alpha"
+        groups = "alpha, beta"
+        releaseNotes = System.getenv("FIREBASE_RELEASE_NOTES") ?: "Virtus Growth - Debug Alpha & Beta"
         val credentialsPath = System.getenv("FIREBASE_APP_DISTRIBUTION_CREDENTIALS")
           ?: System.getenv("GOOGLE_APPLICATION_CREDENTIALS")
         if (!credentialsPath.isNullOrEmpty()) {

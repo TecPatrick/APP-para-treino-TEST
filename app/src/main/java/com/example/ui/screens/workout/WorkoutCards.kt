@@ -284,17 +284,36 @@ fun RoutineDetailView(
                             Spacer(modifier = Modifier.height(8.dp))
                         }
 
-                        Button(
-                            onClick = onFinishWorkout,
-                            colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(40.dp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Default.Stop, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("FINALIZAR E SALVAR TREINO", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                            OutlinedButton(
+                                onClick = onAddExerciseClick,
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, GrowthOrange),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(40.dp)
+                                    .testTag("add_exercise_active_session_btn")
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, tint = GrowthOrange, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("+ Exercício", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = GrowthOrange, maxLines = 1)
+                            }
+
+                            Button(
+                                onClick = onFinishWorkout,
+                                colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier
+                                    .weight(1.4f)
+                                    .height(40.dp)
+                            ) {
+                                Icon(Icons.Default.Stop, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("FINALIZAR TREINO", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Color.White, maxLines = 1)
+                            }
                         }
                     } else {
                         Row(
@@ -380,6 +399,27 @@ fun RoutineDetailView(
                     onOpenGuide = { onOpenGuide(guide) },
                     onSubstitute = { onSubstituteExercise(exercise) }
                 )
+            }
+
+            item {
+                OutlinedButton(
+                    onClick = onAddExerciseClick,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, GrowthOrange),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .testTag("add_exercise_bottom_list_btn")
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = GrowthOrange, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "ADICIONAR NOVO EXERCÍCIO NESTE TREINO",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = GrowthOrange
+                    )
+                }
             }
         }
     }

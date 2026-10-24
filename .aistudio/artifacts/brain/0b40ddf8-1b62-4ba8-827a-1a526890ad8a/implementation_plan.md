@@ -1,37 +1,47 @@
-# Implementation Plan: Photo Diary & Auto Rest Timer
+# Muscle Heatmap & Workout Volume Aggregation Implementation Plan
 
-## 1. Overview
-This plan outlines the implementation of a weekly Photo Diary for physical progress tracking and an automated, flexible Rest Timer for workout sessions.
+Implement an interactive muscle heatmap in the Profile tab (Hevy-style) with timeframe filtering (7 days, 30 days, all-time) using a Blue to Orange intensity scale rendered via Jetpack Compose Canvas, backed by volume aggregation logic in `VirtusViewModel`.
 
-## 2. Feature: Photo Diary
-- **Data Model**: `PhotoEntry` (id, date, goalPhase, imagePath/uri, note).
-- **Persistence**: Room for local storage, Firestore for cloud backup/sync.
-- **Permissions**: `CAMERA` (runtime permission) + `READ_MEDIA_IMAGES` (if picking older photos) or just `TakePicture` via camera.
-- **UI**:
-    - **Photo Capture Screen**: Simple UI to take a new photo.
-    - **Comparison Screen**: List/Gallery view with a date range picker to select two dates for side-by-side comparison.
+## User Review & Critical Decisions
 
-## 3. Feature: Auto Rest Timer
-- **Logic**:
-    - `VirtusViewModel` will manage `restTimerState` (isRunning, remainingTime, duration).
-    - `lastSetCompletedTimestamp` in `ActiveWorkoutSession` triggers countdown.
-- **Configuration**:
-    - **Global**: App-wide default rest time in User Profile/Settings.
-    - **Per-Exercise**: Optional override in the workout routine definition.
-    - **Active Session**: In-session UI element to adjust/skip the timer.
-- **UI**:
-    - Integration into `ExerciseExecutionCard` / `WorkoutScreen` as an overlay or dedicated area during the rest interval.
+> [!IMPORTANT]
+> - **Color Palette**: Blue to Orange intensity scale.
+> - **Timeframe Selector**: Filter chips above the heatmap.
 
-## 4. UI/UX Considerations
-- **Material 3**: Use `DatePickerDialog` for date range selection, `FloatingActionButton` for photo taking.
-- **Timer UI**: Clear, prominent countdown display during rest, with options to "Skip" or "Add 30s".
-- **Accessibility**: All buttons > 48dp.
-- **Growth App Aesthetic**: `GrowthOrange` for primary actions/timers, `CarbonDark` for backgrounds.
+## 1. Overview & Core Concept
 
-## 5. Verification Plan
-1. **Compilation**: `compile_applet`.
-2. **Feature Tests**:
-    - Capture a photo, verify it saves and syncs.
-    - Select two photos via range picker and verify comparison UI.
-    - Complete a set, verify timer starts with the correct duration.
-    - Adjust timer during active session and verify responsiveness.
+- **What It Does**: Aggregates completed workout logs and routine exercise data to calculate training volume per muscle group across 7 days, 30 days, and all-time, displaying the intensity visually on an interactive human body silhouette in the Profile screen.
+- **Target Audience**: Fitness enthusiasts looking for visual feedback on muscle group training frequency and volume.
+- **Key Value**: Gamified muscle recovery and training frequency tracking directly in the user profile.
+
+## 2. User Experience & Visual Design
+
+- **Aesthetic Direction**: Premium fitness dark theme (`CarbonCard`, `GrowthOrange`, `GrowthCyan`, deep blue-to-orange gradient highlights).
+- **Component Styling**:
+  - **Filter Chips**: Horizontal scrollable chips for "7 Dias", "30 Dias", and "Histórico".
+  - **Heatmap Canvas**: Clean vector-style muscle group silhouettes (Chest, Back, Shoulders, Biceps, Triceps, Legs, Abs) colored with dynamic opacity based on volume relative to max volume, transitioning from Cool Blue (low) to Warm Orange (high).
+
+## 3. Key Product Decisions & Trade-Offs
+
+- **Decision 1**: Volume Distribution across Target Muscle Groups.
+  - *Chosen Approach*: Distribute `WorkoutLog` total volume evenly across the `targetMuscleGroups` defined in the associated `WorkoutRoutine`.
+  - *Why*: Ensures robustness even when individual exercise sets aren't stored in isolated historical records.
+
+## 4. Technical Architecture & Data Strategy
+
+```
+┌────────────────────────────────────────────────────────┐
+│               UserProfileScreen (UI)                   │
+│  - Filter Chips (7d, 30d, All)                         │
+│  - MuscleHeatmapView (Canvas Silhouette & Overlays)    │
+└───────────────────────────▲────────────────────────────┘
+                            │ observes volume map
+┌───────────────────────────┴────────────────────────────┐
+│                 VirtusViewModel                        │
+│  - getMuscleVolume(days: Int): Map<String, Float>      │
+└───────────────────────────▲────────────────────────────┘
+                            │ queries
+┌───────────────────────────┴────────────────────────────┐
+│          VirtusRepository / Room Database              │
+└────────────────────────────────────────────────────────┘
+```

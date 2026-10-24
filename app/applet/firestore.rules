@@ -1,9 +1,19 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isSignedIn() { return request.auth != null; }
-    function isOwner(userId) { return request.auth.uid == userId; }
-    function incoming() { return request.resource.data; }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
 
     function isValidDiet(data) {
       return data.userId is string &&
@@ -11,8 +21,7 @@ service cloud.firestore {
              data.calories is number &&
              data.protein is number &&
              data.carbs is number &&
-             data.fat is number &&
-             data.description is string;
+             data.fat is number;
     }
 
     function isValidWorkout(data) {
@@ -24,19 +33,57 @@ service cloud.firestore {
              data.weight is number;
     }
 
+    // Default deny all access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // User-isolated collection structure
     match /users/{userId} {
+      // User Profile
+      allow get, write: if isSignedIn() && isOwner(userId);
+
+      // Diets & Nutrition Subcollection
       match /diets/{dietId} {
         allow get, list: if isSignedIn() && isOwner(userId);
         allow create: if isSignedIn() && isOwner(userId) && incoming().userId == userId && isValidDiet(incoming());
         allow update: if isSignedIn() && isOwner(userId) && incoming().userId == userId && isValidDiet(incoming());
         allow delete: if isSignedIn() && isOwner(userId);
       }
+
+      // Workouts & Exercises Subcollection
       match /workouts/{workoutId} {
         allow get, list: if isSignedIn() && isOwner(userId);
         allow create: if isSignedIn() && isOwner(userId) && incoming().userId == userId && isValidWorkout(incoming());
         allow update: if isSignedIn() && isOwner(userId) && incoming().userId == userId && isValidWorkout(incoming());
         allow delete: if isSignedIn() && isOwner(userId);
       }
+
+      // Food Records & Daily Logs Subcollection
+      match /food_records/{recordId} {
+        allow read, write: if isSignedIn() && isOwner(userId);
+      }
+
+      // Anthropometric Progress & Photo Logs Subcollection
+      match /progress_logs/{logId} {
+        allow read, write: if isSignedIn() && isOwner(userId);
+      }
+
+      // Cardio Logs Subcollection
+      match /cardio_logs/{logId} {
+        allow read, write: if isSignedIn() && isOwner(userId);
+      }
+
+      // GPS Routes Subcollection
+      match /gps_routes/{routeId} {
+        allow read, write: if isSignedIn() && isOwner(userId);
+      }
+      
+      // Workout Exercises Subcollection (Nested)
+      match /workouts/{workoutId}/exercises/{exerciseId} {
+        allow read, write: if isSignedIn() && isOwner(userId);
+      }
     }
   }
 }
+

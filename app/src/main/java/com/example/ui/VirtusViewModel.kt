@@ -2041,6 +2041,13 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 )
                 repository.addWorkoutRoutine(updatedRoutine)
                 repository.deleteExercisesForRoutine(existingRoutineId)
+                
+                // Sync to Cloud
+                firestoreSync.syncWorkoutRoutineToCloud(updatedRoutine).onFailure { e ->
+                    Log.e("VirtusViewModel", "Falha ao sincronizar rotina: ${e.message}")
+                    _toastMessage.value = "Erro ao sincronizar rotina na nuvem."
+                }
+                
                 existingRoutineId
             } else {
                 val newRoutine = WorkoutRoutine(
@@ -2051,21 +2058,41 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                     targetMuscleGroups = targetMuscleGroups,
                     estimatedDurationMinutes = estimatedDurationMinutes
                 )
-                repository.addWorkoutRoutine(newRoutine)
+                val id = repository.addWorkoutRoutine(newRoutine)
+                
+                // Sync to Cloud
+                firestoreSync.syncWorkoutRoutineToCloud(newRoutine.copy(id = id)).onFailure { e ->
+                    Log.e("VirtusViewModel", "Falha ao sincronizar nova rotina: ${e.message}")
+                    _toastMessage.value = "Erro ao sincronizar nova rotina na nuvem."
+                }
+                
+                id
             }
 
             exercises.forEachIndexed { index, ex ->
                 val guide = com.example.util.ExerciseGifMapper.getGuideForExercise(ex.exerciseName)
-                repository.addWorkoutExercise(
-                    ex.copy(
-                        id = 0L,
-                        routineId = routineId,
-                        orderIndex = index,
-                        biomechanicsGuide = ex.biomechanicsGuide.ifBlank { guide.postureTip },
-                        gifDemonstrationUrl = ex.gifDemonstrationUrl.ifBlank { guide.gifUrl }
-                    )
+                val exWithId = ex.copy(
+                    id = 0L,
+                    routineId = routineId,
+                    orderIndex = index,
+                    biomechanicsGuide = ex.biomechanicsGuide.ifBlank { guide.postureTip },
+                    gifDemonstrationUrl = ex.gifDemonstrationUrl.ifBlank { guide.gifUrl }
                 )
+                val id = repository.addWorkoutExercise(exWithId)
+                
+                // Sync to Cloud with nested path
+                val workoutId = routineId.toString()
+                Log.d("VirtusViewModel", "Sincronizando exercício (id: $id, workoutId: $workoutId) com Firestore: $exWithId")
+                
+                firestoreSync.syncWorkoutExerciseToCloud(exWithId.copy(id = id), workoutId = workoutId).onFailure { e ->
+                    Log.e("VirtusViewModel", "Falha ao sincronizar exercício $id no caminho aninhado: ${e.message}")
+                    _toastMessage.value = "Erro ao sincronizar exercício na nuvem."
+                }
             }
+
+
+
+
 
             _toastMessage.value = "Ficha '$title' salva com sucesso!"
         }
@@ -2100,22 +2127,29 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         val exId = exercise.id
         val list = (current.loggedExerciseSets[exId] ?: emptyList()) + Pair(reps, weightKg)
         val updatedMap = current.loggedExerciseSets + (exId to list)
-
+        
+        // Ensure duration is based on exercise setting, otherwise default to 90s
+        val duration = exercise.restSeconds.coerceAtLeast(30)
+        
         _activeWorkout.value = current.copy(
             completedSetsCount = current.completedSetsCount + 1,
             loggedExerciseSets = updatedMap,
-            restTimerRemainingSeconds = exercise.restSeconds,
+            restTimerRemainingSeconds = duration,
             isRestTimerRunning = true,
             isRestTimerFinished = false
         )
-
         restTimerJob?.cancel()
         restTimerJob = viewModelScope.launch {
-            var remaining = exercise.restSeconds
+            var remaining = duration
             while (remaining > 0) {
                 delay(1000)
                 remaining--
-                _activeWorkout.value = _activeWorkout.value.copy(
+                // Check if user manually updated or skipped
+                val updatedSession = _activeWorkout.value
+                if (!updatedSession.isRestTimerRunning && updatedSession.restTimerRemainingSeconds == remaining) {
+                   break
+                }
+                _activeWorkout.value = updatedSession.copy(
                     restTimerRemainingSeconds = remaining
                 )
             }
@@ -2155,401 +2189,206 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     fun cancelRestTimer() {
         restTimerJob?.cancel()
         _activeWorkout.value = _activeWorkout.value.copy(
-            restTimerRemainingSeconds = 0,
             isRestTimerRunning = false,
-            isRestTimerFinished = false
+            isRestTimerFinished = false,
+            restTimerRemainingSeconds = 0
         )
-    }
-
-    fun adjustRestTimer(secondsDelta: Int) {
-        val current = _activeWorkout.value
-        if (current.isRestTimerRunning) {
-            val newRemaining = (current.restTimerRemainingSeconds + secondsDelta).coerceAtLeast(0)
-            if (newRemaining == 0) {
-                cancelRestTimer()
-            } else {
-                _activeWorkout.value = current.copy(restTimerRemainingSeconds = newRemaining)
-            }
-        }
-    }
-
-    fun finishActiveWorkout(perceivedExertion: Int, notes: String) {
-        val current = _activeWorkout.value
-        val routine = current.routine ?: return
-
-        var totalVolume = 0f
-        current.loggedExerciseSets.forEach { (_, setsList) ->
-            setsList.forEach { (reps, weight) ->
-                totalVolume += (reps * weight)
-            }
-        }
-
-        if (totalVolume == 0f) {
-            current.exercises.forEach { ex ->
-                totalVolume += (ex.sets * ex.repsMin * ex.currentWeightKg)
-            }
-        }
-
-        val durationMinutes = (current.elapsedSeconds / 60).coerceAtLeast(1)
-
-        viewModelScope.launch {
-            val workoutDate = selectedDateWithCurrentTime()
-            val insertedId = repository.logCompletedWorkout(
-                routineId = routine.id,
-                routineName = "Treino ${routine.letter} - ${routine.title}",
-                durationMinutes = durationMinutes,
-                totalVolumeKg = totalVolume,
-                totalSetsCompleted = current.completedSetsCount.coerceAtLeast(current.exercises.sumOf { it.sets }),
-                perceivedExertion = perceivedExertion,
-                notes = notes,
-                dateMillis = workoutDate
-            )
-
-            // Sincroniza log de treino no Firestore (persistido no cache local imediatamente)
-            val wLog = WorkoutLog(
-                id = insertedId,
-                routineId = routine.id,
-                routineName = "Treino ${routine.letter} - ${routine.title}",
-                dateMillis = workoutDate,
-                durationMinutes = durationMinutes,
-                totalVolumeKg = totalVolume,
-                totalSetsCompleted = current.completedSetsCount.coerceAtLeast(current.exercises.sumOf { it.sets }),
-                perceivedExertion = perceivedExertion,
-                notes = notes
-            )
-            firestoreSync.syncWorkoutLogToCloud(wLog, userProfile.value.firebaseUid)
-
-            workoutTimerJob?.cancel()
-            restTimerJob?.cancel()
-            _activeWorkout.value = ActiveWorkoutSession()
-            _toastMessage.value = "Treino finalizado! Volume total: ${totalVolume.toInt()} kg (salvo offline)"
-        }
-    }
-
-    fun startFreeWorkout() {
-        workoutTimerJob?.cancel()
-        restTimerJob?.cancel()
-
-        val freeRoutine = WorkoutRoutine(
-            id = 99999L,
-            splitType = WorkoutSplitType.CUSTOM,
-            letter = "L",
-            title = "Treino Livre",
-            dayOfWeekLabel = "Hoje",
-            targetMuscleGroups = "Personalizado",
-            estimatedDurationMinutes = 45
-        )
-
-        _activeWorkout.value = ActiveWorkoutSession(
-            routine = freeRoutine,
-            exercises = emptyList(),
-            isRunning = true,
-            elapsedSeconds = 0,
-            currentExerciseIndex = 0,
-            completedSetsCount = 0
-        )
-
-        workoutTimerJob = viewModelScope.launch {
-            while (true) {
-                delay(1000)
-                _activeWorkout.value = _activeWorkout.value.copy(
-                    elapsedSeconds = _activeWorkout.value.elapsedSeconds + 1
-                )
-            }
-        }
-    }
-
-    fun addExerciseToActiveFreeWorkout(name: String, group: String, sets: Int = 3, weightKg: Float = 20f) {
-        val current = _activeWorkout.value
-        val exId = System.currentTimeMillis()
-        val guide = com.example.util.ExerciseGifMapper.getGuideForExercise(name)
-        val newEx = WorkoutExercise(
-            id = exId,
-            routineId = 99999L,
-            exerciseName = name,
-            muscleGroup = group.ifBlank { guide.muscleGroup },
-            sets = sets,
-            repsMin = 10,
-            repsMax = 12,
-            currentWeightKg = weightKg,
-            restSeconds = 60,
-            biomechanicsGuide = guide.postureTip,
-            gifDemonstrationUrl = guide.gifUrl
-        )
-        _activeWorkout.value = current.copy(
-            exercises = current.exercises + newEx
-        )
-    }
-
-    fun downloadSuggestedRoutine(templateType: String, onSuccess: ((Long) -> Unit)? = null) {
-        viewModelScope.launch {
-            when (templateType) {
-                "FULL_BODY" -> {
-                    val r = repository.addWorkoutRoutine(
-                        WorkoutRoutine(
-                            splitType = WorkoutSplitType.CUSTOM,
-                            letter = "FB",
-                            title = "Full Body Iniciante",
-                            dayOfWeekLabel = "3x por semana",
-                            targetMuscleGroups = "Corpo Todo",
-                            estimatedDurationMinutes = 50
-                        )
-                    )
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Agachamento Livre com Barra", muscleGroup = "Pernas", sets = 3, repsMin = 10, repsMax = 10, currentWeightKg = 40f, restSeconds = 90))
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Supino Reto com Barra", muscleGroup = "Peito", sets = 3, repsMin = 10, repsMax = 10, currentWeightKg = 50f, restSeconds = 90))
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Remada Curvada com Barra", muscleGroup = "Costas", sets = 3, repsMin = 10, repsMax = 10, currentWeightKg = 40f, restSeconds = 90))
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Desenvolvimento com Halteres", muscleGroup = "Ombros", sets = 3, repsMin = 12, repsMax = 12, currentWeightKg = 14f, restSeconds = 60))
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Rosca Direta com Barra W", muscleGroup = "Bíceps", sets = 3, repsMin = 12, repsMax = 12, currentWeightKg = 16f, restSeconds = 45))
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Tríceps Pulley Corda", muscleGroup = "Tríceps", sets = 3, repsMin = 12, repsMax = 12, currentWeightKg = 20f, restSeconds = 45))
-                    _toastMessage.value = "Ficha 'Full Body Iniciante' baixada!"
-                    onSuccess?.invoke(r)
-                }
-                "ABC" -> {
-                    val rA = repository.addWorkoutRoutine(
-                        WorkoutRoutine(splitType = WorkoutSplitType.ABC, letter = "A", title = "A — Peito & Tríceps", dayOfWeekLabel = "Segunda-feira", targetMuscleGroups = "Peitoral, Tríceps", estimatedDurationMinutes = 60)
-                    )
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = rA, exerciseName = "Supino Reto com Barra", muscleGroup = "Peito", sets = 4, repsMin = 8, repsMax = 10, currentWeightKg = 70f, restSeconds = 120))
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = rA, exerciseName = "Supino Inclinado com Halteres", muscleGroup = "Peito", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 24f, restSeconds = 90))
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = rA, exerciseName = "Crucifixo no Cross / Crossover", muscleGroup = "Peito", sets = 3, repsMin = 12, repsMax = 15, currentWeightKg = 15f, restSeconds = 60))
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = rA, exerciseName = "Tríceps Testa com Halteres", muscleGroup = "Tríceps", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 14f, restSeconds = 60))
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = rA, exerciseName = "Tríceps Pulley Corda", muscleGroup = "Tríceps", sets = 3, repsMin = 12, repsMax = 15, currentWeightKg = 25f, restSeconds = 45))
-
-                    val rB = repository.addWorkoutRoutine(
-                        WorkoutRoutine(splitType = WorkoutSplitType.ABC, letter = "B", title = "B — Costas & Bíceps", dayOfWeekLabel = "Quarta-feira", targetMuscleGroups = "Costas, Bíceps", estimatedDurationMinutes = 60)
-                    )
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = rB, exerciseName = "Puxada Alta Aberta no Pulley", muscleGroup = "Costas", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 60f, restSeconds = 90))
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = rB, exerciseName = "Remada Curvada com Barra", muscleGroup = "Costas", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 50f, restSeconds = 90))
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = rB, exerciseName = "Rosca Direta com Barra W", muscleGroup = "Bíceps", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 22f, restSeconds = 60))
-
-                    val rC = repository.addWorkoutRoutine(
-                        WorkoutRoutine(splitType = WorkoutSplitType.ABC, letter = "C", title = "C — Pernas & Ombros", dayOfWeekLabel = "Sexta-feira", targetMuscleGroups = "Pernas, Ombros", estimatedDurationMinutes = 65)
-                    )
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = rC, exerciseName = "Agachamento Livre com Barra", muscleGroup = "Pernas", sets = 4, repsMin = 8, repsMax = 10, currentWeightKg = 80f, restSeconds = 150))
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = rC, exerciseName = "Leg Press 45°", muscleGroup = "Pernas", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 180f, restSeconds = 120))
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = rC, exerciseName = "Cadeira Extensora", muscleGroup = "Quadríceps", sets = 3, repsMin = 12, repsMax = 15, currentWeightKg = 50f, restSeconds = 60))
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = rC, exerciseName = "Desenvolvimento com Halteres", muscleGroup = "Ombros", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 18f, restSeconds = 90))
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = rC, exerciseName = "Elevação Lateral com Halteres", muscleGroup = "Ombros", sets = 3, repsMin = 15, repsMax = 15, currentWeightKg = 10f, restSeconds = 45))
-
-                    _toastMessage.value = "Ficha 'ABC Hipertrofia' baixada com sucesso!"
-                    onSuccess?.invoke(rA)
-                }
-                "EM_CASA" -> {
-                    val r = repository.addWorkoutRoutine(
-                        WorkoutRoutine(
-                            splitType = WorkoutSplitType.CUSTOM,
-                            letter = "EC",
-                            title = "Em Casa — Sem Equipamento",
-                            dayOfWeekLabel = "Qualquer dia",
-                            targetMuscleGroups = "Full Body (Peso Corporal)",
-                            estimatedDurationMinutes = 40
-                        )
-                    )
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Agachamento Livre", muscleGroup = "Pernas", sets = 3, repsMin = 15, repsMax = 20, currentWeightKg = 0f, restSeconds = 45))
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Flexão de Braço", muscleGroup = "Peito", sets = 3, repsMin = 10, repsMax = 15, currentWeightKg = 0f, restSeconds = 45))
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Afundo Alternado", muscleGroup = "Pernas", sets = 3, repsMin = 12, repsMax = 12, currentWeightKg = 0f, restSeconds = 45))
-                    repository.addWorkoutExercise(WorkoutExercise(routineId = r, exerciseName = "Prancha Abdominal", muscleGroup = "Core", sets = 3, repsMin = 30, repsMax = 45, currentWeightKg = 0f, restSeconds = 30, notes = "Reps = segundos de sustentação"))
-
-                    _toastMessage.value = "Ficha 'Em Casa' baixada!"
-                    onSuccess?.invoke(r)
-                }
-            }
-        }
-    }
-
-    fun deleteWorkoutLog(id: Long) {
-        viewModelScope.launch {
-            repository.deleteWorkoutLog(id)
-            firestoreSync.deleteWorkoutLogFromCloud(id, userProfile.value.firebaseUid)
-            _toastMessage.value = "Registro de treino excluído do histórico."
-        }
-    }
-
-    fun updateExerciseWeight(exercise: WorkoutExercise, newWeightKg: Float) {
-        viewModelScope.launch {
-            repository.addWorkoutExercise(exercise.copy(currentWeightKg = newWeightKg))
-            val current = _activeWorkout.value
-            if (current.isRunning) {
-                val updatedList = current.exercises.map {
-                    if (it.id == exercise.id) it.copy(currentWeightKg = newWeightKg) else it
-                }
-                _activeWorkout.value = current.copy(exercises = updatedList)
-            }
-        }
     }
 
     fun toggleSetLog(exercise: WorkoutExercise, setIndex: Int) {
-        val current = _activeWorkout.value
-        if (!current.isRunning) return
+        val reps = exercise.repsMin
+        val weight = exercise.currentWeightKg
+        logSetAndStartRest(exercise, reps, weight)
+    }
 
-        val exId = exercise.id
-        val existingSets = current.loggedExerciseSets[exId] ?: emptyList()
-
-        if (existingSets.size >= setIndex) {
-            // Remove set
-            val updated = existingSets.take(setIndex - 1)
-            val updatedMap = current.loggedExerciseSets + (exId to updated)
-            val newCompletedCount = (current.completedSetsCount - 1).coerceAtLeast(0)
-            _activeWorkout.value = current.copy(
-                completedSetsCount = newCompletedCount,
-                loggedExerciseSets = updatedMap
-            )
-        } else {
-            // Log set
-            logSetAndStartRest(exercise, exercise.repsMin, exercise.currentWeightKg)
+    fun updateExerciseWeight(exercise: WorkoutExercise, newWeight: Float) {
+        viewModelScope.launch {
+            repository.updateWorkoutExercise(exercise.copy(currentWeightKg = newWeight))
         }
     }
 
-    fun cancelActiveWorkout() {
-        workoutTimerJob?.cancel()
-        restTimerJob?.cancel()
-        _activeWorkout.value = ActiveWorkoutSession()
+    fun adjustRestTimer(deltaSeconds: Int) {
+        val current = _activeWorkout.value
+        val newRemaining = (current.restTimerRemainingSeconds + deltaSeconds).coerceAtLeast(0)
+        _activeWorkout.value = current.copy(
+            restTimerRemainingSeconds = newRemaining,
+            isRestTimerRunning = newRemaining > 0
+        )
     }
 
-    // --- Progress Tracking & Antropometry ---
+    fun startFreeWorkout() {
+        val freeRoutine = WorkoutRoutine(
+            id = 99999L,
+            letter = "L",
+            title = "Treino Livre",
+            dayOfWeekLabel = "Hoje",
+            targetMuscleGroups = "Geral",
+            estimatedDurationMinutes = 60
+        )
+        startActiveWorkout(freeRoutine, emptyList())
+    }
+
+    fun finishActiveWorkout(rpe: Int, notes: String) {
+        val active = _activeWorkout.value
+        if (!active.isRunning) return
+        workoutTimerJob?.cancel()
+        restTimerJob?.cancel()
+        viewModelScope.launch {
+            val totalVolume = active.loggedExerciseSets.values.sumOf { setList ->
+                setList.sumOf { (reps, weight) -> (reps * weight).toDouble() }
+            }.toFloat()
+
+            repository.logCompletedWorkout(
+                routineId = active.routine?.id ?: 99999L,
+                routineName = active.routine?.title ?: "Treino Livre",
+                durationMinutes = (active.elapsedSeconds / 60).coerceAtLeast(1),
+                totalVolumeKg = totalVolume,
+                totalSetsCompleted = active.completedSetsCount,
+                perceivedExertion = rpe,
+                notes = notes
+            )
+            _activeWorkout.value = ActiveWorkoutSession()
+            _toastMessage.value = "Treino finalizado e registrado com sucesso!"
+        }
+    }
+
+    fun deleteWorkoutLog(log: WorkoutLog) {
+        viewModelScope.launch {
+            repository.deleteWorkoutLog(log.id)
+            _toastMessage.value = "Registro de treino removido"
+        }
+    }
+
+    fun deleteWorkoutLog(logId: Long) {
+        viewModelScope.launch {
+            repository.deleteWorkoutLog(logId)
+            _toastMessage.value = "Registro de treino removido"
+        }
+    }
+
+    fun formatRoutineForSharing(routine: WorkoutRoutine): String {
+        val exercises = allExercises.value.filter { it.routineId == routine.id }
+        val sb = StringBuilder()
+        sb.append("🏋️ *Ficha de Treino VIRTUS*\n")
+        sb.append("📋 *${routine.letter} - ${routine.title}*\n")
+        if (routine.targetMuscleGroups.isNotBlank()) sb.append("🎯 ${routine.targetMuscleGroups}\n")
+        sb.append("\n*Exercícios:*\n")
+        exercises.forEachIndexed { i, ex ->
+            sb.append("${i + 1}. *${ex.exerciseName}* - ${ex.sets}x${ex.repsMin}-${ex.repsMax} (${ex.currentWeightKg.toInt()}kg)\n")
+            if (ex.biomechanicsGuide.isNotBlank()) sb.append("   💡 ${ex.biomechanicsGuide}\n")
+        }
+        sb.append("\n_Bons treinos! Gerado pelo VIRTUS Fit App_")
+        return sb.toString()
+    }
+
     fun addProgressLog(
         weightKg: Float,
         bodyFatPercentage: Float,
-        chestCm: Float,
-        waistCm: Float,
-        armCm: Float,
-        thighCm: Float,
-        notes: String,
+        chestCm: Float = 0f,
+        waistCm: Float = 0f,
+        armRightCm: Float = 0f,
+        thighCm: Float = 0f,
+        notes: String = "",
         photoUri: String = ""
     ) {
         viewModelScope.launch {
-            val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR"))
-            val now = System.currentTimeMillis()
+            val dateMillis = System.currentTimeMillis()
+            val dateDisplay = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(dateMillis))
             val log = ProgressLog(
-                dateMillis = now,
-                dateDisplay = dateFormat.format(Date(now)),
+                dateMillis = dateMillis,
+                dateDisplay = dateDisplay,
                 weightKg = weightKg,
                 bodyFatPercentage = bodyFatPercentage,
                 chestCm = chestCm,
                 waistCm = waistCm,
-                armLeftCm = armCm,
-                armRightCm = armCm,
+                armLeftCm = armRightCm,
+                armRightCm = armRightCm,
                 thighCm = thighCm,
                 notes = notes,
                 photoUri = photoUri
             )
             repository.addProgressLog(log)
-            _toastMessage.value = "Registro de progresso corporal salvo!"
+            _toastMessage.value = "Evolução salva com sucesso!"
         }
     }
 
     fun deleteProgressLog(id: Long) {
         viewModelScope.launch {
             repository.deleteProgressLog(id)
+            _toastMessage.value = "Registro removido"
         }
     }
 
-    // --- PDF Export ---
-    fun exportPdfProgressReport(context: Context): File? {
-        val prof = userProfile.value
-        val meals = mealPlanItems.value
-        val routines = workoutRoutines.value
-        val exercises = allExercises.value
-        val progress = progressLogs.value
-        val shopping = shoppingList.value
+    fun exportPdfProgressReport(context: Context) {
+        viewModelScope.launch {
+            try {
+                val prof = userProfile.value ?: return@launch
+                val meals = mealPlanItems.value
+                val routines = workoutRoutines.value
+                val exercises = allExercises.value
+                val progress = progressLogs.value
+                val shopping = shoppingList.value
 
-        return PdfExporter.generateAndShareProgressReport(
-            context = context,
-            profile = prof,
-            mealPlans = meals,
-            routines = routines,
-            exercises = exercises,
-            progressLogs = progress,
-            shoppingItems = shopping
-        )
-    }
-
-    // --- WhatsApp & Text Sharing & Backup ---
-    fun formatRoutineForSharing(routine: WorkoutRoutine): String {
-        val routineExs = allExercises.value.filter { it.routineId == routine.id }
-        val sb = StringBuilder()
-        sb.append("🏋️ *FICHA DE TREINO ${routine.letter}*\n")
-        sb.append("*${routine.title}*\n")
-        sb.append("Foco: ${routine.targetMuscleGroups} (${routine.dayOfWeekLabel})\n")
-        sb.append("----------------------------\n")
-        routineExs.forEachIndexed { i, ex ->
-            sb.append("${i + 1}. *${ex.exerciseName}*\n")
-            sb.append("   • ${ex.sets} séries de ${ex.repsMin}-${ex.repsMax} reps (${ex.currentWeightKg.toInt()} kg)\n")
-            if (ex.notes.isNotBlank()) sb.append("   • Obs: ${ex.notes}\n")
+                PdfExporter.generateAndShareProgressReport(
+                    context,
+                    prof,
+                    meals,
+                    routines,
+                    exercises,
+                    progress,
+                    shopping
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _toastMessage.value = "Erro ao exportar PDF: ${e.localizedMessage}"
+            }
         }
-        sb.append("----------------------------\n")
-        sb.append("Gerado pelo App Dieta & Treino 🚀")
-        return sb.toString()
     }
 
     fun formatDietPlanForSharing(): String {
+        val diet = activeDietPlan.value
         val meals = mealPlanItems.value
-        val prof = userProfile.value
         val sb = StringBuilder()
-        sb.append("🥗 *PLANO DE DIETA & NUTRIÇÃO*\n")
-        sb.append("Atleta: ${prof.name} | Meta: ${prof.goal.label}\n")
-        sb.append("Metas Diárias: ${prof.targetCalories} kcal | P: ${prof.targetProteinGrams}g | C: ${prof.targetCarbsGrams}g | G: ${prof.targetFatGrams}g\n")
-        sb.append("----------------------------\n")
-        MealType.entries.forEach { mType ->
-            val itemsForMeal = meals.filter { it.mealType == mType }
+        sb.append("🥗 *Plano Alimentar VIRTUS*\n")
+        if (diet != null) {
+            sb.append("🎯 *Metas Diárias:* ${diet.targetCalories} kcal | P: ${diet.targetProteinGrams}g | C: ${diet.targetCarbsGrams}g | G: ${diet.targetFatGrams}g\n\n")
+        }
+        sb.append("*Refeições:*\n")
+        MealType.values().forEach { mealType ->
+            val itemsForMeal = meals.filter { it.mealType == mealType }
             if (itemsForMeal.isNotEmpty()) {
-                sb.append("*${mType.title.uppercase()}*\n")
+                sb.append("\n📌 *${mealType.title}*\n")
                 itemsForMeal.forEach { item ->
-                    sb.append("• ${item.amount.toInt()}${item.unit} ${item.foodName} (${item.calories.toInt()} kcal | ${item.protein.toInt()}g P)\n")
+                    sb.append("• ${item.foodName} (${item.amount.toInt()}${item.unit}) - ${item.calories.toInt()} kcal\n")
                 }
-                sb.append("\n")
             }
         }
-        sb.append("----------------------------\n")
-        sb.append("Gerado pelo App Dieta & Treino 🚀")
+        sb.append("\n_Foco na dieta! Gerado pelo VIRTUS Fit App_")
         return sb.toString()
     }
 
-    fun exportFullBackupJson(): String {
-        val prof = userProfile.value
-        val meals = mealPlanItems.value
-        val routines = workoutRoutines.value
-        val exercises = allExercises.value
-        val logs = progressLogs.value
-        val shopping = shoppingList.value
-
-        val root = org.json.JSONObject()
-        root.put("version", 1)
-        root.put("timestamp", System.currentTimeMillis())
-
-        val pObj = org.json.JSONObject()
-        pObj.put("name", prof.name)
-        pObj.put("email", prof.email)
-        pObj.put("weightKg", prof.weightKg)
-        pObj.put("heightCm", prof.heightCm)
-        pObj.put("targetCalories", prof.targetCalories)
-        pObj.put("targetWaterMl", prof.targetWaterMl)
-        pObj.put("goal", prof.goal.name)
-        root.put("profile", pObj)
-
-        val rArray = org.json.JSONArray()
-        routines.forEach { r ->
-            val rObj = org.json.JSONObject()
-            rObj.put("letter", r.letter)
-            rObj.put("title", r.title)
-            rObj.put("targetMuscles", r.targetMuscleGroups)
-            rObj.put("split", r.splitType.name)
-            val exArray = org.json.JSONArray()
-            exercises.filter { it.routineId == r.id }.forEach { ex ->
-                val exObj = org.json.JSONObject()
-                exObj.put("name", ex.exerciseName)
-                exObj.put("muscle", ex.muscleGroup)
-                exObj.put("sets", ex.sets)
-                exObj.put("weight", ex.currentWeightKg)
-                exObj.put("repsMin", ex.repsMin)
-                exObj.put("repsMax", ex.repsMax)
-                exArray.put(exObj)
+    fun getMuscleVolume(days: Int): Map<String, Float> {
+        val now = System.currentTimeMillis()
+        val limit = if (days <= 0) 0L else now - (days.toLong() * 24 * 60 * 60 * 1000)
+        
+        val logs = workoutLogs.value.filter { it.dateMillis >= limit }
+        val muscleVolume = mutableMapOf<String, Float>()
+        
+        logs.forEach { log ->
+            val routine = workoutRoutines.value.find { it.id == log.routineId }
+            if (routine != null) {
+                val muscles = routine.targetMuscleGroups.split(",").map { it.trim() }
+                if (muscles.isNotEmpty()) {
+                    val volumePerMuscle = log.totalVolumeKg / muscles.size
+                    muscles.forEach { muscle ->
+                        if (muscle.isNotBlank()) {
+                            muscleVolume[muscle] = muscleVolume.getOrDefault(muscle, 0f) + volumePerMuscle
+                        }
+                    }
+                }
             }
-            rObj.put("exercises", exArray)
-            rArray.put(rObj)
         }
-        root.put("routines", rArray)
-
-        return root.toString(2)
+        return muscleVolume
     }
-}
 
+}
