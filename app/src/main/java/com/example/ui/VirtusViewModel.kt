@@ -2369,26 +2369,23 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
 
     fun getMuscleVolume(days: Int): Map<String, Float> {
         val now = System.currentTimeMillis()
-        val limit = if (days <= 0) 0L else now - (days.toLong() * 24 * 60 * 60 * 1000)
+        val limit = if (days <= 0) 0L else now - (days.toLong() * 86400000L)
         
-        val logs = workoutLogs.value.filter { it.dateMillis >= limit }
-        val muscleVolume = mutableMapOf<String, Float>()
-        
-        logs.forEach { log ->
-            val routine = workoutRoutines.value.find { it.id == log.routineId }
-            if (routine != null) {
-                val muscles = routine.targetMuscleGroups.split(",").map { it.trim() }
-                if (muscles.isNotEmpty()) {
-                    val volumePerMuscle = log.totalVolumeKg / muscles.size
-                    muscles.forEach { muscle ->
-                        if (muscle.isNotBlank()) {
-                            muscleVolume[muscle] = muscleVolume.getOrDefault(muscle, 0f) + volumePerMuscle
-                        }
+        return workoutLogs.value
+            .asSequence()
+            .filter { it.dateMillis >= limit }
+            .mapNotNull { log ->
+                workoutRoutines.value.find { it.id == log.routineId }?.let { routine ->
+                    val muscles = routine.targetMuscleGroups.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                    if (muscles.isEmpty()) emptyMap() else {
+                        val volPerMuscle = log.totalVolumeKg / muscles.size
+                        muscles.associateWith { volPerMuscle }
                     }
                 }
             }
-        }
-        return muscleVolume
+            .flatMap { it.entries }
+            .groupBy({ it.key }, { it.value })
+            .mapValues { (_, volumes) -> volumes.sum() }
     }
 
 }

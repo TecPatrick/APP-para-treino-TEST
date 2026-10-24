@@ -1,5 +1,6 @@
 package com.example.data.firestore
 
+import com.example.util.FirestoreLogger
 import android.content.Context
 import android.util.Log
 import com.example.BuildConfig
@@ -774,7 +775,9 @@ open class FirestoreSyncManager(private val context: Context) {
 
     suspend fun syncWorkoutExerciseToCloud(exercise: WorkoutExercise, workoutId: String? = null, customUid: String? = null): Result<Unit> {
         val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado"))
-        val wid = workoutId ?: "free"
+        val wid = workoutId ?: if (exercise.routineId > 0) exercise.routineId.toString() else "free"
+        val path = "users/$uid/workouts/$wid/exercises/${exercise.id}"
+        FirestoreLogger.logWriteAttempt("syncWorkoutExerciseToCloud", uid, path, exercise)
         return try {
             val docRef = firestore.collection("users").document(uid)
                 .collection("workouts").document(wid)
@@ -794,8 +797,23 @@ open class FirestoreSyncManager(private val context: Context) {
                 "updatedAt" to FieldValue.serverTimestamp()
             )
             awaitCloudWrite(docRef.set(data, SetOptions.merge()))
+            FirestoreLogger.logSuccess("syncWorkoutExerciseToCloud", path)
             Result.success(Unit)
-        } catch (e: Exception) { Result.failure(e) }
+        } catch (e: Exception) {
+            FirestoreLogger.logError("syncWorkoutExerciseToCloud", path, e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun migrateExistingExercises(exercises: List<WorkoutExercise>, customUid: String? = null): Result<Int> {
+        val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado"))
+        var successCount = 0
+        exercises.forEach { ex ->
+            val wid = if (ex.routineId > 0) ex.routineId.toString() else "free"
+            val res = syncWorkoutExerciseToCloud(ex, wid, uid)
+            if (res.isSuccess) successCount++
+        }
+        return Result.success(successCount)
     }
 
 
