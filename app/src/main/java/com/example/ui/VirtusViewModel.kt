@@ -2041,13 +2041,6 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 )
                 repository.addWorkoutRoutine(updatedRoutine)
                 repository.deleteExercisesForRoutine(existingRoutineId)
-                
-                // Sync to Cloud
-                firestoreSync.syncWorkoutRoutineToCloud(updatedRoutine).onFailure { e ->
-                    Log.e("VirtusViewModel", "Falha ao sincronizar rotina: ${e.message}")
-                    _toastMessage.value = "Erro ao sincronizar rotina na nuvem."
-                }
-                
                 existingRoutineId
             } else {
                 val newRoutine = WorkoutRoutine(
@@ -2058,41 +2051,21 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                     targetMuscleGroups = targetMuscleGroups,
                     estimatedDurationMinutes = estimatedDurationMinutes
                 )
-                val id = repository.addWorkoutRoutine(newRoutine)
-                
-                // Sync to Cloud
-                firestoreSync.syncWorkoutRoutineToCloud(newRoutine.copy(id = id)).onFailure { e ->
-                    Log.e("VirtusViewModel", "Falha ao sincronizar nova rotina: ${e.message}")
-                    _toastMessage.value = "Erro ao sincronizar nova rotina na nuvem."
-                }
-                
-                id
+                repository.addWorkoutRoutine(newRoutine)
             }
 
             exercises.forEachIndexed { index, ex ->
                 val guide = com.example.util.ExerciseGifMapper.getGuideForExercise(ex.exerciseName)
-                val exWithId = ex.copy(
-                    id = 0L,
-                    routineId = routineId,
-                    orderIndex = index,
-                    biomechanicsGuide = ex.biomechanicsGuide.ifBlank { guide.postureTip },
-                    gifDemonstrationUrl = ex.gifDemonstrationUrl.ifBlank { guide.gifUrl }
+                repository.addWorkoutExercise(
+                    ex.copy(
+                        id = 0L,
+                        routineId = routineId,
+                        orderIndex = index,
+                        biomechanicsGuide = ex.biomechanicsGuide.ifBlank { guide.postureTip },
+                        gifDemonstrationUrl = ex.gifDemonstrationUrl.ifBlank { guide.gifUrl }
+                    )
                 )
-                val id = repository.addWorkoutExercise(exWithId)
-                
-                // Sync to Cloud with nested path
-                val workoutId = routineId.toString()
-                Log.d("VirtusViewModel", "Sincronizando exercício (id: $id, workoutId: $workoutId) com Firestore: $exWithId")
-                
-                firestoreSync.syncWorkoutExerciseToCloud(exWithId.copy(id = id), workoutId = workoutId).onFailure { e ->
-                    Log.e("VirtusViewModel", "Falha ao sincronizar exercício $id no caminho aninhado: ${e.message}")
-                    _toastMessage.value = "Erro ao sincronizar exercício na nuvem."
-                }
             }
-
-
-
-
 
             _toastMessage.value = "Ficha '$title' salva com sucesso!"
         }
@@ -2366,26 +2339,6 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         sb.append("\n_Foco na dieta! Gerado pelo VIRTUS Fit App_")
         return sb.toString()
     }
-
-    fun getMuscleVolume(days: Int): Map<String, Float> {
-        val now = System.currentTimeMillis()
-        val limit = if (days <= 0) 0L else now - (days.toLong() * 86400000L)
-        
-        return workoutLogs.value
-            .asSequence()
-            .filter { it.dateMillis >= limit }
-            .mapNotNull { log ->
-                workoutRoutines.value.find { it.id == log.routineId }?.let { routine ->
-                    val muscles = routine.targetMuscleGroups.split(",").map { it.trim() }.filter { it.isNotBlank() }
-                    if (muscles.isEmpty()) emptyMap() else {
-                        val volPerMuscle = log.totalVolumeKg / muscles.size
-                        muscles.associateWith { volPerMuscle }
-                    }
-                }
-            }
-            .flatMap { it.entries }
-            .groupBy({ it.key }, { it.value })
-            .mapValues { (_, volumes) -> volumes.sum() }
-    }
-
 }
+
+

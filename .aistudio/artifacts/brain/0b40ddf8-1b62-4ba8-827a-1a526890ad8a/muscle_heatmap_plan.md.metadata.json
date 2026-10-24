@@ -1,6 +1,0 @@
-{
-  "summary":  "Plano para implementar a visualização de 'Muscle Heatmap' interativo na aba de perfil, com suporte a filtros de período (7 dias, 30 dias, histórico total) utilizando uma sobreposição de imagem de mapa de calor.",
-  "updatedAt":  "2026-10-24T20:49:42.286647933Z",
-  "requestFeedback":  true,
-  "userFacing":  true
-}

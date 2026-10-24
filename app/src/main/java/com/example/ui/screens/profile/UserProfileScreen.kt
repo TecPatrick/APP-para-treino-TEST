@@ -1,7 +1,5 @@
 package com.example.ui.screens.profile
 
-import com.example.ui.components.MuscleHeatmapView
-
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
@@ -183,11 +181,7 @@ fun UserProfileScreen(
             }
         )
 
-        
-    var heatmapDays by remember { mutableStateOf(30) }
-    val muscleVolume = viewModel.getMuscleVolume(heatmapDays)
-
-    LazyColumn(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .imePadding()
@@ -195,13 +189,6 @@ fun UserProfileScreen(
             contentPadding = PaddingValues(bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item {
-                MuscleHeatmapView(
-                    muscleVolumes = muscleVolume,
-                    selectedTimeframeDays = heatmapDays,
-                    onTimeframeSelected = { heatmapDays = it }
-                )
-            }
             item {
                 val isGuest = profile.firebaseUid.startsWith("guest_") || profile.email.endsWith("@growth.local")
                 Card(

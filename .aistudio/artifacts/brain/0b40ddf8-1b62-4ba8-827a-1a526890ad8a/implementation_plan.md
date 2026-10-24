@@ -1,39 +1,25 @@
-# Muscle Heatmap Redesign, Firestore Subcollection Migration & Logging Implementation Plan
+# Plano de Implementação: Regras de Segurança do Firestore e Firebase App Check (Play Integrity)
 
-Redesign the muscle heatmap with polished anatomical silhouettes (matching user reference), implement Firestore subcollection migration to `/users/{userId}/workouts/{workoutId}/exercises/{exerciseId}`, add structured logging for Firestore writes, and refactor volume aggregation.
+Implementação de regras de segurança estritas no Firestore para isolamento de dados por usuário e integração do Firebase App Check com o Play Integrity provider no aplicativo Android VIRTUS.
 
-## User Review & Critical Decisions
+---
 
-> [!IMPORTANT]
-> - **Heatmap UI**: Clean anatomical body silhouettes (anterior & posterior) with smooth gradient intensity coloring (Blue to Orange), without breakdown lists.
-> - **Firestore Migration**: Migrate existing exercises to nested subcollections under `/users/{userId}/workouts/{workoutId}/exercises/{exerciseId}` with `'free'` as default ID for unassigned workouts.
-> - **Logging**: Centralized Firestore operation logger capturing auth state, document paths, and data structures before writing.
+## 1. Regras de Segurança do Firestore (`firestore.rules`)
+- **Isolamento por Usuário (`/users/{userId}`):**
+  - Restringir leitura, escrita, atualização e deleção em subcoleções de `/users/{userId}` (`diets`, `workouts`, `food_records`, `progress_logs`, `cardio_logs`, `gps_routes`) exclusivamente ao proprietário do documento (`request.auth.uid == userId`).
+- **Validações de Integridade dos Dados:**
+  - Garantir validação dos tipos e campos obrigatórios de dieta e treino.
+- **Princípio do Menor Privilégio (Zero-Trust):**
+  - Negação explícita por padrão para qualquer tentativa de acesso fora do caminho do usuário.
 
-## 1. Overview & Core Concept
+## 2. Integração do Firebase App Check
+- **Adição de Dependências Gradle:**
+  - `firebase-appcheck-playintegrity` para validação de atestação do app via Google Play Services em produção.
+  - `firebase-appcheck-debug` para permitir desenvolvimento e testes locais sem interrupção.
+- **Inicialização em `VirtusApplication.kt`:**
+  - Configurar `FirebaseAppCheck.getInstance().installAppCheckProviderFactory(...)` na inicialização do aplicativo (`onCreate`).
+  - Alternar automaticamente entre `PlayIntegrityAppCheckProviderFactory` em Release e `DebugAppCheckProviderFactory` em Debug.
 
-- **What It Does**: Provides a polished Hevy-style muscle heatmap UI in the profile, ensures bulletproof Firestore subcollection synchronization, and logs all database operations.
-- **Key Value**: Professional visual polish and reliable cloud data structure.
-
-## 2. User Experience & Visual Design
-
-- **Heatmap Redesign**: Elegant dark theme card housing anterior and posterior anatomical body models, with interactive muscle selection and smooth intensity gradients.
-
-## 3. Technical Architecture & Data Strategy
-
-```
-┌────────────────────────────────────────────────────────┐
-│               UserProfileScreen (UI)                   │
-│  - Redesigned MuscleHeatmapView (Body Silhouettes)     │
-└───────────────────────────▲────────────────────────────┘
-                            │
-┌───────────────────────────┴────────────────────────────┐
-│                 VirtusViewModel                        │
-│  - getMuscleVolume(days) [Map-Reduce aggregation]      │
-└───────────────────────────▲────────────────────────────┘
-                            │
-┌───────────────────────────┴────────────────────────────┐
-│          VirtusRepository / FirestoreSyncManager       │
-│  - migrateExercisesToSubcollection()                   │
-│  - Centralized Firestore Logger                        │
-└────────────────────────────────────────────────────────┘
-```
+## 3. Validação e Verificação
+- Atualizar o arquivo `firestore.rules`.
+- Executar `compile_applet` para verificar que a compilação permanece limpa e funcional.
