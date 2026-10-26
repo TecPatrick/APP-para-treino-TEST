@@ -12,7 +12,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.vector.PathParser
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.text.font.FontWeight
@@ -20,13 +24,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Hevy-style fitness color palette: Blue (low) -> Cyan -> Yellow -> Orange -> Deep Red/Orange (high intensity)
+// Neutral at rest; warm tones show relative training volume.
 fun getIntensityColor(ratio: Float): Color {
     return when {
-        ratio <= 0f -> Color(0xFF222634) // Untrained / Rest
-        ratio < 0.25f -> Color(0xFF1E88E5) // Blue
-        ratio < 0.5f -> Color(0xFF00ACC1)  // Cyan
-        ratio < 0.75f -> Color(0xFFFFB300) // Amber/Yellow
+        !ratio.isFinite() || ratio <= 0f -> Color(0xFF526174) // Untrained / Rest
+        ratio < 0.25f -> Color(0xFFFFD6AD) // Low
+        ratio < 0.5f -> Color(0xFFFFAE73)  // Moderate
+        ratio < 0.75f -> Color(0xFFFF854A) // High
         else -> Color(0xFFFF5722)         // Flame Orange / Red
     }
 }
@@ -38,7 +42,6 @@ fun MuscleHeatmapView(
     onTimeframeSelected: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var selectedMuscle by remember { mutableStateOf<String?>(null) }
     val maxVolume = muscleVolumes.values.maxOrNull() ?: 1f
 
     Card(
@@ -83,7 +86,7 @@ fun MuscleHeatmapView(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(modifier = Modifier.size(8.dp).background(Color(0xFF1E88E5), RoundedCornerShape(4.dp)))
+                        Box(modifier = Modifier.size(8.dp).background(Color(0xFFFFD6AD), RoundedCornerShape(4.dp)))
                         Text("Baixo", fontSize = 10.sp, color = Color.Gray)
                         Box(modifier = Modifier.size(8.dp).background(Color(0xFFFF5722), RoundedCornerShape(4.dp)))
                         Text("Alto", fontSize = 10.sp, color = Color.Gray)
@@ -140,10 +143,11 @@ fun MuscleHeatmapView(
                     Spacer(modifier = Modifier.height(8.dp))
                     Canvas(
                         modifier = Modifier
-                            .fillMaxHeight()
-                            .width(120.dp)
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .semantics { contentDescription = "Mapa muscular: vista anterior. Valores na tabela abaixo." }
                     ) {
-                        drawAnteriorSilhouette(muscleVolumes, maxVolume)
+                        drawMuscleBody(AnteriorMuscles, muscleVolumes, maxVolume)
                     }
                 }
 
@@ -164,10 +168,11 @@ fun MuscleHeatmapView(
                     Spacer(modifier = Modifier.height(8.dp))
                     Canvas(
                         modifier = Modifier
-                            .fillMaxHeight()
-                            .width(120.dp)
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .semantics { contentDescription = "Mapa muscular: vista posterior. Valores na tabela abaixo." }
                     ) {
-                        drawPosteriorSilhouette(muscleVolumes, maxVolume)
+                        drawMuscleBody(PosteriorMuscles, muscleVolumes, maxVolume)
                     }
                 }
             }
@@ -175,7 +180,7 @@ fun MuscleHeatmapView(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Highlighted Muscle Details Banner
-            val activeMuscle = selectedMuscle ?: muscleVolumes.maxByOrNull { it.value }?.key ?: "Nenhum"
+            val activeMuscle = muscleVolumes.filterValues { it > 0f }.maxByOrNull { it.value }?.key ?: "Nenhum"
             val volume = muscleVolumes[activeMuscle] ?: 0f
 
             Surface(
@@ -256,6 +261,10 @@ fun MuscleHeatmapView(
                 muscleVolumes.toList().filter { it.second > 0f }.sortedByDescending { it.second }
             }
 
+            if (sortedMuscles.isEmpty()) {
+                Text("Sem treinos neste período", color = Color(0xFF94A3B8), fontSize = 13.sp)
+            }
+
             sortedMuscles.forEach { (muscle, vol) ->
                 val fraction = if (maxVolume > 0f) (vol / maxVolume).coerceIn(0.06f, 1f) else 0.06f
                 Row(
@@ -303,56 +312,66 @@ fun MuscleHeatmapView(
     }
 }
 
-private fun DrawScope.drawAnteriorSilhouette(volumes: Map<String, Float>, maxVol: Float) {
-    val cx = size.width / 2f
-    
-    // Head outline
-    drawCircle(Color(0xFF222634), radius = 20f, center = Offset(cx, 28f))
-
-    // Shoulders (Deltoids)
-    val shoulderRatio = (volumes["Ombros"] ?: 0f) / maxVol.coerceAtLeast(1f)
-    drawOval(getIntensityColor(shoulderRatio), topLeft = Offset(cx - 40f, 52f), size = Size(80f, 28f))
-
-    // Chest (Peitoral)
-    val chestRatio = (volumes["Peitoral"] ?: volumes["Peito"] ?: 0f) / maxVol.coerceAtLeast(1f)
-    drawRoundRect(getIntensityColor(chestRatio), topLeft = Offset(cx - 32f, 82f), size = Size(64f, 44f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f))
-
-    // Biceps / Arms
-    val bicepRatio = (volumes["Bíceps"] ?: volumes["Braços"] ?: 0f) / maxVol.coerceAtLeast(1f)
-    drawRoundRect(getIntensityColor(bicepRatio), topLeft = Offset(cx - 52f, 85f), size = Size(16f, 52f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f))
-    drawRoundRect(getIntensityColor(bicepRatio), topLeft = Offset(cx + 36f, 85f), size = Size(16f, 52f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f))
-
-    // Abs / Core
-    val absRatio = (volumes["Abdominais"] ?: volumes["Core"] ?: 0f) / maxVol.coerceAtLeast(1f)
-    drawRoundRect(getIntensityColor(absRatio), topLeft = Offset(cx - 22f, 128f), size = Size(44f, 55f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f))
-
-    // Quads / Legs
-    val legRatio = (volumes["Pernas"] ?: volumes["Quadríceps"] ?: 0f) / maxVol.coerceAtLeast(1f)
-    drawRoundRect(getIntensityColor(legRatio), topLeft = Offset(cx - 30f, 186f), size = Size(26f, 85f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f))
-    drawRoundRect(getIntensityColor(legRatio), topLeft = Offset(cx + 4f, 186f), size = Size(26f, 85f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f))
+// Original vector artwork in a 160 x 360 viewport. Each left-side region is mirrored.
+private class MuscleRegion(val names: List<String>, data: String) {
+    val path by lazy { PathParser().parsePathString(data).toPath() }
 }
 
-private fun DrawScope.drawPosteriorSilhouette(volumes: Map<String, Float>, maxVol: Float) {
-    val cx = size.width / 2f
-    
-    // Head outline (back)
-    drawCircle(Color(0xFF222634), radius = 20f, center = Offset(cx, 28f))
+private val BodyDetails = listOf(
+    MuscleRegion(emptyList(), "M80 5 C65 5 63 15 65 27 C66 36 73 43 80 44 C87 43 94 36 95 27 C97 15 95 5 80 5 Z"),
+    MuscleRegion(emptyList(), "M72 42 L72 50 L62 56 L80 63 L98 56 L88 50 L88 42 Q80 49 72 42 Z")
+)
+private val Extremities = listOf(
+    MuscleRegion(emptyList(), "M23 163 L31 166 L29 178 L25 187 Q22 190 20 186 L21 180 Q16 187 14 183 L15 174 Z"),
+    MuscleRegion(emptyList(), "M59 330 L70 331 L71 343 Q75 352 68 354 L51 354 Q46 352 50 347 L57 340 Z")
+)
+private val Shoulders = MuscleRegion(listOf("Ombros"), "M59 57 Q45 57 41 69 L37 85 Q47 89 54 78 L62 65 Z")
+private val Forearms = MuscleRegion(listOf("Antebraços", "Braços"), "M32 119 Q38 122 40 128 L31 163 L23 160 Q25 140 32 119 Z")
+private val Calves = MuscleRegion(listOf("Panturrilhas", "Pernas"), "M56 261 Q64 257 71 263 Q74 281 68 302 L68 328 L59 328 L57 306 Q50 284 56 261 Z")
+private val AnteriorMuscles = listOf(
+    Shoulders,
+    MuscleRegion(listOf("Peitoral", "Peito"), "M63 63 Q70 61 78 65 L78 91 Q65 101 52 91 L55 77 Z"),
+    MuscleRegion(listOf("Bíceps", "Braços"), "M38 88 Q45 91 51 86 L46 110 Q42 123 34 118 Q31 107 38 88 Z"),
+    Forearms,
+    MuscleRegion(listOf("Abdominais", "Core"), "M66 101 L78 100 L78 115 L65 115 Z"),
+    MuscleRegion(listOf("Abdominais", "Core"), "M65 119 L78 119 L78 133 L65 133 Z"),
+    MuscleRegion(listOf("Abdominais", "Core"), "M65 137 L78 137 L78 158 Q68 154 65 147 Z"),
+    MuscleRegion(listOf("Abdominais", "Core"), "M52 98 L61 103 L61 147 L76 166 L64 174 Q52 159 54 140 Z"),
+    MuscleRegion(listOf("Quadríceps", "Pernas"), "M56 169 L65 179 L76 171 Q79 194 74 218 L68 250 Q61 255 56 247 Q47 213 51 187 Z"),
+    MuscleRegion(emptyList(), "M57 252 Q63 257 69 252 L70 260 Q63 266 56 259 Z"),
+    Calves
+)
+private val PosteriorMuscles = listOf(
+    Shoulders,
+    MuscleRegion(listOf("Trapézio", "Costas", "Dorsais"), "M73 53 L78 59 L78 98 Q64 86 59 69 Z"),
+    MuscleRegion(listOf("Costas", "Dorsais"), "M55 80 Q63 93 78 104 L78 145 L65 155 Q57 140 54 120 L50 98 Z"),
+    MuscleRegion(listOf("Tríceps", "Braços"), "M38 88 Q45 91 51 86 L47 109 Q42 122 34 118 Q31 107 38 88 Z"),
+    Forearms,
+    MuscleRegion(listOf("Lombar", "Costas", "Dorsais"), "M78 149 L78 172 L62 161 L66 155 Z"),
+    MuscleRegion(listOf("Glúteos", "Pernas"), "M59 166 Q67 168 78 177 L78 198 Q65 210 52 198 Q50 179 59 166 Z"),
+    MuscleRegion(listOf("Isquiotibiais", "Posterior", "Posterior de Coxa", "Pernas"), "M52 204 Q65 214 77 204 L72 235 L68 254 L57 254 Q50 231 52 204 Z"),
+    Calves
+)
 
-    // Upper Back / Lats
-    val backRatio = (volumes["Costas"] ?: volumes["Dorsais"] ?: 0f) / maxVol.coerceAtLeast(1f)
-    drawRoundRect(getIntensityColor(backRatio), topLeft = Offset(cx - 35f, 52f), size = Size(70f, 48f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f))
-
-    // Triceps / Arms back
-    val tricepRatio = (volumes["Tríceps"] ?: volumes["Braços"] ?: 0f) / maxVol.coerceAtLeast(1f)
-    drawRoundRect(getIntensityColor(tricepRatio), topLeft = Offset(cx - 52f, 85f), size = Size(16f, 52f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f))
-    drawRoundRect(getIntensityColor(tricepRatio), topLeft = Offset(cx + 36f, 85f), size = Size(16f, 52f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f))
-
-    // Glutes / Lower Back
-    val gluteRatio = (volumes["Glúteos"] ?: volumes["Pernas"] ?: 0f) / maxVol.coerceAtLeast(1f)
-    drawRoundRect(getIntensityColor(gluteRatio), topLeft = Offset(cx - 30f, 102f), size = Size(60f, 42f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f))
-
-    // Hamstrings / Calves
-    val legRatio = (volumes["Pernas"] ?: volumes["Posterior"] ?: 0f) / maxVol.coerceAtLeast(1f)
-    drawRoundRect(getIntensityColor(legRatio), topLeft = Offset(cx - 30f, 146f), size = Size(26f, 125f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f))
-    drawRoundRect(getIntensityColor(legRatio), topLeft = Offset(cx + 4f, 146f), size = Size(26f, 125f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(8f, 8f))
+private fun DrawScope.drawMuscleBody(regions: List<MuscleRegion>, volumes: Map<String, Float>, maxVolume: Float) {
+    val factor = minOf(size.width / 160f, size.height / 360f)
+    withTransform({
+        translate((size.width - 160f * factor) / 2f, (size.height - 360f * factor) / 2f)
+        scale(factor, factor, pivot = Offset.Zero)
+    }) {
+        fun drawRegion(region: MuscleRegion) {
+            val volume = region.names.firstNotNullOfOrNull { volumes[it] } ?: 0f
+            val color = if (region.names.isEmpty()) Color(0xFF394657)
+                else getIntensityColor(volume / maxVolume.coerceAtLeast(1f))
+            drawPath(region.path, color)
+            drawPath(region.path, Color(0xFF8995A5), style = Stroke(width = 0.65f))
+        }
+        BodyDetails.forEach { drawRegion(it) }
+        for (side in listOf(1f, -1f)) {
+            withTransform({ scale(side, 1f, pivot = Offset(80f, 0f)) }) {
+                Extremities.forEach { drawRegion(it) }
+                regions.forEach { drawRegion(it) }
+            }
+        }
+    }
 }
