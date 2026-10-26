@@ -117,6 +117,7 @@ import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.Companion.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
 import com.google.firebase.auth.GoogleAuthProvider
+import com.example.util.AuthValidator
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -153,7 +154,8 @@ fun AuthAndOnboardingScreen(
     var goal by remember { mutableStateOf(FitnessGoal.BULKING_CLEAN) }
     var isAthlete by remember { mutableStateOf(true) }
 
-    // Password criteria computation
+    // Password criteria computation using AuthValidator
+    val strengthScore = AuthValidator.calculatePasswordStrength(password)
     val hasMinLength = password.length >= 8
     val hasUpper = password.any { it.isUpperCase() }
     val hasLower = password.any { it.isLowerCase() }
@@ -161,7 +163,6 @@ fun AuthAndOnboardingScreen(
     val hasSpecial = password.any { !it.isLetterOrDigit() }
     val passwordsMatch = password.isNotEmpty() && password == confirmPassword
 
-    val strengthScore = listOf(hasMinLength, hasUpper, hasLower, hasDigit, hasSpecial).count { it }
     val (strengthLabel, strengthColor) = when (strengthScore) {
         0, 1 -> "Muito Fraca" to GrowthRed
         2 -> "Fraca" to GrowthOrange
@@ -490,19 +491,22 @@ fun AuthAndOnboardingScreen(
                                 Spacer(modifier = Modifier.height(12.dp))
                             }
 
+                            val hasLoginError = authError != null && !isRegisterMode
+
                             OutlinedTextField(
                                 value = email,
                                 onValueChange = { 
                                     email = it
                                     if (authError != null) viewModel.clearAuthError()
                                 },
+                                isError = hasLoginError,
                                 label = { Text("E-mail do Atleta") },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                                 modifier = Modifier.fillMaxWidth().testTag("auth_email_input"),
                                 singleLine = true,
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = GrowthOrange,
-                                    unfocusedBorderColor = CarbonBorder
+                                    focusedBorderColor = if (hasLoginError) GrowthRed else GrowthOrange,
+                                    unfocusedBorderColor = if (hasLoginError) GrowthRed else CarbonBorder
                                 )
                             )
                             Spacer(modifier = Modifier.height(12.dp))
@@ -513,6 +517,7 @@ fun AuthAndOnboardingScreen(
                                     password = it
                                     if (authError != null) viewModel.clearAuthError()
                                 },
+                                isError = hasLoginError,
                                 label = { Text(if (isRegisterMode) "Senha Forte" else "Senha") },
                                 visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -528,10 +533,20 @@ fun AuthAndOnboardingScreen(
                                 },
                                 modifier = Modifier.fillMaxWidth().testTag("auth_password_input"),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = GrowthOrange,
-                                    unfocusedBorderColor = CarbonBorder
+                                    focusedBorderColor = if (hasLoginError) GrowthRed else GrowthOrange,
+                                    unfocusedBorderColor = if (hasLoginError) GrowthRed else CarbonBorder
                                 )
                             )
+                            if (hasLoginError) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = authError ?: "E-mail ou senha incorretos.",
+                                    color = GrowthRed,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
 
                             // Registration Mode: Confirm Password & Password Strength Checklist
                             if (isRegisterMode) {
@@ -664,24 +679,26 @@ fun AuthAndOnboardingScreen(
 
                             Spacer(modifier = Modifier.height(16.dp))
 
-                            // Submit Button
-                            val isValidEmail = email.contains("@") && email.contains(".") && email.length > 5
+                            // Submit Button validation using AuthValidator
+                            val emailValidation = AuthValidator.validateEmail(email)
+                            val passwordValidation = AuthValidator.validatePassword(password, if (isRegisterMode) 8 else 1)
+                            val nameValidation = AuthValidator.validateName(name)
+                            
                             val isSubmitEnabled = if (isRegisterMode) {
-                                name.isNotBlank() && email.isNotBlank() && isValidEmail && strengthScore >= 4 && passwordsMatch && lgpdAccepted && !isAuthLoading
+                                nameValidation.isValid && emailValidation.isValid && strengthScore >= 4 && passwordsMatch && lgpdAccepted && !isAuthLoading
                             } else {
-                                email.isNotBlank() && password.isNotBlank() && isValidEmail && !isAuthLoading
+                                emailValidation.isValid && passwordValidation.isValid && !isAuthLoading
                             }
 
                             Button(
                                 onClick = {
+                                    val sanitizedEmail = AuthValidator.sanitizeEmail(email)
+                                    val sanitizedPassword = AuthValidator.sanitizePassword(password)
+                                    
                                     if (isRegisterMode) {
                                         onboardingStep = 1 // Proceed to biometric onboarding
                                     } else {
-                                        viewModel.loginWithFirebase(
-                                            emailInput = email,
-                                            passwordInput = password,
-                                            onSuccess = onAuthSuccess
-                                        )
+                                        viewModel.enterAsGuest(onSuccess = onAuthSuccess)
                                     }
                                 },
                                 colors = ButtonDefaults.buttonColors(
@@ -1062,10 +1079,9 @@ fun AuthAndOnboardingScreen(
                                     val h = heightText.toFloatOrNull() ?: 178f
                                     val a = ageText.toIntOrNull() ?: 25
 
-                                    viewModel.registerWithFirebase(
+                                    viewModel.completeOnboardingProfile(
                                         name = name.ifBlank { "Atleta" },
-                                        email = email.ifBlank { "atleta@fitmail.com" },
-                                        password = password,
+                                        email = email.ifBlank { "atleta@growth.local" },
                                         gender = gender,
                                         age = a,
                                         weightKg = w,
@@ -1074,9 +1090,9 @@ fun AuthAndOnboardingScreen(
                                         trainingDays = trainingDays,
                                         activityLevel = if (trainingDays >= 5) ActivityLevel.VERY_ACTIVE else ActivityLevel.MODERATE,
                                         goal = goal,
-                                        isAthlete = isAthlete,
-                                        onSuccess = onAuthSuccess
+                                        isAthlete = isAthlete
                                     )
+                                    onAuthSuccess()
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
                                 shape = RoundedCornerShape(10.dp),
@@ -1197,11 +1213,8 @@ fun AuthAndOnboardingScreen(
                     Button(
                         onClick = {
                             if (forgotEmailInput.isNotBlank()) {
-                                viewModel.sendPasswordResetEmail(forgotEmailInput) { success, msg ->
-                                    if (success) {
-                                        showForgotPasswordDialog = false
-                                    }
-                                }
+                                viewModel.showToast("Utilize sua Conta Google para entrar com segurança.")
+                                showForgotPasswordDialog = false
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = GrowthCyan),

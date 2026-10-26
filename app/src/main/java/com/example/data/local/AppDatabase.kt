@@ -49,10 +49,29 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Add isFixed to meal_plan_items (fixes Turn 1 error)
-                db.execSQL("ALTER TABLE meal_plan_items ADD COLUMN isFixed INTEGER NOT NULL DEFAULT 0")
-                // Add isFavorite to food_items (for New Feature)
-                db.execSQL("ALTER TABLE food_items ADD COLUMN isFavorite INTEGER NOT NULL DEFAULT 0")
+                // Safely add isFixed to meal_plan_items if not already present
+                val mealCursor = db.query("PRAGMA table_info(meal_plan_items)")
+                var hasIsFixed = false
+                while (mealCursor.moveToNext()) {
+                    val name = mealCursor.getString(mealCursor.getColumnIndexOrThrow("name"))
+                    if (name == "isFixed") hasIsFixed = true
+                }
+                mealCursor.close()
+                if (!hasIsFixed) {
+                    db.execSQL("ALTER TABLE meal_plan_items ADD COLUMN isFixed INTEGER NOT NULL DEFAULT 0")
+                }
+
+                // Safely add isFavorite to food_items if not already present
+                val foodCursor = db.query("PRAGMA table_info(food_items)")
+                var hasIsFavorite = false
+                while (foodCursor.moveToNext()) {
+                    val name = foodCursor.getString(foodCursor.getColumnIndexOrThrow("name"))
+                    if (name == "isFavorite") hasIsFavorite = true
+                }
+                foodCursor.close()
+                if (!hasIsFavorite) {
+                    db.execSQL("ALTER TABLE food_items ADD COLUMN isFavorite INTEGER NOT NULL DEFAULT 0")
+                }
             }
         }
 

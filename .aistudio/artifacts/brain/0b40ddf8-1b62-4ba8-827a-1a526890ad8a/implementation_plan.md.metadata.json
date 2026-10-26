@@ -1,6 +1,6 @@
 {
-  "summary":  "Plano de implementação para Regras de Segurança do Firestore (Zero-Trust com isolamento por usuário) e Firebase App Check usando Play Integrity Provider (com suporte a Debug Provider em desenvolvimento).",
-  "updatedAt":  "2026-10-23T02:46:35.058143238Z",
+  "summary":  "Implementation plan for refactoring Firebase and preserving workouts with Google Sign-In, Room + Firestore sync, and M3 design.",
+  "updatedAt":  "2026-10-26T02:16:27.318955565Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

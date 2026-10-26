@@ -1,268 +1,84 @@
 rules_version = '2';
-
-// Assumed data model:
-// All documents are private and scoped below /users/{authenticated uid}.
-// users stores profile and nutrition targets.
-// calorieGoals stores nutrition targets.
-// workoutLogs and gpsRouteLogs store exercise metrics.
-// mealPlans, shoppingItems and progressLogs store diet/progress records.
-// All models require userId and a server-generated updatedAt timestamp.
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAuthenticated() {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
       return request.auth != null;
     }
 
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    function uidUnchanged(data, userId) {
-      return data.userId is string && data.userId == userId;
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
-    function uidNotModified(data, userId) {
-      return uidUnchanged(data, userId) &&
-             (!('userId' in resource.data) || data.userId == resource.data.userId);
+    // --- Validation Helpers ---
+
+    function isValidUserProfile(data) {
+      return data.userId == request.auth.uid &&
+             data.email is string &&
+             (!('name' in data) || data.name is string) &&
+             (!('age' in data) || data.age is int) &&
+             (!('weightKg' in data) || data.weightKg is number) &&
+             (!('heightCm' in data) || data.heightCm is number) &&
+             (!('hasCompletedOnboarding' in data) || data.hasCompletedOnboarding is bool);
     }
 
-    function validText(value, maxSize) {
-      return value is string && value.size() <= maxSize;
+    function isValidWorkoutLog(data) {
+      return data.userId == request.auth.uid &&
+             data.dateMillis is int &&
+             (!('durationMinutes' in data) || data.durationMinutes is int);
     }
 
-    function validNumber(value, minimum, maximum) {
-      return value is number && value >= minimum && value <= maximum;
+    function isValidCardioLog(data) {
+      return data.userId == request.auth.uid &&
+             data.dateMillis is int &&
+             data.type is string;
     }
 
-    function validUpdatedAt(data) {
-      // Every client write must use FieldValue.serverTimestamp(). This prevents
-      // forged future timestamps from winning synchronization conflicts.
-      return data.updatedAt is timestamp && data.updatedAt == request.time;
-    }
-
-    function validEmail(value) {
-      return validText(value, 254) &&
-             value.matches('^[^@]+@[^@]+[.][^@]+$');
-    }
-
-    function authenticatedEmailMatches(value) {
-      return 'email' in request.auth.token &&
-             request.auth.token.email is string &&
-             value == request.auth.token.email;
-    }
-
-    function isValidUser(data, userId) {
-      let fields = [
-        'userId', 'name', 'email', 'gender', 'age', 'weightKg', 'heightCm',
-        'biotype', 'trainingDaysPerWeek', 'activityLevel', 'goal',
-        'targetCalories', 'targetProteinGrams', 'targetCarbsGrams',
-        'targetFatGrams', 'targetWaterMl', 'monthlyTargetWeightKg',
-        'monthlyTargetDurationWeeks', 'monthlyNotes', 'updatedAt'
-      ];
-      return data.keys().hasAll(fields) && data.keys().hasOnly(fields) &&
-             uidUnchanged(data, userId) &&
-             validText(data.name, 100) && validEmail(data.email) &&
-             authenticatedEmailMatches(data.email) &&
-             data.gender in ['MASCULINO', 'FEMININO'] &&
-             validNumber(data.age, 1, 120) &&
-             validNumber(data.weightKg, 20, 500) &&
-             validNumber(data.heightCm, 50, 300) &&
-             data.biotype in ['ECTOMORPH', 'MESOMORPH', 'ENDOMORPH'] &&
-             validNumber(data.trainingDaysPerWeek, 0, 7) &&
-             data.activityLevel in ['SEDENTARY', 'LIGHT', 'MODERATE', 'VERY_ACTIVE', 'EXTRA_ACTIVE'] &&
-             data.goal in ['BULKING_CLEAN', 'BULKING_AGGRESSIVE', 'MAINTENANCE', 'CUTTING_MODERATE', 'CUTTING_AGGRESSIVE'] &&
-             validNumber(data.targetCalories, 500, 10000) &&
-             validNumber(data.targetProteinGrams, 0, 1000) &&
-             validNumber(data.targetCarbsGrams, 0, 2000) &&
-             validNumber(data.targetFatGrams, 0, 1000) &&
-             validNumber(data.targetWaterMl, 0, 20000) &&
-             validNumber(data.monthlyTargetWeightKg, 20, 500) &&
-             validNumber(data.monthlyTargetDurationWeeks, 1, 104) &&
-             validText(data.monthlyNotes, 2000) && validUpdatedAt(data);
-    }
-
-    function isValidCalorieGoal(data, userId) {
-      let fields = ['userId', 'targetCalories', 'targetProteinGrams', 'targetCarbsGrams', 'targetFatGrams', 'targetWaterMl', 'updatedAt'];
-      return data.keys().hasAll(fields) && data.keys().hasOnly(fields) &&
-             uidUnchanged(data, userId) &&
-             validNumber(data.targetCalories, 500, 10000) &&
-             validNumber(data.targetProteinGrams, 0, 1000) &&
-             validNumber(data.targetCarbsGrams, 0, 2000) &&
-             validNumber(data.targetFatGrams, 0, 1000) &&
-             validNumber(data.targetWaterMl, 0, 20000) && validUpdatedAt(data);
-    }
-
-    function isValidWorkout(data, userId) {
-      let fields = ['userId', 'routineId', 'routineName', 'dateMillis', 'durationMinutes', 'totalVolumeKg', 'totalSetsCompleted', 'perceivedExertion', 'notes', 'updatedAt'];
-      return data.keys().hasAll(fields) && data.keys().hasOnly(fields) &&
-             uidUnchanged(data, userId) &&
-             validNumber(data.routineId, 0, 9999999999999) &&
-             validText(data.routineName, 150) &&
-             validNumber(data.dateMillis, 0, 9999999999999) &&
-             validNumber(data.durationMinutes, 0, 10000) &&
-             validNumber(data.totalVolumeKg, 0, 100000000) &&
-             validNumber(data.totalSetsCompleted, 0, 10000) &&
-             validNumber(data.perceivedExertion, 0, 10) &&
-             validText(data.notes, 5000) && validUpdatedAt(data);
-    }
-
-    function isValidGpsRoute(data, userId) {
-      let fields = ['userId', 'routeName', 'activityType', 'dateMillis', 'dateDisplay', 'durationSeconds', 'distanceMeters', 'stepsCount', 'caloriesBurned', 'averagePaceMinPerKm', 'routePointsJson', 'notes', 'updatedAt'];
-      return data.keys().hasAll(fields) && data.keys().hasOnly(fields) &&
-             uidUnchanged(data, userId) &&
-             validText(data.routeName, 150) && validText(data.activityType, 50) &&
-             validNumber(data.dateMillis, 0, 9999999999999) &&
-             validText(data.dateDisplay, 100) &&
-             validNumber(data.durationSeconds, 0, 10000000) &&
-             validNumber(data.distanceMeters, 0, 10000000) &&
-             validNumber(data.stepsCount, 0, 100000000) &&
-             validNumber(data.caloriesBurned, 0, 1000000) &&
-             validNumber(data.averagePaceMinPerKm, 0, 10000) &&
-             validText(data.routePointsJson, 500000) &&
-             validText(data.notes, 5000) && validUpdatedAt(data);
-    }
-
-    function isValidMeal(data, userId) {
-      let fields = ['userId', 'mealType', 'name', 'portionGrams', 'calories', 'protein', 'carbs', 'fat', 'isCompletedToday', 'isFixed', 'updatedAt'];
-      return data.keys().hasAll(fields) && data.keys().hasOnly(fields) &&
-             uidUnchanged(data, userId) &&
-             validText(data.mealType, 50) && validText(data.name, 200) &&
-             validNumber(data.portionGrams, 0, 100000) &&
-             validNumber(data.calories, 0, 100000) &&
-             validNumber(data.protein, 0, 10000) &&
-             validNumber(data.carbs, 0, 10000) &&
-             validNumber(data.fat, 0, 10000) &&
-             data.isCompletedToday is bool &&
-             data.isFixed is bool && validUpdatedAt(data);
-    }
-
-    function isValidShoppingItem(data, userId) {
-      let fields = ['userId', 'name', 'category', 'totalQuantityGrams', 'unit', 'estimatedPrice', 'isBought', 'updatedAt'];
-      return data.keys().hasAll(fields) && data.keys().hasOnly(fields) &&
-             uidUnchanged(data, userId) &&
-             validText(data.name, 200) && validText(data.category, 50) &&
-             validText(data.unit, 20) &&
-             validNumber(data.totalQuantityGrams, 0, 1000000) &&
-             validNumber(data.estimatedPrice, 0, 10000000) &&
-             data.isBought is bool && validUpdatedAt(data);
-    }
-
-    function isValidProgress(data, userId) {
-      let fields = ['userId', 'dateMillis', 'weightKg', 'bodyFatPercent', 'notes', 'updatedAt'];
-      return data.keys().hasAll(fields) && data.keys().hasOnly(fields) &&
-             uidUnchanged(data, userId) &&
-             validNumber(data.dateMillis, 0, 9999999999999) &&
-             validNumber(data.weightKg, 20, 500) &&
-             validNumber(data.bodyFatPercent, 0, 100) &&
-             validText(data.notes, 5000) && validUpdatedAt(data);
-    }
-
-    function isValidFoodRecord(data, userId) {
-      let fields = ['userId', 'dateString', 'dateMillis', 'mealType', 'foodItemId', 'foodName', 'amount', 'unit', 'calories', 'protein', 'carbs', 'fat', 'fiber', 'notes', 'updatedAt'];
-      return data.keys().hasAll(fields) && data.keys().hasOnly(fields) && uidUnchanged(data, userId) &&
-             validText(data.dateString, 10) && validNumber(data.dateMillis, 0, 9999999999999) &&
-             validText(data.mealType, 50) && validNumber(data.foodItemId, 0, 9999999999999) &&
-             validText(data.foodName, 200) && validNumber(data.amount, 0, 100000) && validText(data.unit, 20) &&
-             validNumber(data.calories, 0, 100000) && validNumber(data.protein, 0, 10000) &&
-             validNumber(data.carbs, 0, 10000) && validNumber(data.fat, 0, 10000) &&
-             validNumber(data.fiber, 0, 10000) && validText(data.notes, 5000) && validUpdatedAt(data);
-    }
-
-    function isValidCardio(data, userId) {
-      let fields = ['userId', 'type', 'durationMinutes', 'caloriesBurned', 'distanceKm', 'dateMillis', 'notes', 'updatedAt'];
-      return data.keys().hasAll(fields) && data.keys().hasOnly(fields) && uidUnchanged(data, userId) &&
-             validText(data.type, 50) && validNumber(data.durationMinutes, 0, 10000) &&
-             validNumber(data.caloriesBurned, 0, 1000000) && validNumber(data.distanceKm, 0, 1000000) &&
-             validNumber(data.dateMillis, 0, 9999999999999) && validText(data.notes, 5000) && validUpdatedAt(data);
-    }
-
-    function isValidDailyIntake(data, userId) {
-      let fields = ['userId', 'dateString', 'dateMillis', 'totalCalories', 'totalProtein', 'totalCarbs', 'totalFat', 'targetCalories', 'isAdhered', 'waterDrankMl', 'updatedAt'];
-      return data.keys().hasAll(fields) && data.keys().hasOnly(fields) && uidUnchanged(data, userId) &&
-             validText(data.dateString, 10) && validNumber(data.dateMillis, 0, 9999999999999) &&
-             validNumber(data.totalCalories, 0, 100000) && validNumber(data.totalProtein, 0, 10000) &&
-             validNumber(data.totalCarbs, 0, 10000) && validNumber(data.totalFat, 0, 10000) &&
-             validNumber(data.targetCalories, 500, 10000) && data.isAdhered is bool &&
-             validNumber(data.waterDrankMl, 0, 20000) && validUpdatedAt(data);
-    }
-
-    function isValidFavoriteFood(data, userId) {
-      let fields = ['userId', 'foodId', 'foodName', 'category', 'isFavorite', 'updatedAt'];
-      return data.keys().hasAll(fields) && data.keys().hasOnly(fields) && uidUnchanged(data, userId) &&
-             validNumber(data.foodId, 0, 9999999999999) && validText(data.foodName, 200) &&
-             validText(data.category, 50) && data.isFavorite is bool && validUpdatedAt(data);
-    }
+    // --- Collections ---
 
     match /users/{userId} {
-      allow read, delete: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidUser(request.resource.data, userId);
-      allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) &&
-        (isValidUser(request.resource.data, userId) ||
-         (request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-           'targetCalories', 'targetProteinGrams', 'targetCarbsGrams', 'targetFatGrams', 'targetWaterMl', 'updatedAt'
-         ]) &&
-          validNumber(request.resource.data.targetCalories, 500, 10000) &&
-          validNumber(request.resource.data.targetProteinGrams, 0, 1000) &&
-          validNumber(request.resource.data.targetCarbsGrams, 0, 2000) &&
-          validNumber(request.resource.data.targetFatGrams, 0, 1000) &&
-          validNumber(request.resource.data.targetWaterMl, 0, 20000) &&
-          validUpdatedAt(request.resource.data)));
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && 
+                       isValidUserProfile(request.resource.data) &&
+                       request.resource.data.createdAt <= request.time;
+      allow update: if isOwner(userId) && 
+                       isValidUserProfile(request.resource.data) &&
+                       request.resource.data.userId == resource.data.userId &&
+                       request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isOwner(userId);
 
-      match /favoriteFoods/{foodId} {
-        allow read, delete: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidFavoriteFood(request.resource.data, userId);
-        allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) && isValidFavoriteFood(request.resource.data, userId);
+      match /workout_logs/{logId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && 
+                         isValidWorkoutLog(request.resource.data) &&
+                         request.resource.data.createdAt <= request.time;
+        allow update: if isOwner(userId) && 
+                         isValidWorkoutLog(request.resource.data) &&
+                         request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isOwner(userId);
       }
-      match /calorieGoals/{goalId} {
-        allow read, delete: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidCalorieGoal(request.resource.data, userId);
-        allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) && isValidCalorieGoal(request.resource.data, userId);
-      }
-      match /workoutLogs/{workoutLogId} {
-        allow read, delete: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidWorkout(request.resource.data, userId);
-        allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) && isValidWorkout(request.resource.data, userId);
-      }
-      match /gpsRouteLogs/{logId} {
-        allow read, delete: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidGpsRoute(request.resource.data, userId);
-        allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) && isValidGpsRoute(request.resource.data, userId);
-      }
-      match /mealPlans/{mealPlanId} {
-        allow read, delete: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidMeal(request.resource.data, userId);
-        allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) && isValidMeal(request.resource.data, userId);
-      }
-      match /shoppingItems/{itemId} {
-        allow read, delete: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidShoppingItem(request.resource.data, userId);
-        allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) && isValidShoppingItem(request.resource.data, userId);
-      }
-      match /progressLogs/{logId} {
-        allow read, delete: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidProgress(request.resource.data, userId);
-        allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) && isValidProgress(request.resource.data, userId);
-      }
-      match /foodRecords/{recordId} {
-        allow read, delete: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidFoodRecord(request.resource.data, userId);
-        allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) && isValidFoodRecord(request.resource.data, userId);
-      }
-      match /cardioLogs/{logId} {
-        allow read, delete: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidCardio(request.resource.data, userId);
-        allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) && isValidCardio(request.resource.data, userId);
-      }
-      match /dailyIntake/{dateId} {
-        allow read, delete: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidDailyIntake(request.resource.data, userId);
-        allow update: if isOwner(userId) && uidNotModified(request.resource.data, userId) && isValidDailyIntake(request.resource.data, userId);
-      }
-    }
 
-    match /{document=**} {
-      allow read, write: if false;
+      match /cardio_logs/{logId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && 
+                         isValidCardioLog(request.resource.data) &&
+                         request.resource.data.createdAt <= request.time;
+        allow update: if isOwner(userId) && 
+                         isValidCardioLog(request.resource.data) &&
+                         request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isOwner(userId);
+      }
     }
   }
 }

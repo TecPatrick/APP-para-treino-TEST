@@ -593,5 +593,12 @@ open class VirtusRepository(
 
     val allWorkoutSchedules: Flow<List<WorkoutSchedule>> = dao.getAllWorkoutSchedules()
     suspend fun saveWorkoutSchedule(schedule: WorkoutSchedule) = dao.insertWorkoutSchedule(schedule)
-}
 
+    // --- Migração de Treinos e Exercícios para Subcoleções ---
+    suspend fun runWorkoutMigration(
+        service: com.example.data.firestore.WorkoutMigrationService,
+        userId: String? = null
+    ): Result<com.example.data.firestore.WorkoutMigrationReport> =
+        service.migrateUserWorkoutsAndExercises(userId)
+
+}

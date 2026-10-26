@@ -4,6 +4,7 @@ import com.example.data.auth.FirebaseAuthService
 import com.example.data.firestore.FirestoreSyncManager
 import com.example.data.model.*
 import com.example.data.repository.VirtusRepository
+import com.example.util.AuthValidator
 import com.example.util.MacroCalculator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
@@ -94,7 +95,6 @@ class AuthController(
             result.onSuccess { user ->
                 val current = localProfileForUser(user.uid)
 
-                // A conta autenticada pode entrar imediatamente no aplicativo.
                 val hasOnboarded = true
 
                 val updated = current.copy(
@@ -120,63 +120,6 @@ class AuthController(
 
                 _authError.value = errorMsg
                 showMessage(errorMsg)
-            }
-        }
-    }
-
-    fun loginWithFirebase(
-        emailInput: String,
-        passwordInput: String,
-        onSuccess: () -> Unit
-    ) {
-        launchAuth {
-            _authError.value = null
-
-            val result = authService.login(emailInput, passwordInput)
-
-            result.onSuccess { user ->
-                val current = localProfileForUser(user.uid)
-
-                // A conta autenticada pode entrar imediatamente no aplicativo.
-                val hasOnboarded = true
-
-                val fallbackName =
-                    if (current.name.isNotBlank() && current.name != "Atleta") {
-                        current.name
-                    } else {
-                        emailInput
-                            .substringBefore("@")
-                            .replace(".", " ")
-                            .replaceFirstChar { it.uppercase() }
-                    }
-
-                val updated = current.copy(
-                    isLoggedIn = true,
-                    hasCompletedOnboarding = hasOnboarded,
-                    email = user.email ?: emailInput,
-                    name = user.displayName
-                        ?.takeIf { it.isNotBlank() }
-                        ?: fallbackName,
-                    firebaseUid = user.uid
-                )
-
-                repository.saveUserProfile(updated)
-                firestoreSync.syncProfileToCloud(updated)
-
-                showMessage(
-                    "Login realizado com sucesso! " +
-                        "Bem-vindo, ${updated.name}."
-                )
-
-                onSuccess()
-            }.onFailure { ex ->
-                val message =
-                    ex.message
-                        ?: "Não foi possível entrar. " +
-                        "Verifique suas credenciais."
-
-                _authError.value = message
-                showMessage(message)
             }
         }
     }
@@ -226,11 +169,11 @@ class AuthController(
 
             if (current.firebaseUid.startsWith("guest_")) {
                 _authError.value =
-                    "Vincule uma conta com e-mail antes " +
+                    "Vincule uma conta com Google antes " +
                         "de ativar o login biométrico."
 
                 showMessage(
-                    "Vincule seu e-mail no Perfil " +
+                    "Vincule sua conta Google no Perfil " +
                         "para usar a biometria."
                 )
 
@@ -242,8 +185,7 @@ class AuthController(
                 !current.email.contains("@")
             ) {
                 _authError.value =
-                    "Perfil sem e-mail válido vinculado. " +
-                        "Todo perfil precisa ter um e-mail válido."
+                    "Perfil sem e-mail válido vinculado."
 
                 showMessage(
                     "Erro: E-mail obrigatório para acesso via biometria."
@@ -281,122 +223,6 @@ class AuthController(
             )
 
             onSuccess()
-        }
-    }
-
-    fun registerWithFirebase(
-        name: String,
-        email: String,
-        password: String,
-        gender: Gender,
-        age: Int,
-        weightKg: Float,
-        heightCm: Float,
-        biotype: BodyType,
-        trainingDays: Int,
-        activityLevel: ActivityLevel,
-        goal: FitnessGoal,
-        isAthlete: Boolean = true,
-        onSuccess: () -> Unit
-    ) {
-        launchAuth {
-            _authError.value = null
-
-            val result = authService.register(
-                email,
-                password,
-                name
-            )
-
-            val user = result.getOrElse { error ->
-                val message =
-                    error.message
-                        ?: "Não foi possível criar a conta."
-
-                _authError.value = message
-                showMessage(message)
-
-                return@launchAuth
-            }
-
-            localProfileForUser(user.uid)
-
-            val plan = MacroCalculator.computeFullPlan(
-                weightKg = weightKg,
-                heightCm = heightCm,
-                age = age,
-                gender = gender,
-                activityLevel = activityLevel,
-                goal = goal,
-                biotype = biotype,
-                customProteinGPerKg = 2.2f,
-                customFatGPerKg = 0.8f,
-                isAthleteOrWarmClimate = isAthlete
-            )
-
-            val updated = UserProfile(
-                id = 1,
-                name = name.ifBlank { "Atleta" },
-                email = user.email ?: email,
-                firebaseUid = user.uid,
-                passwordHash = "",
-                isLoggedIn = true,
-                hasCompletedOnboarding = true,
-                lgpdConsentAccepted = true,
-                lgpdConsentDate = System.currentTimeMillis(),
-                gender = gender,
-                age = age,
-                weightKg = weightKg,
-                heightCm = heightCm,
-                biotype = biotype,
-                trainingDaysPerWeek = trainingDays,
-                activityLevel = activityLevel,
-                goal = goal,
-                targetCalories = plan.targetCalories,
-                targetProteinGrams = plan.proteinGrams,
-                targetCarbsGrams = plan.carbsGrams,
-                targetFatGrams = plan.fatGrams,
-                targetWaterMl = plan.waterMl,
-                monthlyTargetWeightKg =
-                    if (goal.calorieAdjustment > 0) {
-                        weightKg + 2.0f
-                    } else if (goal.calorieAdjustment < 0) {
-                        weightKg - 2.5f
-                    } else {
-                        weightKg
-                    }
-            )
-
-            repository.saveUserProfile(updated)
-            firestoreSync.syncProfileToCloud(updated)
-
-            showMessage("Conta criada com sucesso! Protocolo gerado.")
-            onSuccess()
-        }
-    }
-
-    fun sendPasswordResetEmail(
-        email: String,
-        onComplete: (Boolean, String) -> Unit
-    ) {
-        launchAuth {
-            val result = authService.sendPasswordReset(email)
-
-            result.onSuccess {
-                val message =
-                    "Se existir uma conta para esse e-mail, " +
-                        "enviaremos as instruções de recuperação."
-
-                showMessage(message)
-                onComplete(true, message)
-            }.onFailure { ex ->
-                val errorMsg =
-                    ex.message
-                        ?: "Falha ao enviar e-mail de recuperação."
-
-                showMessage(errorMsg)
-                onComplete(false, errorMsg)
-            }
         }
     }
 }

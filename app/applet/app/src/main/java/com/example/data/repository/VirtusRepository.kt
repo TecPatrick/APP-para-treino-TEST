@@ -1,0 +1,604 @@
+package com.example.data.repository
+
+import android.util.Base64
+import com.example.data.local.AppDao
+import com.example.data.local.GrowthDao
+import com.example.data.model.DailyIntakeHistory
+import com.example.data.model.DietPlan
+import com.example.data.model.FoodCategory
+import com.example.data.model.FoodItem
+import com.example.data.model.FoodRecord
+import com.example.data.model.ItemPriceInflationStat
+import com.example.data.model.MealPlanItem
+import com.example.data.model.MealType
+import com.example.data.model.ProgressLog
+import com.example.data.model.PurchaseItemLog
+import com.example.data.model.PurchaseReceipt
+import com.example.data.model.ShoppingItem
+import com.example.data.model.UserProfile
+import com.example.data.model.GpsRouteLog
+import com.example.data.model.WeeklyDietPlan
+import com.example.data.model.WorkoutExercise
+import com.example.data.model.WorkoutLog
+import com.example.data.model.WorkoutPlan
+import com.example.data.model.WorkoutRoutine
+import com.example.data.model.DietaryProfile
+import com.example.data.model.Macro
+import com.example.data.model.WorkoutSchedule
+import com.example.data.model.CardioLog
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import java.nio.charset.StandardCharsets
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlin.math.ceil
+import kotlin.math.roundToInt
+
+open class VirtusRepository(
+    private val dao: AppDao,
+    private val clearLocalStorage: (() -> Unit)? = null
+) {
+
+    val userProfile: Flow<UserProfile?> = dao.getUserProfile()
+    val allUserProfiles: Flow<List<UserProfile>> = dao.getAllUserProfiles()
+    val allDietPlans: Flow<List<DietPlan>> = dao.getAllDietPlans()
+    val activeDietPlan: Flow<DietPlan?> = dao.getActiveDietPlan()
+    val allFoods: Flow<List<FoodItem>> = dao.getAllFoods()
+    val allFoodRecords: Flow<List<FoodRecord>> = dao.getAllFoodRecords()
+    val mealPlanItems: Flow<List<MealPlanItem>> = dao.getAllMealPlanItems()
+    val shoppingList: Flow<List<ShoppingItem>> = dao.getShoppingList()
+    val allWorkoutPlans: Flow<List<WorkoutPlan>> = dao.getAllWorkoutPlans()
+    val activeWorkoutPlan: Flow<WorkoutPlan?> = dao.getActiveWorkoutPlan()
+    val workoutRoutines: Flow<List<WorkoutRoutine>> = dao.getAllRoutines()
+    val allExercises: Flow<List<WorkoutExercise>> = dao.getAllExercises()
+    val workoutLogs: Flow<List<WorkoutLog>> = dao.getAllWorkoutLogs()
+    val progressLogs: Flow<List<ProgressLog>> = dao.getAllProgressLogs()
+    val recentIntakeHistory: Flow<List<DailyIntakeHistory>> = dao.getRecentIntakeHistory()
+    val allReceipts: Flow<List<PurchaseReceipt>> = dao.getAllReceipts()
+    val allPurchaseLogs: Flow<List<PurchaseItemLog>> = dao.getAllPurchaseLogs()
+    val allGpsRouteLogs: Flow<List<GpsRouteLog>> = dao.getAllGpsRouteLogs()
+    val totalGpsDistanceMeters: Flow<Float> = dao.getTotalGpsDistanceMeters().map { it ?: 0f }
+    val totalGpsSteps: Flow<Int> = dao.getTotalGpsSteps().map { it ?: 0 }
+    val allCardioLogs: Flow<List<CardioLog>> = dao.getAllCardioLogs()
+
+    suspend fun insertGpsRouteLog(log: GpsRouteLog): Long = dao.insertGpsRouteLog(log)
+    suspend fun saveGpsRouteLog(log: GpsRouteLog): Long = dao.insertGpsRouteLog(log)
+    suspend fun deleteGpsRouteLog(id: Long) = dao.deleteGpsRouteLog(id)
+    
+    suspend fun addCardioLog(log: CardioLog): Long = dao.insertCardioLog(log)
+    suspend fun deleteCardioLog(id: Long) = dao.deleteCardioLog(id)
+
+    fun searchFoods(query: String): Flow<List<FoodItem>> = dao.searchFoods(query)
+
+    fun getExercisesForRoutine(routineId: Long): Flow<List<WorkoutExercise>> =
+        dao.getExercisesForRoutine(routineId)
+
+    suspend fun saveUserProfile(profile: UserProfile) {
+        dao.insertOrUpdateProfile(profile.copy(passwordHash = ""))
+    }
+
+    suspend fun deleteAllUserProfiles() {
+        dao.deleteAllUserProfiles()
+    }
+
+    /**
+     * Removes every local table when a session ends or an account is deleted.
+     * Keeping health data from one account on a shared device could expose it to
+     * the next user, so profile-only deletion is intentionally not sufficient.
+     */
+    suspend fun clearAllLocalData() = withContext(Dispatchers.IO) {
+        val clear = checkNotNull(clearLocalStorage) {
+            "Local database clearing is not configured."
+        }
+        clear()
+    }
+
+    suspend fun getUserProfileDirect(id: Int = 1): UserProfile? {
+        return dao.getUserProfileDirect(id)
+    }
+
+    suspend fun updateDietaryGoals(calories: Int, protein: Int, carbs: Int, fat: Int, water: Int) {
+        dao.updateDietaryGoals(calories, protein, carbs, fat, water)
+    }
+
+    suspend fun updateWaterGoal(newTargetWater: Int) {
+        dao.updateWaterGoal(newTargetWater)
+    }
+
+    suspend fun updateWeight(newWeight: Float) {
+        dao.updateWeight(newWeight)
+    }
+
+    suspend fun switchActiveDietPlan(planId: Long) {
+        dao.switchActiveDietPlan(planId)
+    }
+
+    suspend fun updateDietPlanGoals(planId: Long, calories: Int, protein: Int, carbs: Int, fat: Int, water: Int) {
+        dao.updateDietPlanGoals(planId, calories, protein, carbs, fat, water)
+    }
+
+    suspend fun addDietPlan(plan: DietPlan): Long = dao.insertDietPlan(plan)
+
+    suspend fun updateDietPlan(plan: DietPlan) = dao.updateDietPlan(plan)
+
+    suspend fun deleteDietPlan(id: Long) = dao.deleteDietPlan(id)
+
+    suspend fun addFoodItem(food: FoodItem): Long = dao.insertFood(food)
+    suspend fun insertFoods(foods: List<FoodItem>) = dao.insertFoods(foods)
+    suspend fun getFoodsCount(): Int = dao.getFoodsCount()
+
+    suspend fun toggleFoodFavorite(food: FoodItem, userId: String?) {
+        val nextState = !food.isFavorite
+        dao.setFoodFavorite(food.id, nextState)
+    }
+
+    suspend fun clearAllFavorites() = dao.clearAllFavorites()
+
+    suspend fun addMealPlanItem(item: MealPlanItem): Long = dao.insertMealPlanItem(item)
+    suspend fun insertMealPlanItems(items: List<MealPlanItem>) = dao.insertMealPlanItems(items)
+
+    suspend fun updateMealPlanItem(item: MealPlanItem) = dao.updateMealPlanItem(item)
+
+    suspend fun deleteMealPlanItem(id: Long) = dao.deleteMealPlanItem(id)
+    suspend fun clearMealPlanItems() = dao.deleteAllMealPlanItems()
+
+    suspend fun toggleMealCompletion(id: Long, currentCompleted: Boolean) {
+        dao.setMealCompleted(id, !currentCompleted)
+    }
+
+    suspend fun resetDailyMeals() = dao.resetDailyMealCompletions()
+
+    suspend fun toggleMealFixed(id: Long, currentFixed: Boolean) {
+        dao.setMealFixed(id, !currentFixed)
+    }
+
+    // --- Shopping List Automation ---
+    suspend fun generateAutomatedShoppingList(daysPeriod: Int = 30) {
+        val currentMealPlans = dao.getAllMealPlanItems().firstOrNull() ?: emptyList()
+        if (currentMealPlans.isEmpty()) return
+
+        // Clear previous auto-generated items
+        dao.clearAutoGeneratedShoppingItems()
+
+        // Aggregate totals by food name & category
+        // Also keep track of original unit to decide conversion factor
+        val aggregated = mutableMapOf<String, Triple<FoodCategory, Float, String>>()
+
+        for (item in currentMealPlans) {
+            val key = item.foodName.trim()
+            val existing = aggregated[key]
+            val totalDailyAmount = (existing?.second ?: 0f) + item.amount
+            aggregated[key] = Triple(item.foodCategory, totalDailyAmount, item.unit)
+        }
+
+        val generatedItems = aggregated.map { (foodName, data) ->
+            val (category, dailyAmount, originalUnit) = data
+            val totalPeriodAmountGrams = dailyAmount * daysPeriod
+
+            // Lógica de Verificação e Correção Proporcional
+            val (displayQty, displayUnit, estimatedPrice) = when {
+                // Suplementos Growth específicos
+                foodName.contains("Whey", ignoreCase = true) -> {
+                    val kgs = totalPeriodAmountGrams / 1000f
+                    val roundedPots = ceil(kgs.toDouble()).coerceAtLeast(1.0).toFloat()
+                    Triple(roundedPots, "pct (1kg)", roundedPots * 105.0f)
+                }
+                foodName.contains("Creatina", ignoreCase = true) -> {
+                    val pots = totalPeriodAmountGrams / 250f
+                    val roundedPots = ceil(pots.toDouble()).coerceAtLeast(1.0).toFloat()
+                    Triple(roundedPots, "pote (250g)", roundedPots * 89.0f)
+                }
+                foodName.contains("Ovo", ignoreCase = true) -> {
+                    // 1 ovo médio ~50g
+                    val totalEggs = ceil(totalPeriodAmountGrams / 50.0).toInt()
+                    val cartelas = ceil(totalEggs / 30.0).toFloat()
+                    if (cartelas >= 1f) {
+                        Triple(cartelas, "cartela (30un)", cartelas * 21.0f)
+                    } else {
+                        Triple(totalEggs.toFloat(), "unidades", totalEggs * 0.75f)
+                    }
+                }
+                // Líquidos (ml para L)
+                originalUnit.lowercase() == "ml" || foodName.contains("Azeite", ignoreCase = true) || foodName.contains("Leite", ignoreCase = true) -> {
+                    val liters = totalPeriodAmountGrams / 1000f
+                    val roundedLiters = (Math.round(liters * 10f) / 10f).coerceAtLeast(1.0f).toFloat()
+                    val pricePerLiter = when {
+                        foodName.contains("Azeite", ignoreCase = true) -> 38.0f
+                        foodName.contains("Leite", ignoreCase = true) -> 5.5f
+                        else -> 8.0f
+                    }
+                    Triple(roundedLiters, "L", roundedLiters * pricePerLiter)
+                }
+                // Sólidos peso (g para kg)
+                totalPeriodAmountGrams >= 1000f -> {
+                    val kg = totalPeriodAmountGrams / 1000f
+                    val roundedKg = (Math.round(kg * 10f) / 10f).coerceAtLeast(0.1f).toFloat()
+                    val pricePerKg = when (category) {
+                        FoodCategory.PROTEIN -> 24.5f // Frango/Carne médio
+                        FoodCategory.CARBOHYDRATE -> 7.2f // Arroz/Macarrão
+                        FoodCategory.FAT -> 45.0f
+                        FoodCategory.FRUITS_VEGETABLES -> 9.5f
+                        else -> 12.0f
+                    }
+                    // Cálculo proporcional preciso: kg real * preço base
+                    Triple(roundedKg, "kg", kg * pricePerKg)
+                }
+                // Pequenas quantidades em gramas
+                else -> {
+                    val roundedGrams = (Math.round(totalPeriodAmountGrams / 10f) * 10).toFloat().coerceAtLeast(10f)
+                    val pricePerKg = 15.0f
+                    Triple(roundedGrams, "g", (totalPeriodAmountGrams / 1000f) * pricePerKg)
+                }
+            }
+
+            ShoppingItem(
+                name = foodName,
+                category = category,
+                quantity = displayQty,
+                partnerQuantity = 0f,
+                partnerName = "",
+                isJointItem = false,
+                unit = displayUnit,
+                periodDays = daysPeriod,
+                isChecked = false,
+                estimatedPrice = estimatedPrice,
+                myEstimatedPrice = estimatedPrice,
+                partnerEstimatedPrice = 0f,
+                isAutoGenerated = true,
+                notes = "Calculado proporcionalmente para $daysPeriod dias (${dailyAmount.toInt()}${originalUnit}/dia)"
+            )
+        }
+
+        dao.insertShoppingItems(generatedItems)
+    }
+
+    // --- Joint Shopping List ---
+
+    suspend fun exportShoppingListAsShareCode(authorName: String): String {
+        val currentItems = dao.getShoppingList().firstOrNull() ?: emptyList()
+        val json = JSONObject()
+        json.put("author", authorName)
+        json.put("timestamp", System.currentTimeMillis())
+
+        val itemsArray = JSONArray()
+        for (item in currentItems) {
+            val itemObj = JSONObject()
+            itemObj.put("name", item.name)
+            itemObj.put("category", item.category.name)
+            itemObj.put("quantity", item.quantity.toDouble())
+            itemObj.put("unit", item.unit)
+            itemObj.put("price", item.myEstimatedPrice.toDouble().let { if (it > 0) it else item.estimatedPrice.toDouble() })
+            itemsArray.put(itemObj)
+        }
+        json.put("items", itemsArray)
+
+        val rawString = json.toString()
+        val base64 = Base64.encodeToString(rawString.toByteArray(StandardCharsets.UTF_8), Base64.NO_WRAP)
+        return "FIT-SHARE:$base64"
+    }
+
+    suspend fun importAndMergePartnerShoppingList(shareCode: String, partnerName: String): Boolean {
+        try {
+            val cleanCode = shareCode.trim()
+            val base64Content = when {
+                cleanCode.startsWith("FIT-SHARE:") -> cleanCode.substringAfter("FIT-SHARE:")
+                cleanCode.startsWith("GROWTH-SHARE:") -> cleanCode.substringAfter("GROWTH-SHARE:")
+                else -> cleanCode
+            }
+
+            val decodedBytes = Base64.decode(base64Content, Base64.DEFAULT)
+            val jsonString = String(decodedBytes, StandardCharsets.UTF_8)
+            val json = JSONObject(jsonString)
+            val itemsArray = json.getJSONArray("items")
+
+            val currentItems = dao.getShoppingList().firstOrNull() ?: emptyList()
+            val currentMap = currentItems.associateBy { it.name.trim().lowercase() }.toMutableMap()
+
+            for (i in 0 until itemsArray.length()) {
+                val obj = itemsArray.getJSONObject(i)
+                val name = obj.getString("name")
+                val categoryStr = obj.optString("category", FoodCategory.OTHER.name)
+                val category = try { FoodCategory.valueOf(categoryStr) } catch (e: Exception) { FoodCategory.OTHER }
+                val qty = obj.getDouble("quantity").toFloat()
+                val unit = obj.getString("unit")
+                val price = obj.optDouble("price", 0.0).toFloat()
+
+                val key = name.trim().lowercase()
+                val existing = currentMap[key]
+
+                if (existing != null) {
+                    val updated = existing.copy(
+                        partnerQuantity = qty,
+                        partnerName = partnerName,
+                        isJointItem = true,
+                        partnerEstimatedPrice = price,
+                        estimatedPrice = existing.myEstimatedPrice + price
+                    )
+                    dao.updateShoppingItem(updated)
+                } else {
+                    val newItem = ShoppingItem(
+                        name = name,
+                        category = category,
+                        quantity = 0f,
+                        partnerQuantity = qty,
+                        partnerName = partnerName,
+                        isJointItem = true,
+                        unit = unit,
+                        periodDays = 30,
+                        isChecked = false,
+                        estimatedPrice = price,
+                        myEstimatedPrice = 0f,
+                        partnerEstimatedPrice = price,
+                        isAutoGenerated = false,
+                        notes = "Item solicitado exclusivamente por $partnerName"
+                    )
+                    dao.insertShoppingItem(newItem)
+                }
+            }
+            return true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return false
+        }
+    }
+
+    suspend fun unlinkPartnerShoppingList() {
+        val currentItems = dao.getShoppingList().firstOrNull() ?: emptyList()
+        for (item in currentItems) {
+            if (item.quantity == 0f && item.isJointItem) {
+                dao.deleteShoppingItem(item.id)
+            } else if (item.isJointItem) {
+                val restored = item.copy(
+                    partnerQuantity = 0f,
+                    partnerName = "",
+                    isJointItem = false,
+                    partnerEstimatedPrice = 0f,
+                    estimatedPrice = item.myEstimatedPrice
+                )
+                dao.updateShoppingItem(restored)
+            }
+        }
+    }
+
+    suspend fun addShoppingItem(item: ShoppingItem): Long = dao.insertShoppingItem(item)
+
+    suspend fun insertShoppingItems(items: List<ShoppingItem>) = dao.insertShoppingItems(items)
+
+    suspend fun clearAutoGeneratedShoppingItems() = dao.clearAutoGeneratedShoppingItems()
+
+    suspend fun toggleShoppingItem(item: ShoppingItem) {
+        dao.updateShoppingItem(item.copy(isChecked = !item.isChecked))
+    }
+
+    suspend fun deleteShoppingItem(id: Long) = dao.deleteShoppingItem(id)
+
+    suspend fun clearCheckedShoppingItems() = dao.deleteCheckedShoppingItems()
+
+    // --- Purchases & Nota Fiscal Price Tracking ---
+
+    suspend fun registerPurchaseReceipt(
+        storeName: String,
+        receiptNumber: String,
+        dateMillis: Long,
+        items: List<PurchaseItemLog>,
+        notes: String
+    ): Long {
+        val monthFormat = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+        val displayFormat = SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR"))
+        val monthYear = monthFormat.format(Date(dateMillis))
+        val dateDisplay = displayFormat.format(Date(dateMillis))
+        val total = items.sumOf { it.totalPricePaid.toDouble() }.toFloat()
+
+        val receipt = PurchaseReceipt(
+            storeName = storeName,
+            receiptNumber = receiptNumber,
+            dateMillis = dateMillis,
+            dateDisplay = dateDisplay,
+            monthYearKey = monthYear,
+            totalAmount = total,
+            itemCount = items.size,
+            notes = notes
+        )
+
+        val receiptId = dao.insertReceipt(receipt)
+        val logsToInsert = items.map {
+            it.copy(
+                receiptId = receiptId,
+                dateMillis = dateMillis,
+                monthYearKey = monthYear,
+                storeName = storeName
+            )
+        }
+        dao.insertPurchaseItemLogs(logsToInsert)
+        return receiptId
+    }
+
+    suspend fun deleteReceipt(id: Long) {
+        dao.deletePurchaseLogsForReceipt(id)
+        dao.deleteReceipt(id)
+    }
+
+    fun computeInflationStats(allLogs: List<PurchaseItemLog>): List<ItemPriceInflationStat> {
+        if (allLogs.isEmpty()) return emptyList()
+
+        val groupedByName = allLogs.groupBy { it.foodName.trim() }
+        val result = mutableListOf<ItemPriceInflationStat>()
+
+        val displayFormat = SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR"))
+
+        for ((foodName, logs) in groupedByName) {
+            val sorted = logs.sortedByDescending { it.dateMillis }
+            val latest = sorted.first()
+            val latestPrice = latest.unitPricePaid
+
+            // Find a previous purchase in an earlier date
+            val previous = sorted.firstOrNull { it.dateMillis < latest.dateMillis - (3 * 86400000L) }
+            val prevPrice = previous?.unitPricePaid ?: latestPrice
+            val inflationPct = if (prevPrice > 0) {
+                ((latestPrice - prevPrice) / prevPrice) * 100f
+            } else 0f
+
+            result.add(
+                ItemPriceInflationStat(
+                    foodName = foodName,
+                    category = latest.category,
+                    unit = latest.unit,
+                    currentAvgPrice = latestPrice,
+                    previousAvgPrice = prevPrice,
+                    inflationPercentage = inflationPct,
+                    latestDateDisplay = displayFormat.format(Date(latest.dateMillis))
+                )
+            )
+        }
+
+        return result.sortedByDescending { Math.abs(it.inflationPercentage) }
+    }
+
+    // --- Workouts ---
+    suspend fun addWorkoutRoutine(routine: WorkoutRoutine): Long = dao.insertRoutine(routine)
+
+    suspend fun addWorkoutExercise(exercise: WorkoutExercise): Long = dao.insertExercise(exercise)
+
+    suspend fun updateWorkoutExercise(exercise: WorkoutExercise) = dao.updateExercise(exercise)
+
+    suspend fun deleteWorkoutExercise(id: Long) = dao.deleteExercise(id)
+
+    suspend fun deleteExercisesForRoutine(routineId: Long) = dao.deleteExercisesForRoutine(routineId)
+
+    suspend fun deleteWorkoutRoutine(id: Long) {
+        dao.deleteExercisesForRoutine(id)
+        dao.deleteRoutine(id)
+    }
+
+    suspend fun logCompletedWorkout(
+        routineId: Long,
+        routineName: String,
+        durationMinutes: Int,
+        totalVolumeKg: Float,
+        totalSetsCompleted: Int,
+        perceivedExertion: Int,
+        notes: String,
+        dateMillis: Long = System.currentTimeMillis()
+    ): Long {
+        return dao.insertWorkoutLog(
+            WorkoutLog(
+                routineId = routineId,
+                routineName = routineName,
+                dateMillis = dateMillis,
+                durationMinutes = durationMinutes,
+                totalVolumeKg = totalVolumeKg,
+                totalSetsCompleted = totalSetsCompleted,
+                perceivedExertion = perceivedExertion,
+                notes = notes
+            )
+        )
+    }
+
+    suspend fun deleteWorkoutLog(id: Long) = dao.deleteWorkoutLog(id)
+
+    fun getWorkoutLogsForRoutine(routineId: Long): Flow<List<WorkoutLog>> =
+        dao.getWorkoutLogsForRoutine(routineId)
+
+    fun getRecentWorkoutLogs(limit: Int = 10): Flow<List<WorkoutLog>> =
+        dao.getRecentWorkoutLogs(limit)
+
+    val totalWorkoutVolume: Flow<Float?> = dao.getTotalWorkoutVolume()
+    val totalWorkoutCount: Flow<Int> = dao.getTotalWorkoutCount()
+
+    // --- Progress & Analytics ---
+    suspend fun addProgressLog(log: ProgressLog): Long = dao.insertProgressLog(log)
+
+    suspend fun deleteProgressLog(id: Long) = dao.deleteProgressLog(id)
+
+    // --- Registros de Consumo Alimentar (Diário Offline) ---
+    fun getFoodRecordsForDate(dateString: String): Flow<List<FoodRecord>> =
+        dao.getFoodRecordsForDate(dateString)
+
+    fun getFoodRecordsForMeal(dateString: String, mealType: MealType): Flow<List<FoodRecord>> =
+        dao.getFoodRecordsForMeal(dateString, mealType)
+
+    fun getFoodRecordsBetween(startMillis: Long, endMillis: Long): Flow<List<FoodRecord>> =
+        dao.getFoodRecordsBetween(startMillis, endMillis)
+
+    suspend fun addFoodRecord(record: FoodRecord): Long = dao.insertFoodRecord(record)
+    suspend fun insertFoodRecords(records: List<FoodRecord>) = dao.insertFoodRecords(records)
+
+    suspend fun updateFoodRecord(record: FoodRecord) = dao.updateFoodRecord(record)
+
+    suspend fun deleteFoodRecord(id: Long) = dao.deleteFoodRecord(id)
+
+    suspend fun deleteLatestMatchingFoodRecord(dateString: String, foodItemId: Long, mealType: MealType) =
+        dao.deleteLatestMatchingFoodRecord(dateString, foodItemId, mealType)
+
+    suspend fun deleteFoodRecordsForDate(dateString: String) =
+        dao.deleteFoodRecordsForDate(dateString)
+    suspend fun clearFoodRecords() = dao.deleteAllFoodRecords()
+
+    suspend fun saveDailyIntake(intake: DailyIntakeHistory): Long {
+        val existing = dao.getDailyIntakeForDate(intake.dateString)
+        return dao.insertDailyIntake(intake.copy(id = existing?.id ?: intake.id))
+    }
+
+    // --- Dietas Semanais (Dia a Dia) ---
+    fun getWeeklyDietPlans(dietPlanId: Long = 1L): Flow<List<WeeklyDietPlan>> =
+        dao.getWeeklyDietPlans(dietPlanId)
+
+    fun getWeeklyDietPlanForDay(dietPlanId: Long = 1L, dayOfWeek: Int): Flow<WeeklyDietPlan?> =
+        dao.getWeeklyDietPlanForDay(dietPlanId, dayOfWeek)
+
+    suspend fun addWeeklyDietPlan(plan: WeeklyDietPlan): Long =
+        dao.insertWeeklyDietPlan(plan)
+
+    suspend fun insertWeeklyDietPlans(plans: List<WeeklyDietPlan>) =
+        dao.insertWeeklyDietPlans(plans)
+
+    suspend fun updateWeeklyDietPlan(plan: WeeklyDietPlan) =
+        dao.updateWeeklyDietPlan(plan)
+
+    suspend fun deleteWeeklyDietPlan(id: Long) =
+        dao.deleteWeeklyDietPlan(id)
+
+    // --- Planos de Treino (Training Programs) ---
+    suspend fun addWorkoutPlan(plan: WorkoutPlan): Long =
+        dao.insertWorkoutPlan(plan)
+
+    suspend fun updateWorkoutPlan(plan: WorkoutPlan) =
+        dao.updateWorkoutPlan(plan)
+
+    suspend fun deleteWorkoutPlan(id: Long) =
+        dao.deleteWorkoutPlan(id)
+
+    suspend fun switchActiveWorkoutPlan(planId: Long) =
+        dao.switchActiveWorkoutPlan(planId)
+
+    fun getRoutinesForSplit(splitType: com.example.data.model.WorkoutSplitType): Flow<List<WorkoutRoutine>> =
+        dao.getRoutinesForSplit(splitType)
+
+    // --- Gestão de Perfis Adicionais ---
+    suspend fun deleteUserProfile(id: Int) =
+        dao.deleteUserProfile(id)
+
+    // --- Dietary Profiles, Saved Macros, and Workout Schedules (Local Room) ---
+    val dietaryProfile: Flow<DietaryProfile?> = dao.getDietaryProfile()
+    suspend fun saveDietaryProfile(profile: DietaryProfile) = dao.insertDietaryProfile(profile)
+
+    fun getMacrosByDate(date: Long): Flow<Macro?> = dao.getMacrosByDate(date)
+    suspend fun saveMacro(macro: Macro) = dao.insertMacro(macro)
+
+    val allWorkoutSchedules: Flow<List<WorkoutSchedule>> = dao.getAllWorkoutSchedules()
+    suspend fun saveWorkoutSchedule(schedule: WorkoutSchedule) = dao.insertWorkoutSchedule(schedule)
+
+    // --- Migração de Treinos e Exercícios para Subcoleções ---
+    suspend fun runWorkoutMigration(
+        service: com.example.data.firestore.WorkoutMigrationService,
+        userId: String? = null
+    ): Result<com.example.data.firestore.WorkoutMigrationReport> =
+        service.migrateUserWorkoutsAndExercises(userId)
+
+}

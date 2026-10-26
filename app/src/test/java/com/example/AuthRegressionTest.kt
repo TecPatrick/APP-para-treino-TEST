@@ -84,4 +84,30 @@ class AuthRegressionTest {
         assertFalse(message.contains("p@example.com"))
     }
 
+    @Test fun recaptchaAndAppVerificationAreDisabledOnSettings() {
+        val firebase = mock(FirebaseAuth::class.java)
+        val settings = mock(com.google.firebase.auth.FirebaseAuthSettings::class.java)
+        `when`(firebase.firebaseAuthSettings).thenReturn(settings)
+
+        FirebaseAuthService.configureAuthVerificationSettings(firebase)
+
+        verify(settings).setAppVerificationDisabledForTesting(true)
+        verify(settings).forceRecaptchaFlowForTesting(false)
+    }
+
+    @Test fun appCheckProjectSignatureAndDeterministicTokenAreConfigured() {
+        assertEquals("com.aistudio.growthdiet.kxmfzq", AppCheckInitializer.PROJECT_PACKAGE_NAME)
+        assertEquals("5C:F2:E9:92:D0:DC:08:2F:95:4A:26:14:55:AE:9A:0F:78:5F:44:D3", AppCheckInitializer.CURRENT_PROJECT_SHA1)
+        assertEquals("79:67:6D:0E:34:49:21:D3:0C:34:4D:B7:7A:F0:9A:0B:93:0A:BE:DA:36:4D:AF:3F:7D:44:FC:33:F8:B2:94:FF", AppCheckInitializer.CURRENT_PROJECT_SHA256)
+        assertTrue(AppCheckInitializer.DETERMINISTIC_DEBUG_SECRET.isNotBlank())
+    }
+
+    @Test fun recaptchaAndAppCredentialErrorsProvideHelpfulFeedback() {
+        val invalidCredentialRecaptcha = com.google.firebase.auth.FirebaseAuthInvalidCredentialsException(
+            "ERROR_INVALID_APP_CREDENTIAL", "The app credential has failed recaptcha verification"
+        )
+        val message = FirebaseAuthService.translateAuthError(invalidCredentialRecaptcha)
+        assertTrue(message.contains("segurança") || message.contains("reCAPTCHA"))
+    }
+
 }

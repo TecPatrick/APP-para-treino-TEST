@@ -734,12 +734,6 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         onSuccess: () -> Unit
     ) = authController.loginWithGoogleCredential(credential, onSuccess)
 
-    fun loginWithFirebase(
-        emailInput: String,
-        passwordInput: String,
-        onSuccess: () -> Unit
-    ) = authController.loginWithFirebase(emailInput, passwordInput, onSuccess)
-
     fun enterAsGuest(onSuccess: () -> Unit) = authController.enterAsGuest(onSuccess)
 
     fun saveRoomDietaryProfile(name: String, calories: Int, protein: Int, carbs: Int, fat: Int) {
@@ -790,24 +784,6 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
      * Authenticates user via device biometric prompt (fingerprint / face unlock)
      */
     fun loginWithBiometrics(onSuccess: () -> Unit) = authController.loginWithBiometrics(onSuccess)
-
-    fun registerWithFirebase(
-        name: String,
-        email: String,
-        password: String,
-        gender: Gender,
-        age: Int,
-        weightKg: Float,
-        heightCm: Float,
-        biotype: BodyType,
-        trainingDays: Int,
-        activityLevel: ActivityLevel,
-        goal: FitnessGoal,
-        isAthlete: Boolean = true,
-        onSuccess: () -> Unit
-    ) = authController.registerWithFirebase(name, email, password, gender, age, weightKg, heightCm, biotype, trainingDays, activityLevel, goal, isAthlete, onSuccess)
-
-    fun sendPasswordResetEmail(email: String, onComplete: (Boolean, String) -> Unit) = authController.sendPasswordResetEmail(email, onComplete)
 
     fun deleteAccountLgpd(onSuccess: () -> Unit) {
         viewModelScope.launch {
@@ -2041,6 +2017,13 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 )
                 repository.addWorkoutRoutine(updatedRoutine)
                 repository.deleteExercisesForRoutine(existingRoutineId)
+                
+                // Sync to Cloud
+                firestoreSync.syncWorkoutRoutineToCloud(updatedRoutine).onFailure { e ->
+                    Log.e("VirtusViewModel", "Falha ao sincronizar rotina: ${e.message}")
+                    _toastMessage.value = "Erro ao sincronizar rotina na nuvem."
+                }
+                
                 existingRoutineId
             } else {
                 val newRoutine = WorkoutRoutine(
@@ -2051,21 +2034,41 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                     targetMuscleGroups = targetMuscleGroups,
                     estimatedDurationMinutes = estimatedDurationMinutes
                 )
-                repository.addWorkoutRoutine(newRoutine)
+                val id = repository.addWorkoutRoutine(newRoutine)
+                
+                // Sync to Cloud
+                firestoreSync.syncWorkoutRoutineToCloud(newRoutine.copy(id = id)).onFailure { e ->
+                    Log.e("VirtusViewModel", "Falha ao sincronizar nova rotina: ${e.message}")
+                    _toastMessage.value = "Erro ao sincronizar nova rotina na nuvem."
+                }
+                
+                id
             }
 
             exercises.forEachIndexed { index, ex ->
                 val guide = com.example.util.ExerciseGifMapper.getGuideForExercise(ex.exerciseName)
-                repository.addWorkoutExercise(
-                    ex.copy(
-                        id = 0L,
-                        routineId = routineId,
-                        orderIndex = index,
-                        biomechanicsGuide = ex.biomechanicsGuide.ifBlank { guide.postureTip },
-                        gifDemonstrationUrl = ex.gifDemonstrationUrl.ifBlank { guide.gifUrl }
-                    )
+                val exWithId = ex.copy(
+                    id = 0L,
+                    routineId = routineId,
+                    orderIndex = index,
+                    biomechanicsGuide = ex.biomechanicsGuide.ifBlank { guide.postureTip },
+                    gifDemonstrationUrl = ex.gifDemonstrationUrl.ifBlank { guide.gifUrl }
                 )
+                val id = repository.addWorkoutExercise(exWithId)
+                
+                // Sync to Cloud with nested path
+                val workoutId = routineId.toString()
+                Log.d("VirtusViewModel", "Sincronizando exercício (id: $id, workoutId: $workoutId) com Firestore: $exWithId")
+                
+                firestoreSync.syncWorkoutExerciseToCloud(exWithId.copy(id = id), workoutId = workoutId).onFailure { e ->
+                    Log.e("VirtusViewModel", "Falha ao sincronizar exercício $id no caminho aninhado: ${e.message}")
+                    _toastMessage.value = "Erro ao sincronizar exercício na nuvem."
+                }
             }
+
+
+
+
 
             _toastMessage.value = "Ficha '$title' salva com sucesso!"
         }
@@ -2339,6 +2342,49 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         sb.append("\n_Foco na dieta! Gerado pelo VIRTUS Fit App_")
         return sb.toString()
     }
+
+    fun getMuscleVolume(days: Int): Map<String, Float> {
+        val now = System.currentTimeMillis()
+        val limit = if (days <= 0) 0L else now - (days.toLong() * 86400000L)
+        
+        return workoutLogs.value
+            .asSequence()
+            .filter { it.dateMillis >= limit }
+            .mapNotNull { log ->
+                workoutRoutines.value.find { it.id == log.routineId }?.let { routine ->
+                    val muscles = routine.targetMuscleGroups.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                    if (muscles.isEmpty()) emptyMap() else {
+                        val volPerMuscle = log.totalVolumeKg / muscles.size
+                        muscles.associateWith { volPerMuscle }
+                    }
+                }
+            }
+            .flatMap { it.entries }
+            .groupBy({ it.key }, { it.value })
+            .mapValues { (_, volumes) -> volumes.sum() }
+    }
+
+
+    fun runWorkoutSubcollectionMigration(onComplete: (Boolean, String) -> Unit = { _, _ -> }) {
+        viewModelScope.launch {
+            try {
+                val service = com.example.data.firestore.WorkoutMigrationService(getApplication())
+                val result = service.migrateUserWorkoutsAndExercises()
+                result.onSuccess { report ->
+                    val msg = "Migração concluída: ${report.workoutsProcessed} treinos e ${report.exercisesMigrated + report.legacyExercisesMoved} exercícios migrados."
+                    _toastMessage.value = msg
+                    onComplete(true, msg)
+                }.onFailure { err ->
+                    val msg = "Erro na migração: ${err.message}"
+                    _toastMessage.value = msg
+                    onComplete(false, msg)
+                }
+            } catch (e: Exception) {
+                val msg = "Falha ao executar migração: ${e.message}"
+                _toastMessage.value = msg
+                onComplete(false, msg)
+            }
+        }
+    }
+
 }
-
-

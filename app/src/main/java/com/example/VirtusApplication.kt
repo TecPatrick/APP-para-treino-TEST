@@ -27,8 +27,14 @@ open class MainApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        // Inicialização prioritária do Firebase App Check com Play Integrity
-        initFirebaseAppCheck()
+        // App Check is currently disabled to prevent reCAPTCHA challenges during development.
+        // initFirebaseAppCheck()
+
+        try {
+            com.example.util.AuthLogger.attachAuthStateListener()
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao inicializar AuthLogger", e)
+        }
 
         try {
             com.example.util.ExerciseGifMapper.init(this)
@@ -43,29 +49,7 @@ open class MainApplication : Application() {
      * e DebugAppCheckProviderFactory em desenvolvimento (debug).
      */
     private fun initFirebaseAppCheck() {
-        try {
-            // Garante inicialização do Firebase Core
-            if (FirebaseApp.getApps(this).isEmpty()) {
-                FirebaseApp.initializeApp(this)
-            }
-
-            val firebaseAppCheck = FirebaseAppCheck.getInstance()
-            val providerFactory = if (BuildConfig.DEBUG) {
-                Log.d(TAG, "Configurando App Check com Provedor de Debug...")
-                DebugAppCheckProviderFactory.getInstance()
-            } else {
-                Log.d(TAG, "Configurando App Check com Estratégia Play Integrity...")
-                PlayIntegrityAppCheckProviderFactory.getInstance()
-            }
-
-            // Instala o provedor e ativa a renovação automática de tokens
-            firebaseAppCheck.installAppCheckProviderFactory(providerFactory)
-            firebaseAppCheck.setTokenAutoRefreshEnabled(true)
-
-            Log.i(TAG, "Firebase App Check inicializado com sucesso [${if (BuildConfig.DEBUG) "DebugProvider" else "PlayIntegrity"}].")
-        } catch (e: Exception) {
-            Log.e(TAG, "Falha na inicialização do Firebase App Check", e)
-        }
+        AppCheckInitializer.initialize()
     }
 
     companion object {

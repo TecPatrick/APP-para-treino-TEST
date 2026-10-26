@@ -33,6 +33,8 @@ Before a release build:
 3. If a real Gemini key was shipped in an old APK, revoke/rotate it in the provider console. Removing the code does not revoke old keys.
 
 References:
+- Setup Guide: [docs/FIREBASE_APP_CHECK_SETUP.md](FIREBASE_APP_CHECK_SETUP.md) (SHA-256 fingerprint & App Check configuration)
+- Authentication Logger: `com.example.util.AuthLogger`
 - https://firebase.google.com/docs/ai-logic/get-started?platform=android
 - https://firebase.google.com/docs/app-check/android/play-integrity-provider
 

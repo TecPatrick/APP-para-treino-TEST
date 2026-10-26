@@ -1,25 +1,74 @@
 {
-  "collections": {
-    "users": {
-      "documents": {
-        "{userId}": {
-          "collections": {
-            "favorite_foods": {
-              "documents": {
-                "{foodId}": {
-                  "fields": {
-                    "foodId": "number",
-                    "foodName": "string",
-                    "category": "string",
-                    "isFavorite": "boolean",
-                    "updatedAt": "timestamp"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Public and private user data including physical metrics and goals.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The Firebase UID of the user." },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "gender": { "type": "string", "enum": ["MASCULINO", "FEMININO"] },
+        "age": { "type": "integer" },
+        "weightKg": { "type": "number" },
+        "heightCm": { "type": "number" },
+        "biotype": { "type": "string", "enum": ["ECTOMORPH", "MESOMORPH", "ENDOMORPH"] },
+        "trainingDaysPerWeek": { "type": "integer" },
+        "activityLevel": { "type": "string" },
+        "goal": { "type": "string" },
+        "targetCalories": { "type": "integer" },
+        "targetProteinGrams": { "type": "integer" },
+        "targetCarbsGrams": { "type": "integer" },
+        "targetFatGrams": { "type": "integer" },
+        "targetWaterMl": { "type": "integer" },
+        "hasCompletedOnboarding": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "email", "createdAt"]
+    },
+    "WorkoutLog": {
+      "title": "Workout Log",
+      "description": "Record of a completed gym workout session.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "routineName": { "type": "string" },
+        "dateMillis": { "type": "integer" },
+        "durationMinutes": { "type": "integer" },
+        "totalVolume": { "type": "number" },
+        "exercisesCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "dateMillis", "createdAt"]
+    },
+    "CardioLog": {
+      "title": "Cardio Log",
+      "description": "Manual entry for cardio activities.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string" },
+        "durationMinutes": { "type": "integer" },
+        "caloriesBurned": { "type": "integer" },
+        "dateMillis": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "dateMillis", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile document identified by UID."
+    },
+    "/users/{userId}/workout_logs/{logId}": {
+      "schema": "WorkoutLog",
+      "description": "Historical gym workout records for the user."
+    },
+    "/users/{userId}/cardio_logs/{logId}": {
+      "schema": "CardioLog",
+      "description": "Historical manual cardio records for the user."
     }
   }
 }
