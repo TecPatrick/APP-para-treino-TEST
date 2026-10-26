@@ -974,7 +974,7 @@ fun UserProfileScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Login com Biometria",
+                                    text = "Segurança Biometria",
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onBackground
@@ -1011,57 +1011,123 @@ fun UserProfileScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Acesse seu treino e diário com rapidez usando o leitor ultrassônico de digital ou reconhecimento facial do seu Galaxy/smartphone Android.",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Toggle Biometric Lock for Diaries
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(CarbonCardElevated, RoundedCornerShape(8.dp))
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Bloquear Diários com Biometria",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Text(
+                                    text = "Exige impressão digital ou face ao entrar nas abas de Treino e Dieta.",
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            Switch(
+                                checked = profile.isBiometricLockEnabled,
+                                onCheckedChange = { viewModel.toggleBiometricLock(it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = GrowthCyan,
+                                    uncheckedTrackColor = CarbonBorder
+                                ),
+                                modifier = Modifier.testTag("biometric_lock_toggle")
+                            )
+                        }
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        OutlinedButton(
-                            onClick = {
-                                if (fragmentActivity != null) {
-                                    BiometricAuthHelper.promptBiometricAuth(
-                                        activity = fragmentActivity,
-                                        title = "Teste de Biometria",
-                                        subtitle = "Sensor biométrico verificado com sucesso",
-                                        description = "Toque no sensor biométrico do aparelho.",
-                                        onSuccess = {
-                                            viewModel.showToast("Sensor biométrico reconhecido e validado com sucesso!")
-                                        },
-                                        onError = { error ->
-                                            viewModel.showToast(error)
-                                        }
-                                    )
-                                } else {
-                                    viewModel.showToast("Biometria não disponível nesta sessão")
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(40.dp)
-                                .testTag("test_biometric_btn"),
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(1.dp, CarbonBorder),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                containerColor = CarbonCardElevated,
-                                contentColor = GrowthCyan
-                            )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Security,
-                                contentDescription = null,
-                                tint = GrowthCyan,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Testar Sensor Biométrico (Digital / Face)",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
+                            OutlinedButton(
+                                onClick = {
+                                    if (fragmentActivity != null) {
+                                        BiometricAuthHelper.promptBiometricAuth(
+                                            activity = fragmentActivity,
+                                            title = "Teste de Biometria",
+                                            subtitle = "Sensor biométrico verificado com sucesso",
+                                            description = "Toque no sensor biométrico do aparelho.",
+                                            onSuccess = {
+                                                viewModel.showToast("Sensor biométrico reconhecido e validado com sucesso!")
+                                            },
+                                            onError = { error ->
+                                                viewModel.showToast(error)
+                                            }
+                                        )
+                                    } else {
+                                        viewModel.showToast("Biometria não disponível nesta sessão")
+                                    }
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(38.dp)
+                                    .testTag("test_biometric_btn"),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, CarbonBorder),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = CarbonCardElevated,
+                                    contentColor = GrowthCyan
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Security,
+                                    contentDescription = null,
+                                    tint = GrowthCyan,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Testar Sensor",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    viewModel.restoreDefaultRoutines()
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(38.dp)
+                                    .testTag("restore_routines_btn"),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, CarbonBorder),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = CarbonCardElevated,
+                                    contentColor = GrowthOrangeLight
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Restore,
+                                    contentDescription = null,
+                                    tint = GrowthOrange,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Restaurar ABCDE",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                 }

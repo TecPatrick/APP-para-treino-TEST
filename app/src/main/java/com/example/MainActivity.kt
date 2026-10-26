@@ -41,6 +41,22 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import com.example.util.BiometricAuthHelper
+import com.example.ui.theme.CarbonCard
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -116,6 +132,8 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
     val context = LocalContext.current
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
     var currentScreen by rememberSaveable { mutableStateOf(AppNavigationScreen.DASHBOARD) }
+    var isWorkoutBiometricVerified by rememberSaveable { mutableStateOf(false) }
+    var isDietBiometricVerified by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val toastMessage by viewModel.toastMessage.collectAsStateWithLifecycle()
 
@@ -234,14 +252,38 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
                         onNavigateToReceipts = { currentScreen = AppNavigationScreen.RECEIPTS },
                         onNavigateToGps = { currentScreen = AppNavigationScreen.GPS }
                     )
-                    AppNavigationScreen.DIET -> DietScreen(
-                        viewModel = viewModel,
-                        onNavigateToShopping = { currentScreen = AppNavigationScreen.SHOPPING }
-                    )
-                    AppNavigationScreen.WORKOUT -> WorkoutScreen(
-                        viewModel = viewModel,
-                        onNavigateToProgression = { currentScreen = AppNavigationScreen.EXERCISE_PROGRESSION }
-                    )
+                    AppNavigationScreen.DIET -> {
+                        val requiresLock = profile.isBiometricLockEnabled && !isDietBiometricVerified
+                        if (requiresLock) {
+                            BiometricDiaryLockScreen(
+                                title = "Dieta",
+                                subtitle = "Diário Nutricional",
+                                onSuccess = { isDietBiometricVerified = true },
+                                onFallbackToFirebase = { isDietBiometricVerified = true }
+                            )
+                        } else {
+                            DietScreen(
+                                viewModel = viewModel,
+                                onNavigateToShopping = { currentScreen = AppNavigationScreen.SHOPPING }
+                            )
+                        }
+                    }
+                    AppNavigationScreen.WORKOUT -> {
+                        val requiresLock = profile.isBiometricLockEnabled && !isWorkoutBiometricVerified
+                        if (requiresLock) {
+                            BiometricDiaryLockScreen(
+                                title = "Treinos",
+                                subtitle = "Diário de Treinos",
+                                onSuccess = { isWorkoutBiometricVerified = true },
+                                onFallbackToFirebase = { isWorkoutBiometricVerified = true }
+                            )
+                        } else {
+                            WorkoutScreen(
+                                viewModel = viewModel,
+                                onNavigateToProgression = { currentScreen = AppNavigationScreen.EXERCISE_PROGRESSION }
+                            )
+                        }
+                    }
                     AppNavigationScreen.GPS -> GpsTrackerScreen(
                         viewModel = viewModel,
                         onNavigateBack = { currentScreen = AppNavigationScreen.DASHBOARD }
@@ -280,3 +322,98 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
         }
     }
 }
+
+@Composable
+fun BiometricDiaryLockScreen(
+    title: String,
+    subtitle: String,
+    onSuccess: () -> Unit,
+    onFallbackToFirebase: () -> Unit
+) {
+    val context = LocalContext.current
+    val fragmentActivity = context as? FragmentActivity
+
+    LaunchedEffect(Unit) {
+        if (fragmentActivity != null) {
+            BiometricAuthHelper.promptBiometricAuth(
+                activity = fragmentActivity,
+                title = "Acesso Seguro ao $title",
+                subtitle = subtitle,
+                description = "Confirme sua digital ou reconhecimento facial para visualizar e editar seus registros.",
+                onSuccess = onSuccess,
+                onError = { /* fallback available via button */ }
+            )
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(CarbonDark)
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = CarbonCard),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Fingerprint,
+                    contentDescription = null,
+                    tint = GrowthOrange,
+                    modifier = Modifier.size(56.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Diário Protegido por Biometria",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Para garantir a privacidade e segurança do seu $title, confirme sua identidade.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = {
+                        if (fragmentActivity != null) {
+                            BiometricAuthHelper.promptBiometricAuth(
+                                activity = fragmentActivity,
+                                title = "Acesso Seguro ao $title",
+                                subtitle = subtitle,
+                                description = "Confirme sua digital ou reconhecimento facial.",
+                                onSuccess = onSuccess,
+                                onError = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange)
+                ) {
+                    Text("Desbloquear com Biometria", fontWeight = FontWeight.Bold, color = Color.White)
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onFallbackToFirebase,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.LightGray)
+                ) {
+                    Text("Fallback: Autenticação Firebase / Google", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+}
+

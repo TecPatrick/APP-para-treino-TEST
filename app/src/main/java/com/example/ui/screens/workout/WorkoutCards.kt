@@ -105,6 +105,7 @@ import com.example.data.model.WorkoutRoutine
 import com.example.data.model.WorkoutSplitType
 import com.example.ui.VirtusViewModel
 import com.example.ui.components.GrowthHeader
+import com.example.ui.components.RoutineMuscleSummaryCard
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
 import com.example.ui.theme.CarbonCardElevated
@@ -338,6 +339,16 @@ fun RoutineDetailView(
                         }
                     }
                 }
+            }
+        }
+
+        // Routine Muscle Summary (Routine Summary & Foco Muscular)
+        if (exercises.isNotEmpty()) {
+            item {
+                RoutineMuscleSummaryCard(
+                    exercises = exercises,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                )
             }
         }
 
@@ -774,7 +785,8 @@ fun EmptySlotRoutineCard(
 fun EmptyWorkoutGroupCard(
     title: String,
     subtitle: String,
-    onCreateClick: () -> Unit
+    onCreateClick: () -> Unit,
+    onRestoreDefaultClick: (() -> Unit)? = null
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = CarbonCard),
@@ -804,14 +816,39 @@ fun EmptyWorkoutGroupCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(14.dp))
-            Button(
-                onClick = onCreateClick,
-                colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Criar Ficha de Treino", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            if (onRestoreDefaultClick != null) {
+                Button(
+                    onClick = onRestoreDefaultClick,
+                    colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Carregar Divisão ABCDE Completa", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onCreateClick,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground),
+                    border = BorderStroke(1.dp, CarbonBorder),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = GrowthCyan, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Criar Ficha em Branco", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+            } else {
+                Button(
+                    onClick = onCreateClick,
+                    colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Criar Ficha de Treino", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }

@@ -383,12 +383,15 @@ fun WorkoutScreen(
                         item {
                             EmptyWorkoutGroupCard(
                                 title = "Nenhuma Ficha Cadastrada",
-                                subtitle = "Crie suas fichas de treino para visualizar os exercícios.",
+                                subtitle = "Crie fichas em branco personalizadas ou inicie com a divisão recomendada ABCDE completa.",
                                 onCreateClick = {
                                     routineToEdit = null
                                     presetLetterForNewRoutine = "A"
                                     presetSplitForNewRoutine = WorkoutSplitType.CUSTOM
                                     showRoutineEditorDialog = true
+                                },
+                                onRestoreDefaultClick = {
+                                    viewModel.restoreDefaultRoutines()
                                 }
                             )
                         }

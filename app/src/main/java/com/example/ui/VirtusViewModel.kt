@@ -318,8 +318,74 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 if (currentMeals.isEmpty()) {
                     repository.insertMealPlanItems(com.example.data.local.PrepopulatedData.defaultMealPlan)
                 }
+                val currentRoutines = repository.workoutRoutines.firstOrNull() ?: emptyList()
+                if (currentRoutines.isEmpty()) {
+                    for (routine in com.example.data.local.PrepopulatedData.defaultRoutines) {
+                        repository.addWorkoutRoutine(routine)
+                    }
+                    for (exercise in com.example.data.local.PrepopulatedData.defaultExercises) {
+                        repository.addWorkoutExercise(exercise)
+                    }
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
+            }
+        }
+    }
+
+    fun restoreDefaultRoutines() {
+        viewModelScope.launch {
+            try {
+                val currentRoutines = repository.workoutRoutines.firstOrNull() ?: emptyList()
+                for (r in currentRoutines) {
+                    repository.deleteWorkoutRoutine(r.id)
+                }
+                for (routine in com.example.data.local.PrepopulatedData.defaultRoutines) {
+                    repository.addWorkoutRoutine(routine)
+                }
+                for (exercise in com.example.data.local.PrepopulatedData.defaultExercises) {
+                    repository.addWorkoutExercise(exercise)
+                }
+                _toastMessage.value = "Fichas padrão (Divisão ABCDE) restauradas com sucesso!"
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _toastMessage.value = "Erro ao restaurar fichas: ${e.message}"
+            }
+        }
+    }
+
+    fun toggleBiometricLock(enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                val current = userProfile.value
+                val updated = current.copy(isBiometricLockEnabled = enabled)
+                repository.saveUserProfile(updated)
+                _toastMessage.value = if (enabled) "Bloqueio biométrico ativado nos diários" else "Bloqueio biométrico desativado"
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _toastMessage.value = "Erro ao atualizar biometria: ${e.message}"
+            }
+        }
+    }
+
+    fun createBlankRoutine(letter: String, title: String, splitType: WorkoutSplitType = WorkoutSplitType.ABCDE) {
+        viewModelScope.launch {
+            try {
+                val currentList = repository.workoutRoutines.firstOrNull() ?: emptyList()
+                val nextOrder = (currentList.maxOfOrNull { it.orderIndex } ?: 0) + 1
+                val newRoutine = WorkoutRoutine(
+                    letter = letter,
+                    title = title,
+                    splitType = splitType,
+                    targetMuscleGroups = "Geral",
+                    estimatedDurationMinutes = 60,
+                    orderIndex = nextOrder
+                )
+                repository.addWorkoutRoutine(newRoutine)
+                _toastMessage.value = "Ficha $letter criada com sucesso!"
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _toastMessage.value = "Erro ao criar ficha: ${e.message}"
             }
         }
     }

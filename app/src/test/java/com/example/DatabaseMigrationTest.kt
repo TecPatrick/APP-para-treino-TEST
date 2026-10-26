@@ -32,7 +32,7 @@ class DatabaseMigrationTest {
             sqlite.execSQL("DELETE FROM room_master_table")
         }
         val upgraded = Room.databaseBuilder(context, AppDatabase::class.java, name)
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3).build()
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4).build()
         try {
             val profile = upgraded.appDao().getUserProfileDirect(1)!!
             assertEquals("Patrick", profile.name)

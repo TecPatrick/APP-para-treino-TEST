@@ -29,7 +29,7 @@ import com.example.data.model.*
     Macro::class,
     WorkoutSchedule::class,
     CardioLog::class
-], version = 3, exportSchema = true)
+], version = 4, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun appDao(): AppDao
     fun growthDao(): AppDao = appDao()
@@ -75,6 +75,21 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val profileCursor = db.query("PRAGMA table_info(user_profile)")
+                var hasBiometricLock = false
+                while (profileCursor.moveToNext()) {
+                    val name = profileCursor.getString(profileCursor.getColumnIndexOrThrow("name"))
+                    if (name == "isBiometricLockEnabled") hasBiometricLock = true
+                }
+                profileCursor.close()
+                if (!hasBiometricLock) {
+                    db.execSQL("ALTER TABLE user_profile ADD COLUMN isBiometricLockEnabled INTEGER NOT NULL DEFAULT 0")
+                }
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -85,7 +100,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "app_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .addCallback(object : RoomDatabase.Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) {
                             // Older versions stored the raw password in this legacy column.

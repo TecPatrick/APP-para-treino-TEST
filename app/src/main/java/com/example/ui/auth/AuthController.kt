@@ -71,6 +71,7 @@ class AuthController(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                e.printStackTrace()
                 val message =
                     "Não foi possível concluir a operação. Tente novamente."
 

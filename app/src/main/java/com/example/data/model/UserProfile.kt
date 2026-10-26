@@ -96,5 +96,6 @@ data class UserProfile(
     val monthlyTargetWeightKg: Float = 81.0f,
     val monthlyTargetDurationWeeks: Int = 4,
     val monthlyNotes: String = "Fase de hipertrofia com foco em peitoral e dorsais.",
-    val isDarkMode: Boolean = true
+    val isDarkMode: Boolean = true,
+    val isBiometricLockEnabled: Boolean = false
 )

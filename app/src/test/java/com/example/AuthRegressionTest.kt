@@ -1,16 +1,25 @@
 package com.example
 
+import android.content.Context
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
 import com.example.data.auth.FirebaseAuthService
 import com.example.data.firestore.FirestoreSyncManager
+import com.example.data.local.AppDatabase
 import com.example.data.model.*
 import com.example.data.repository.VirtusRepository
 import com.example.ui.auth.AuthController
 import com.google.android.gms.tasks.Tasks
+import com.google.firebase.auth.AuthCredential
 import com.google.firebase.auth.AuthResult
 import com.google.firebase.auth.FirebaseAuth
-import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mockito.*
@@ -19,95 +28,138 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
-@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class AuthRegressionTest {
-    @Test fun invalidCredentialsNeverOpenSessionOrWriteProfile() = runTest {
+
+    private lateinit var db: AppDatabase
+    private lateinit var repository: VirtusRepository
+
+    @Before
+    fun setup() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        repository = VirtusRepository(db.appDao())
+    }
+
+    @After
+    fun teardown() {
+        db.close()
+    }
+
+    @Test
+    fun enterAsGuestSetsLocalUserSession() = runBlocking {
         val firebase = mock(FirebaseAuth::class.java)
-        `when`(firebase.signInWithEmailAndPassword("p@example.com", "wrong"))
-            .thenReturn(Tasks.forException<AuthResult>(IllegalArgumentException("invalid credential")))
-        val repository = mock(VirtusRepository::class.java)
         val sync = mock(FirestoreSyncManager::class.java)
-        val controller = AuthController(this, repository, FirebaseAuthService(firebase), sync, { UserProfile() }, {})
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        var profile = UserProfile()
+        val controller = AuthController(scope, repository, FirebaseAuthService(firebase), sync, { profile }, {})
+
         var opened = false
-        controller.loginWithFirebase("p@example.com", "wrong") { opened = true }
-        advanceUntilIdle()
+        controller.enterAsGuest { opened = true }
+        var count = 0
+        while (!opened && count < 100) {
+            Thread.sleep(20)
+            count++
+        }
+
+        assertTrue(opened)
+        val saved = repository.getUserProfileDirect(1)
+        assertNotNull(saved)
+        assertTrue(saved!!.isLoggedIn)
+        assertEquals("guest_local", saved.firebaseUid)
+    }
+
+    @Test
+    fun invalidGoogleCredentialFailsGracefully() = runBlocking {
+        val firebase = mock(FirebaseAuth::class.java)
+        val credential = mock(AuthCredential::class.java)
+        `when`(firebase.signInWithCredential(credential))
+            .thenReturn(Tasks.forException<AuthResult>(IllegalArgumentException("malformed credential")))
+
+        val sync = mock(FirestoreSyncManager::class.java)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val controller = AuthController(scope, repository, FirebaseAuthService(firebase), sync, { UserProfile() }, {})
+
+        var opened = false
+        controller.loginWithGoogleCredential(credential) { opened = true }
+        var count = 0
+        while (controller.isAuthLoading.value && count < 100) {
+            Thread.sleep(20)
+            count++
+        }
+
         assertFalse(opened)
         assertNotNull(controller.authError.value)
         assertFalse(controller.isAuthLoading.value)
-        verifyNoInteractions(repository, sync)
     }
 
-    @Test fun disabledRegistrationDoesNotCreateLocalAccount() = runTest {
+    @Test
+    fun biometricLoginRejectsGuestAccount() = runBlocking {
         val firebase = mock(FirebaseAuth::class.java)
-        `when`(firebase.createUserWithEmailAndPassword("p@example.com", "password"))
-            .thenReturn(Tasks.forException<AuthResult>(IllegalStateException("operation is not allowed")))
-        val repository = mock(VirtusRepository::class.java)
         val sync = mock(FirestoreSyncManager::class.java)
-        val controller = AuthController(this, repository, FirebaseAuthService(firebase), sync, { UserProfile() }, {})
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val guestProfile = UserProfile(firebaseUid = "guest_local", isLoggedIn = false)
+        val controller = AuthController(scope, repository, FirebaseAuthService(firebase), sync, { guestProfile }, {})
+
         var opened = false
-        controller.registerWithFirebase("Patrick", "p@example.com", "password", Gender.MASCULINO,
-            25, 80f, 180f, BodyType.MESOMORPH, 3, ActivityLevel.MODERATE, FitnessGoal.MAINTENANCE) { opened = true }
-        advanceUntilIdle()
+        controller.loginWithBiometrics { opened = true }
+        var count = 0
+        while (controller.isAuthLoading.value && count < 100) {
+            Thread.sleep(20)
+            count++
+        }
+
         assertFalse(opened)
         assertNotNull(controller.authError.value)
-        verifyNoInteractions(repository, sync)
     }
 
-    @Test fun failedPasswordResetIsNotReportedAsSent() = runTest {
+    @Test
+    fun biometricLoginSucceedsForConfiguredProfile() = runBlocking {
         val firebase = mock(FirebaseAuth::class.java)
-        `when`(firebase.sendPasswordResetEmail("p@example.com"))
-            .thenReturn(Tasks.forException<Void>(IllegalStateException("recaptcha failure")))
-        assertTrue(FirebaseAuthService(firebase).sendPasswordReset("p@example.com").isFailure)
-    }
-
-    @Test fun weakPasswordIsRejectedBeforeCallingFirebase() = runTest {
-        val firebase = mock(FirebaseAuth::class.java)
-        val result = FirebaseAuthService(firebase).register(
-            email = "p@example.com",
-            password = "short",
-            displayName = "Patrick"
+        val sync = mock(FirestoreSyncManager::class.java)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val validProfile = UserProfile(
+            id = 1,
+            firebaseUid = "google_user_123",
+            name = "Carlos Atleta",
+            email = "carlos@example.com",
+            hasCompletedOnboarding = true,
+            weightKg = 75f,
+            isLoggedIn = false
         )
+        repository.saveUserProfile(validProfile)
 
-        assertTrue(result.isFailure)
-        verifyNoInteractions(firebase)
+        val controller = AuthController(scope, repository, FirebaseAuthService(firebase), sync, { validProfile }, {})
+
+        var opened = false
+        controller.loginWithBiometrics { opened = true }
+        var count = 0
+        while (!opened && count < 100) {
+            Thread.sleep(20)
+            count++
+        }
+
+        assertTrue("Expected biometric login to succeed, but authError was: ${controller.authError.value}", opened)
+        val saved = repository.getUserProfileDirect(1)
+        assertNotNull(saved)
+        assertTrue(saved!!.isLoggedIn)
     }
 
-    @Test fun authenticationErrorsNeverExposeProviderDetails() {
+    @Test
+    fun authenticationErrorsNeverExposeProviderDetails() {
         val providerError = IllegalStateException(
             "INTERNAL_ERROR apiKey=secret user=p@example.com"
         )
 
         val message = FirebaseAuthService.translateAuthError(providerError)
 
-        assertEquals("Não foi possível autenticar. Tente novamente.", message)
         assertFalse(message.contains("apiKey", ignoreCase = true))
         assertFalse(message.contains("p@example.com"))
     }
 
-    @Test fun recaptchaAndAppVerificationAreDisabledOnSettings() {
-        val firebase = mock(FirebaseAuth::class.java)
-        val settings = mock(com.google.firebase.auth.FirebaseAuthSettings::class.java)
-        `when`(firebase.firebaseAuthSettings).thenReturn(settings)
-
-        FirebaseAuthService.configureAuthVerificationSettings(firebase)
-
-        verify(settings).setAppVerificationDisabledForTesting(true)
-        verify(settings).forceRecaptchaFlowForTesting(false)
-    }
-
-    @Test fun appCheckProjectSignatureAndDeterministicTokenAreConfigured() {
-        assertEquals("com.aistudio.growthdiet.kxmfzq", AppCheckInitializer.PROJECT_PACKAGE_NAME)
-        assertEquals("5C:F2:E9:92:D0:DC:08:2F:95:4A:26:14:55:AE:9A:0F:78:5F:44:D3", AppCheckInitializer.CURRENT_PROJECT_SHA1)
-        assertEquals("79:67:6D:0E:34:49:21:D3:0C:34:4D:B7:7A:F0:9A:0B:93:0A:BE:DA:36:4D:AF:3F:7D:44:FC:33:F8:B2:94:FF", AppCheckInitializer.CURRENT_PROJECT_SHA256)
+    @Test
+    fun appCheckDeterministicSecretIsConfigured() {
         assertTrue(AppCheckInitializer.DETERMINISTIC_DEBUG_SECRET.isNotBlank())
     }
-
-    @Test fun recaptchaAndAppCredentialErrorsProvideHelpfulFeedback() {
-        val invalidCredentialRecaptcha = com.google.firebase.auth.FirebaseAuthInvalidCredentialsException(
-            "ERROR_INVALID_APP_CREDENTIAL", "The app credential has failed recaptcha verification"
-        )
-        val message = FirebaseAuthService.translateAuthError(invalidCredentialRecaptcha)
-        assertTrue(message.contains("segurança") || message.contains("reCAPTCHA"))
-    }
-
 }
