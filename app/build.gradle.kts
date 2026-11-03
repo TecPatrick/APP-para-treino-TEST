@@ -20,7 +20,7 @@ android {
     minSdk = 24
     targetSdk = 36
     versionCode = 1
-    versionName = "1.0"
+    versionName = "0.9.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -53,7 +53,7 @@ android {
         appId = "1:204365877775:android:f77650214127790642497a"
         artifactType = "APK"
         groups = "alpha, beta"
-        releaseNotes = System.getenv("FIREBASE_RELEASE_NOTES") ?: "Virtus Growth - Release Alpha & Beta"
+        releaseNotes = System.getenv("FIREBASE_RELEASE_NOTES") ?: "Virtus - Dieta & Treino - Release Beta v0.9.0"
         val credentialsPath = System.getenv("FIREBASE_APP_DISTRIBUTION_CREDENTIALS")
           ?: System.getenv("GOOGLE_APPLICATION_CREDENTIALS")
         if (!credentialsPath.isNullOrEmpty()) {

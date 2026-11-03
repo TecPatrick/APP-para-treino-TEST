@@ -239,15 +239,15 @@ object PrepopulatedData {
         )
     )
 
-    // Rotinas completas do Plano ABCDE
+    // Rotinas completas: Treino A, B, C e E
     val defaultRoutines = listOf(
         WorkoutRoutine(
             id = 1,
             splitType = WorkoutSplitType.ABCDE,
             letter = "A",
-            title = "A — Peitoral, Deltoide Anterior e Tríceps",
+            title = "Treino A — Peitoral & Tríceps",
             dayOfWeekLabel = "Segunda-feira",
-            targetMuscleGroups = "Peito, Ombros (anterior), Tríceps",
+            targetMuscleGroups = "Peitoral, Tríceps",
             estimatedDurationMinutes = 60,
             orderIndex = 1
         ),
@@ -255,9 +255,9 @@ object PrepopulatedData {
             id = 2,
             splitType = WorkoutSplitType.ABCDE,
             letter = "B",
-            title = "B — Dorsais, Deltoide Posterior e Trapézio",
+            title = "Treino B — Dorsais, Bíceps & Antebraço",
             dayOfWeekLabel = "Terça-feira",
-            targetMuscleGroups = "Costas, Deltoides (posterior), Trapézio",
+            targetMuscleGroups = "Costas, Bíceps, Antebraço",
             estimatedDurationMinutes = 60,
             orderIndex = 2
         ),
@@ -265,68 +265,62 @@ object PrepopulatedData {
             id = 3,
             splitType = WorkoutSplitType.ABCDE,
             letter = "C",
-            title = "C — Quadríceps, Adutores e Panturrilhas",
+            title = "Treino C — Pernas Completo & Glúteos",
             dayOfWeekLabel = "Quarta-feira",
-            targetMuscleGroups = "Pernas (anterior), Panturrilhas",
+            targetMuscleGroups = "Quadríceps, Isquiotibiais, Glúteos",
             estimatedDurationMinutes = 65,
             orderIndex = 3
         ),
         WorkoutRoutine(
             id = 4,
             splitType = WorkoutSplitType.ABCDE,
-            letter = "D",
-            title = "D — Ombros Completo e Abdômen",
-            dayOfWeekLabel = "Quinta-feira",
-            targetMuscleGroups = "Deltoides (lateral/frontal), Core",
+            letter = "E",
+            title = "Treino E — Braços Completo (Bíceps & Tríceps)",
+            dayOfWeekLabel = "Sexta-feira",
+            targetMuscleGroups = "Bíceps, Tríceps",
             estimatedDurationMinutes = 55,
             orderIndex = 4
-        ),
-        WorkoutRoutine(
-            id = 5,
-            splitType = WorkoutSplitType.ABCDE,
-            letter = "E",
-            title = "E — Braços (Bíceps, Tríceps) & Isquiotibiais",
-            dayOfWeekLabel = "Sexta-feira",
-            targetMuscleGroups = "Bíceps, Tríceps, Posteriores de Coxa",
-            estimatedDurationMinutes = 60,
-            orderIndex = 5
         )
     )
 
     // Exercícios completos com biomecânica, séries, repetições e cargas
     val defaultExercises = listOf(
-        // Treino A: Peito, Deltoide Anterior e Tríceps
-        WorkoutExercise(id = 1, routineId = 1, exerciseName = "Supino Reto com Barra", muscleGroup = "Peitoral", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 60f, restSeconds = 90, orderIndex = 1, notes = "Escápulas retraídas, toque suave no esterno", biomechanicsGuide = "Pés firmes no chão, glúteo apoiado no banco e trajetória em leve arco."),
-        WorkoutExercise(id = 2, routineId = 1, exerciseName = "Supino Inclinado com Halteres", muscleGroup = "Peitoral Superior", sets = 4, repsMin = 10, repsMax = 12, currentWeightKg = 24f, restSeconds = 75, orderIndex = 2, notes = "Inclinação a 30 graus para focar na porção clavicular", biomechanicsGuide = "Alongue bem na descida sem hiperestender os ombros."),
-        WorkoutExercise(id = 3, routineId = 1, exerciseName = "Crucifixo na Polia (Crossover)", muscleGroup = "Peitoral", sets = 3, repsMin = 12, repsMax = 15, currentWeightKg = 20f, restSeconds = 60, orderIndex = 3, notes = "Pico de contração de 1 segundo no centro", biomechanicsGuide = "Cotovelos levemente flexionados durante todo o movimento."),
-        WorkoutExercise(id = 4, routineId = 1, exerciseName = "Tríceps Pulley com Barra Reta", muscleGroup = "Tríceps", sets = 4, repsMin = 10, repsMax = 12, currentWeightKg = 35f, restSeconds = 60, orderIndex = 4, notes = "Cotovelos colados ao tronco", biomechanicsGuide = "Extensão completa sem balanço lombar."),
-        WorkoutExercise(id = 5, routineId = 1, exerciseName = "Tríceps Testa com Halteres", muscleGroup = "Tríceps", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 12f, restSeconds = 60, orderIndex = 5, notes = "Descida controlada em direção à testa/têmporas", biomechanicsGuide = "Mantenha os cotovelos apontados para o teto."),
+        // Treino A: Peitoral e Tríceps
+        WorkoutExercise(id = 1, routineId = 1, exerciseName = "Supino Reto", muscleGroup = "Peitoral", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 60f, restSeconds = 90, orderIndex = 1, notes = "Escápulas retraídas, pés firmes no chão", biomechanicsGuide = "Pés firmes no chão, glúteo apoiado no banco e trajetória em leve arco."),
+        WorkoutExercise(id = 2, routineId = 1, exerciseName = "Supino Inclinado 30°", muscleGroup = "Peitoral Superior", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 24f, restSeconds = 75, orderIndex = 2, notes = "Inclinação a 30 graus para focar na porção clavicular", biomechanicsGuide = "Alongue bem na descida sem hiperestender os ombros."),
+        WorkoutExercise(id = 3, routineId = 1, exerciseName = "Crucifixo Polia Alta", muscleGroup = "Peitoral", sets = 3, repsMin = 10, repsMax = 15, currentWeightKg = 20f, restSeconds = 60, orderIndex = 3, notes = "Pico de contração de 1 segundo no centro", biomechanicsGuide = "Cotovelos levemente flexionados durante todo o movimento."),
+        WorkoutExercise(id = 4, routineId = 1, exerciseName = "Crucifixo Máquina", muscleGroup = "Peitoral", sets = 3, repsMin = 10, repsMax = 15, currentWeightKg = 40f, restSeconds = 60, orderIndex = 4, notes = "Peito aberto e escápulas aduzidas contra o encosto", biomechanicsGuide = "Feche os braços contraindo o peitoral, retorne alongando lentamente."),
+        WorkoutExercise(id = 5, routineId = 1, exerciseName = "Tríceps Pulley Barra W", muscleGroup = "Tríceps", sets = 4, repsMin = 10, repsMax = 12, currentWeightKg = 35f, restSeconds = 60, orderIndex = 5, notes = "Cotovelos colados ao tronco", biomechanicsGuide = "Extensão completa sem balanço lombar."),
+        WorkoutExercise(id = 6, routineId = 1, exerciseName = "Tríceps Testa na Polia", muscleGroup = "Tríceps", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 25f, restSeconds = 60, orderIndex = 6, notes = "Cotovelos elevados e fixos", biomechanicsGuide = "Flexione em direção à testa e estenda totalmente os cotovelos."),
+        WorkoutExercise(id = 7, routineId = 1, exerciseName = "Tríceps Francês na Polia Barra W", muscleGroup = "Tríceps", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 25f, restSeconds = 60, orderIndex = 7, notes = "Alongamento máximo da cabeça longa do tríceps", biomechanicsGuide = "Cotovelos elevados ao lado da cabeça, estenda para cima."),
 
-        // Treino B: Costas, Deltoide Posterior e Trapézio
-        WorkoutExercise(id = 6, routineId = 2, exerciseName = "Puxada Frontal na Polia", muscleGroup = "Costas", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 55f, restSeconds = 90, orderIndex = 1, notes = "Puxe com os cotovelos, estufando o peito", biomechanicsGuide = "Depressão escapular no início da puxada."),
-        WorkoutExercise(id = 7, routineId = 2, exerciseName = "Remada Curvada com Barra", muscleGroup = "Costas", sets = 4, repsMin = 8, repsMax = 10, currentWeightKg = 50f, restSeconds = 90, orderIndex = 2, notes = "Tronco inclinado a 45 graus, coluna neutra", biomechanicsGuide = "Barra sobe em direção ao umbigo."),
-        WorkoutExercise(id = 8, routineId = 2, exerciseName = "Remada Baixa no Triângulo", muscleGroup = "Costas", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 45f, restSeconds = 75, orderIndex = 3, notes = "Alongamento completo das dorsais na volta", biomechanicsGuide = "Não hiperestenda a coluna para trás."),
-        WorkoutExercise(id = 9, routineId = 2, exerciseName = "Crucifixo Inverso no Peck Deck", muscleGroup = "Deltoides", sets = 3, repsMin = 12, repsMax = 15, currentWeightKg = 30f, restSeconds = 60, orderIndex = 4, notes = "Foco total na cabeça posterior do ombro", biomechanicsGuide = "Braços paralelos ao solo."),
-        WorkoutExercise(id = 10, routineId = 2, exerciseName = "Encolhimento de Ombros com Halteres", muscleGroup = "Trapézio", sets = 4, repsMin = 12, repsMax = 15, currentWeightKg = 26f, restSeconds = 60, orderIndex = 5, notes = "Movimento estritamente vertical, sem girar os ombros", biomechanicsGuide = "Segure 1 segundo no topo."),
+        // Treino B: Costas, Bíceps e Antebraço
+        WorkoutExercise(id = 8, routineId = 2, exerciseName = "Puxada Alta Pronada na Polia", muscleGroup = "Costas", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 55f, restSeconds = 90, orderIndex = 1, notes = "Puxe com os cotovelos, estufando o peito", biomechanicsGuide = "Depressão escapular no início da puxada."),
+        WorkoutExercise(id = 9, routineId = 2, exerciseName = "Puxada Triângulo", muscleGroup = "Costas", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 50f, restSeconds = 75, orderIndex = 2, notes = "Pegada neutra e fechada com o triângulo", biomechanicsGuide = "Puxe até a parte superior do peito com tronco firme."),
+        WorkoutExercise(id = 10, routineId = 2, exerciseName = "Remada Baixa", muscleGroup = "Costas", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 45f, restSeconds = 75, orderIndex = 3, notes = "Alongamento completo das dorsais na volta", biomechanicsGuide = "Coluna ereta, puxe o triângulo até o umbigo."),
+        WorkoutExercise(id = 11, routineId = 2, exerciseName = "Remada Curvada", muscleGroup = "Costas", sets = 4, repsMin = 8, repsMax = 10, currentWeightKg = 50f, restSeconds = 90, orderIndex = 4, notes = "Tronco inclinado a 45 graus, coluna neutra", biomechanicsGuide = "Barra sobe em direção ao abdômen com cotovelos fechados."),
+        WorkoutExercise(id = 12, routineId = 2, exerciseName = "Rosca Direta", muscleGroup = "Bíceps", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 25f, restSeconds = 60, orderIndex = 5, notes = "Cotovelos colados ao lado do corpo", biomechanicsGuide = "Suba sem balanço de tronco e controle a descida excêntrica."),
+        WorkoutExercise(id = 13, routineId = 2, exerciseName = "Rosca Martelo Alternada", muscleGroup = "Bíceps", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 14f, restSeconds = 60, orderIndex = 6, notes = "Pegada neutra para foco no braquial e antebraço", biomechanicsGuide = "Alterne os braços mantendo os cotovelos parados."),
+        WorkoutExercise(id = 14, routineId = 2, exerciseName = "Rosca Scott", muscleGroup = "Bíceps", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 30f, restSeconds = 60, orderIndex = 7, notes = "Braços apoiados no banco Scott", biomechanicsGuide = "Isolamento estrito sem impulsos corporais."),
+        WorkoutExercise(id = 15, routineId = 2, exerciseName = "Rosca Inversa Barra W", muscleGroup = "Antebraço", sets = 3, repsMin = 12, repsMax = 15, currentWeightKg = 18f, restSeconds = 60, orderIndex = 8, notes = "Pegada pronada focando braquiorradial", biomechanicsGuide = "Mantenha os punhos firmes e alinhados durante o movimento."),
 
-        // Treino C: Pernas (Quadríceps e Panturrilhas)
-        WorkoutExercise(id = 11, routineId = 3, exerciseName = "Agachamento Livre com Barra", muscleGroup = "Quadríceps / Glúteo", sets = 4, repsMin = 8, repsMax = 10, currentWeightKg = 70f, restSeconds = 120, orderIndex = 1, notes = "Profundidade abaixo de 90 graus", biomechanicsGuide = "Joelhos na linha das pontas dos pés, tronco firme."),
-        WorkoutExercise(id = 12, routineId = 3, exerciseName = "Leg Press 45 Graus", muscleGroup = "Quadríceps", sets = 4, repsMin = 10, repsMax = 12, currentWeightKg = 160f, restSeconds = 90, orderIndex = 2, notes = "Não tire o quadril do encosto no ponto mais baixo", biomechanicsGuide = "Pés na largura dos ombros."),
-        WorkoutExercise(id = 13, routineId = 3, exerciseName = "Cadeira Extensora", muscleGroup = "Quadríceps", sets = 3, repsMin = 12, repsMax = 15, currentWeightKg = 45f, restSeconds = 60, orderIndex = 3, notes = "Pausa isométrica de 1 segundo no topo", biomechanicsGuide = "Eixo do joelho alinhado com o eixo da máquina."),
-        WorkoutExercise(id = 14, routineId = 3, exerciseName = "Gêmeos em Pé (Panturrilhas)", muscleGroup = "Panturrilhas", sets = 4, repsMin = 15, repsMax = 20, currentWeightKg = 50f, restSeconds = 60, orderIndex = 4, notes = "Amplitude máxima: desça até alongar bem o tendão", biomechanicsGuide = "Suba na ponta dos pés estendendo ao máximo."),
+        // Treino C: Pernas Completo (Quadríceps, Isquiotibiais, Glúteos & Adutores)
+        WorkoutExercise(id = 16, routineId = 3, exerciseName = "Cadeira Abdutora", muscleGroup = "Glúteos", sets = 4, repsMin = 12, repsMax = 15, currentWeightKg = 50f, restSeconds = 60, orderIndex = 1, notes = "Foco em glúteo médio, tronco levemente inclinado à frente", biomechanicsGuide = "Abra afastando os joelhos e segure 1 segundo no pico de contração."),
+        WorkoutExercise(id = 17, routineId = 3, exerciseName = "Cadeira Adutora", muscleGroup = "Adutores & Quadríceps", sets = 4, repsMin = 12, repsMax = 15, currentWeightKg = 45f, restSeconds = 60, orderIndex = 2, notes = "Foco na parte medial/interna da coxa", biomechanicsGuide = "Aproxime os joelhos com controle e amplitude máxima."),
+        WorkoutExercise(id = 18, routineId = 3, exerciseName = "Cadeira Flexora", muscleGroup = "Isquiotibiais", sets = 4, repsMin = 10, repsMax = 12, currentWeightKg = 40f, restSeconds = 60, orderIndex = 3, notes = "Tronco colado ao encosto, ponta dos pés apontada para cima", biomechanicsGuide = "Flexione os joelhos espremendo os posteriores de coxa."),
+        WorkoutExercise(id = 19, routineId = 3, exerciseName = "Extensora em Pé", muscleGroup = "Quadríceps", sets = 3, repsMin = 12, repsMax = 15, currentWeightKg = 25f, restSeconds = 60, orderIndex = 4, notes = "Isolamento unilateral de quadríceps", biomechanicsGuide = "Extensão completa do joelho mantendo o quadril alinhado."),
+        WorkoutExercise(id = 20, routineId = 3, exerciseName = "Cadeira Extensora", muscleGroup = "Quadríceps", sets = 4, repsMin = 10, repsMax = 12, currentWeightKg = 45f, restSeconds = 60, orderIndex = 5, notes = "Pausa isométrica de 1 segundo no topo", biomechanicsGuide = "Eixo do joelho alinhado ao eixo rotativo da máquina."),
+        WorkoutExercise(id = 21, routineId = 3, exerciseName = "Elevação Pélvica", muscleGroup = "Glúteos", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 80f, restSeconds = 90, orderIndex = 6, notes = "Apoio nas escápulas, contração máxima no topo", biomechanicsGuide = "Pés firmes, eleve o quadril estendendo até formar linha reta com o tronco."),
+        WorkoutExercise(id = 22, routineId = 3, exerciseName = "Leg Press 45°", muscleGroup = "Quadríceps", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 160f, restSeconds = 90, orderIndex = 7, notes = "Não tire o quadril nem a lombar do encosto", biomechanicsGuide = "Pés na largura dos ombros, descida ampla e controlada."),
+        WorkoutExercise(id = 23, routineId = 3, exerciseName = "Agachamento Hack 45°", muscleGroup = "Quadríceps", sets = 4, repsMin = 8, repsMax = 10, currentWeightKg = 80f, restSeconds = 90, orderIndex = 8, notes = "Pés alinhados, desça até 90 graus", biomechanicsGuide = "Costas e cabeça apoiadas, empurre distribuindo a força pelos pés."),
 
-        // Treino D: Ombros e Abdômen
-        WorkoutExercise(id = 15, routineId = 4, exerciseName = "Desenvolvimento Militar com Halteres", muscleGroup = "Ombros", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 18f, restSeconds = 90, orderIndex = 1, notes = "Costas bem apoiadas no encosto", biomechanicsGuide = "Cotovelos levemente à frente do plano coronal."),
-        WorkoutExercise(id = 16, routineId = 4, exerciseName = "Elevação Lateral com Halteres", muscleGroup = "Deltoide Lateral", sets = 4, repsMin = 12, repsMax = 15, currentWeightKg = 10f, restSeconds = 60, orderIndex = 2, notes = "Cotovelos ligeiramente flexionados, polegar nivelado", biomechanicsGuide = "Não use impulso com o tronco."),
-        WorkoutExercise(id = 17, routineId = 4, exerciseName = "Elevação Frontal na Polia", muscleGroup = "Deltoide Anterior", sets = 3, repsMin = 12, repsMax = 15, currentWeightKg = 15f, restSeconds = 60, orderIndex = 3, notes = "Tensão contínua do cabo", biomechanicsGuide = "Suba até a linha dos olhos."),
-        WorkoutExercise(id = 18, routineId = 4, exerciseName = "Abdominal Supra na Polia (Crunch)", muscleGroup = "Abdômen", sets = 4, repsMin = 15, repsMax = 20, currentWeightKg = 35f, restSeconds = 60, orderIndex = 4, notes = "Flexione a coluna lombar aproximando costelas da bacia", biomechanicsGuide = "Mantenha os braços fixos, movendo o tronco."),
-
-        // Treino E: Bíceps, Tríceps & Isquiotibiais
-        WorkoutExercise(id = 19, routineId = 5, exerciseName = "Stiff com Barra", muscleGroup = "Isquiotibiais / Glúteo", sets = 4, repsMin = 10, repsMax = 12, currentWeightKg = 50f, restSeconds = 90, orderIndex = 1, notes = "Coluna ereta, quadril para trás, joelhos semiflexionados", biomechanicsGuide = "Sinta o alongamento intenso dos posteriores."),
-        WorkoutExercise(id = 20, routineId = 5, exerciseName = "Mesa Flexora", muscleGroup = "Isquiotibiais", sets = 4, repsMin = 10, repsMax = 12, currentWeightKg = 40f, restSeconds = 60, orderIndex = 2, notes = "Quadril colado no banco", biomechanicsGuide = "Flexão completa sem soltar o peso no final."),
-        WorkoutExercise(id = 21, routineId = 5, exerciseName = "Rosca Direta com Barra W", muscleGroup = "Bíceps", sets = 4, repsMin = 10, repsMax = 12, currentWeightKg = 25f, restSeconds = 60, orderIndex = 3, notes = "Punhos firmes e cotovelos fixos ao lado do corpo", biomechanicsGuide = "Controle total na descida excêntrica."),
-        WorkoutExercise(id = 22, routineId = 5, exerciseName = "Rosca Martelo com Halteres", muscleGroup = "Braquiorradial / Bíceps", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 14f, restSeconds = 60, orderIndex = 4, notes = "Pegada neutra para fortalecer braquial e antebraço", biomechanicsGuide = "Movimento alternado ou simultâneo."),
-        WorkoutExercise(id = 23, routineId = 5, exerciseName = "Tríceps Corda na Polia", muscleGroup = "Tríceps", sets = 4, repsMin = 12, repsMax = 15, currentWeightKg = 25f, restSeconds = 60, orderIndex = 5, notes = "Abra a corda na parte inferior para contração máxima", biomechanicsGuide = "Extensão com rotação externa dos punhos.")
+        // Treino E: Braços Completo (Bíceps & Tríceps)
+        WorkoutExercise(id = 24, routineId = 4, exerciseName = "Rosca Direta com Barra W", muscleGroup = "Bíceps", sets = 4, repsMin = 8, repsMax = 12, currentWeightKg = 25f, restSeconds = 60, orderIndex = 1, notes = "Punhos firmes e cotovelos fixos ao lado do corpo", biomechanicsGuide = "Controle total na descida excêntrica sem balanço."),
+        WorkoutExercise(id = 25, routineId = 4, exerciseName = "Rosca Martelo Alternada", muscleGroup = "Bíceps", sets = 4, repsMin = 10, repsMax = 12, currentWeightKg = 14f, restSeconds = 60, orderIndex = 2, notes = "Pegada neutra para fortalecer braquial e antebraço", biomechanicsGuide = "Movimento alternado com cadência controlada."),
+        WorkoutExercise(id = 26, routineId = 4, exerciseName = "Rosca Polia Alta Unilateral", muscleGroup = "Bíceps", sets = 3, repsMin = 12, repsMax = 15, currentWeightKg = 15f, restSeconds = 60, orderIndex = 3, notes = "Cotovelo na altura do ombro, flexionando até a têmpora", biomechanicsGuide = "Pico de contração de 1 segundo no ponto de máxima flexão."),
+        WorkoutExercise(id = 27, routineId = 4, exerciseName = "Tríceps Pulley Barra W", muscleGroup = "Tríceps", sets = 4, repsMin = 10, repsMax = 12, currentWeightKg = 35f, restSeconds = 60, orderIndex = 4, notes = "Cotovelos colados ao tronco", biomechanicsGuide = "Extensão completa sem balanço lombar."),
+        WorkoutExercise(id = 28, routineId = 4, exerciseName = "Tríceps Testa na Polia", muscleGroup = "Tríceps", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 25f, restSeconds = 60, orderIndex = 5, notes = "Descida controlada, cotovelos apontados para frente/cima", biomechanicsGuide = "Mantenha o braço estático movendo apenas o antebraço."),
+        WorkoutExercise(id = 29, routineId = 4, exerciseName = "Tríceps Francês na Polia Barra W", muscleGroup = "Tríceps", sets = 3, repsMin = 10, repsMax = 12, currentWeightKg = 25f, restSeconds = 60, orderIndex = 6, notes = "Alongamento máximo da cabeça longa do tríceps", biomechanicsGuide = "Cotovelos elevados e fixos ao lado da cabeça.")
     )
 
     // Prepopulated Price History to show inflation tracking

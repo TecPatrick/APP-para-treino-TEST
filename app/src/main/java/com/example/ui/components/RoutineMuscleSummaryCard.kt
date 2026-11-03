@@ -58,9 +58,9 @@ fun normalizeExerciseMuscle(raw: String): TargetMuscle {
         clean.contains("tricep") || clean.contains("trícep") -> TargetMuscle.TRICEPS
         clean.contains("dorsal") || clean.contains("dorsais") || clean.contains("lat") -> TargetMuscle.LATS
         clean.contains("costa") || clean.contains("back") -> TargetMuscle.UPPER_BACK
-        clean.contains("isquio") || clean.contains("posterior") || clean.contains("hamstring") -> TargetMuscle.HAMSTRINGS
-        clean.contains("quad") || clean.contains("perna") -> TargetMuscle.QUADRICEPS
-        clean.contains("glúteo") || clean.contains("glute") -> TargetMuscle.GLUTES
+        clean.contains("isquio") || clean.contains("posterior") || clean.contains("hamstring") || clean.contains("flexor") -> TargetMuscle.HAMSTRINGS
+        clean.contains("quad") || clean.contains("perna") || clean.contains("extensor") || clean.contains("adutor") || clean.contains("hack") || clean.contains("leg") -> TargetMuscle.QUADRICEPS
+        clean.contains("glúteo") || clean.contains("glute") || clean.contains("abdutor") || clean.contains("pélvic") || clean.contains("pelvic") -> TargetMuscle.GLUTES
         clean.contains("abdom") || clean.contains("core") || clean.contains("abs") -> TargetMuscle.ABDOMINALS
         clean.contains("antebraço") || clean.contains("forearm") -> TargetMuscle.FOREARMS
         clean.contains("trapéz") || clean.contains("trap") -> TargetMuscle.TRAPS

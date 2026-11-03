@@ -449,6 +449,33 @@ object ExerciseGifMapper {
             eccentricPhase = "Desça controladamente até 90 graus com as costas apoiadas.",
             postureTip = "Mantenha os pés alinhados com os ombros e lombar colada no encosto."
         ),
+        ExerciseVisualGuide(
+            exerciseName = "Cadeira Abdutora",
+            muscleGroup = "Glúteos & Abdutores",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/seated-hip-abduction/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Seated-Hip-Abduction.gif",
+            concentricPhase = "Abra afastando os joelhos e contraindo os glúteos.",
+            eccentricPhase = "Retorne aproximando as pernas de forma lenta e controlada.",
+            postureTip = "Mantenha o tronco firme e apoiado no encosto."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Cadeira Adutora",
+            muscleGroup = "Adutores & Quadríceps",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/seated-hip-adduction/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/02/Seated-Hip-Adduction.gif",
+            concentricPhase = "Feche as pernas aproximando os joelhos no centro.",
+            eccentricPhase = "Abra controlando a volta sem bater os pesos.",
+            postureTip = "Mantenha a coluna ereta e joelhos alinhados com o suporte."
+        ),
+        ExerciseVisualGuide(
+            exerciseName = "Extensora em Pé",
+            muscleGroup = "Quadríceps",
+            fitnessProgrammerUrl = "https://fitnessprogramer.com/exercise/standing-leg-extension/",
+            gifUrl = "https://fitnessprogramer.com/wp-content/uploads/2021/06/Standing-Cable-Leg-Extension.gif",
+            concentricPhase = "Estenda o joelho elevando a carga e contraindo o quadríceps.",
+            eccentricPhase = "Flexione o joelho devagar retornando à posição inicial.",
+            postureTip = "Mantenha o quadril alinhado e o tronco estável."
+        ),
 
         // === ABDÔMEN & CORE ===
         ExerciseVisualGuide(
@@ -967,6 +994,70 @@ object ExerciseGifMapper {
         map["Panturrilha no Smith em Pé"] = panturrilha
         map["Panturrilha"] = panturrilha
         map["Panturrilha em Pé no Smith"] = panturrilha
+
+        // Aliases específicos para as fichas A, B, C e E
+        map["Supino Reto"] = supinoReto
+        map["Supino Inclinado 30°"] = supinoInclinado
+        map["Supino Inclinado 30"] = supinoInclinado
+        map["Crucifixo Polia Alta"] = crossover
+        map["Crucifixo Máquina"] = voador
+        map["Cruxifixo polia alta"] = crossover
+        map["Cruxufixo maquina"] = voador
+        map["Tríceps Pulley Barra W"] = tricepsCorda
+        map["Triceps pulley barra w"] = tricepsCorda
+        map["Tríceps Testa na Polia"] = tricepsTesta
+        map["Triceps testa na polia"] = tricepsTesta
+        map["Tríceps Francês na Polia Barra W"] = tricepsFrances
+        map["triceps frances na polia barra W"] = tricepsFrances
+
+        map["Puxada Alta Pronada na Polia"] = puxadaAlta
+        map["puxada alta pronada na polia"] = puxadaAlta
+        map["Puxada Triângulo"] = puxadaAlta
+        map["puxada triangulo"] = puxadaAlta
+        map["Remada Baixa"] = remadaBaixa
+        map["Remada Curvada"] = remadaCurvada
+
+        map["Rosca Direta"] = roscaDireta
+        map["Rosca Martelo Alternada"] = roscaMartelo
+        map["Rosca martelo Alternada"] = roscaMartelo
+        map["Rosca Scott"] = roscaScott
+        val roscaInversa = catalogGuides.first { it.exerciseName == "Rosca Inversa com Barra" }
+        map["Rosca Inversa Barra W"] = roscaInversa
+        map["Rosca Inversa barra W"] = roscaInversa
+
+        val abdutora = catalogGuides.first { it.exerciseName == "Cadeira Abdutora" }
+        map["Cadeira Abdutora"] = abdutora
+        map["Abdutora"] = abdutora
+
+        val adutora = catalogGuides.first { it.exerciseName == "Cadeira Adutora" }
+        map["Cadeira Adutora"] = adutora
+        map["adutora"] = adutora
+
+        map["Cadeira Flexora"] = flexoraCadeira
+        map["cadeira flexora"] = flexoraCadeira
+
+        val extensoraEmPe = catalogGuides.first { it.exerciseName == "Extensora em Pé" }
+        map["Extensora em Pé"] = extensoraEmPe
+        map["extensora em pe"] = extensoraEmPe
+
+        map["Cadeira Extensora"] = extensora
+        map["cadeira extensora"] = extensora
+
+        val elevacaoPelvica = catalogGuides.first { it.exerciseName == "Elevação Pélvica com Barra" }
+        map["Elevação Pélvica"] = elevacaoPelvica
+        map["elevação pélvica"] = elevacaoPelvica
+
+        map["Leg Press 45°"] = legPress
+        map["legpress 45"] = legPress
+
+        val agachamentoHack = catalogGuides.first { it.exerciseName == "Agachamento Hack" }
+        map["Agachamento Hack 45°"] = agachamentoHack
+        map["agachemento hack 45"] = agachamentoHack
+
+        map["Rosca Direta com Barra W"] = roscaDireta
+        map["rosca direta com barra W"] = roscaDireta
+        map["Rosca Polia Alta Unilateral"] = roscaConcentrada
+        map["Rosca polia alta unilateral"] = roscaConcentrada
 
         map
     }

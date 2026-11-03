@@ -203,7 +203,16 @@ fun WorkoutScreen(
             onOpenGuide = { guide -> selectedExerciseGuide = guide },
             onSubstituteExercise = { exercise -> exerciseToSubstitute = exercise },
             onAddExerciseClick = { showSingleExerciseAddDialog = true },
-            onAdjustRest = { delta -> viewModel.adjustRestTimer(delta) }
+            onAdjustRest = { delta -> viewModel.adjustRestTimer(delta) },
+            onAddSet = { exercise -> viewModel.addSetToExercise(exercise) },
+            onRemoveSet = { exercise -> viewModel.removeSetFromExercise(exercise) },
+            onToggleSound = { viewModel.toggleWorkoutSound() },
+            onUpdateLoggedSet = { exercise, setIndex, reps, weight ->
+                viewModel.updateLoggedSetDetails(exercise.id, setIndex, reps, weight)
+            },
+            onRemoveLoggedSet = { exercise, setIndex ->
+                viewModel.removeLoggedSet(exercise.id, setIndex)
+            }
         )
     } else {
         // --- VIEW 1: FICHAS DE TREINO LIST & DIVISIONS ---

@@ -47,6 +47,7 @@ import com.example.data.model.CardioLog
 import com.example.data.repository.VirtusRepository
 import com.example.util.MacroCalculator
 import com.example.util.PdfExporter
+import com.example.util.WorkoutAudioHapticHelper
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -88,8 +89,11 @@ data class ActiveWorkoutSession(
     val currentExerciseIndex: Int = 0,
     val completedSetsCount: Int = 0,
     val restTimerRemainingSeconds: Int = 0,
+    val restTimerTotalSeconds: Int = 90,
     val isRestTimerRunning: Boolean = false,
     val isRestTimerFinished: Boolean = false,
+    val isWorkoutSoundEnabled: Boolean = true,
+    val isWorkoutHapticEnabled: Boolean = true,
     val loggedExerciseSets: Map<Long, List<Pair<Int, Float>>> = emptyMap()
 )
 
@@ -142,6 +146,14 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     val isAuthLoading: StateFlow<Boolean> get() = authController.isAuthLoading
     val authError: StateFlow<String?> get() = authController.authError
     fun clearAuthError() = authController.clearAuthError()
+
+    init {
+        try {
+            WorkoutAudioHapticHelper.init(application)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 
     private val _aiAdvice = MutableStateFlow<String?>(null)
     val aiAdvice: StateFlow<String?> = _aiAdvice.asStateFlow()
@@ -319,7 +331,15 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                     repository.insertMealPlanItems(com.example.data.local.PrepopulatedData.defaultMealPlan)
                 }
                 val currentRoutines = repository.workoutRoutines.firstOrNull() ?: emptyList()
-                if (currentRoutines.isEmpty()) {
+                val isOldDefaultRoutines = currentRoutines.any {
+                    it.title.contains("Peitoral, Deltoide Anterior e Tríceps") ||
+                    it.title.contains("D — Ombros Completo") ||
+                    it.letter == "D"
+                }
+                if (currentRoutines.isEmpty() || isOldDefaultRoutines) {
+                    for (r in currentRoutines) {
+                        repository.deleteWorkoutRoutine(r.id)
+                    }
                     for (routine in com.example.data.local.PrepopulatedData.defaultRoutines) {
                         repository.addWorkoutRoutine(routine)
                     }
@@ -346,7 +366,7 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 for (exercise in com.example.data.local.PrepopulatedData.defaultExercises) {
                     repository.addWorkoutExercise(exercise)
                 }
-                _toastMessage.value = "Fichas padrão (Divisão ABCDE) restauradas com sucesso!"
+                _toastMessage.value = "Fichas padrão (Treinos A, B, C e E) restauradas com sucesso!"
             } catch (e: Exception) {
                 e.printStackTrace()
                 _toastMessage.value = "Erro ao restaurar fichas: ${e.message}"
@@ -2173,10 +2193,17 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         // Ensure duration is based on exercise setting, otherwise default to 90s
         val duration = exercise.restSeconds.coerceAtLeast(30)
         
+        WorkoutAudioHapticHelper.playRestStarted(
+            getApplication(),
+            current.isWorkoutSoundEnabled,
+            current.isWorkoutHapticEnabled
+        )
+
         _activeWorkout.value = current.copy(
             completedSetsCount = current.completedSetsCount + 1,
             loggedExerciseSets = updatedMap,
             restTimerRemainingSeconds = duration,
+            restTimerTotalSeconds = duration,
             isRestTimerRunning = true,
             isRestTimerFinished = false
         )
@@ -2186,7 +2213,6 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
             while (remaining > 0) {
                 delay(1000)
                 remaining--
-                // Check if user manually updated or skipped
                 val updatedSession = _activeWorkout.value
                 if (!updatedSession.isRestTimerRunning && updatedSession.restTimerRemainingSeconds == remaining) {
                    break
@@ -2194,38 +2220,39 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 _activeWorkout.value = updatedSession.copy(
                     restTimerRemainingSeconds = remaining
                 )
+                // Countdown warning ticks during final 3 seconds
+                if (remaining in 1..3) {
+                    WorkoutAudioHapticHelper.playCountdownTick(
+                        getApplication(),
+                        updatedSession.isWorkoutSoundEnabled,
+                        updatedSession.isWorkoutHapticEnabled
+                    )
+                }
             }
             _activeWorkout.value = _activeWorkout.value.copy(
                 isRestTimerRunning = false,
                 isRestTimerFinished = true
             )
-            triggerRestFinishedVibration()
+            WorkoutAudioHapticHelper.playRestFinished(
+                getApplication(),
+                _activeWorkout.value.isWorkoutSoundEnabled,
+                _activeWorkout.value.isWorkoutHapticEnabled
+            )
         }
     }
 
-    private fun triggerRestFinishedVibration() {
-        try {
-            val app = getApplication<Application>()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val vibratorManager = app.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
-                vibratorManager?.defaultVibrator?.vibrate(
-                    VibrationEffect.createWaveform(longArrayOf(0, 400, 200, 400), -1)
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                val vibrator = app.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    vibrator?.vibrate(
-                        VibrationEffect.createWaveform(longArrayOf(0, 400, 200, 400), -1)
-                    )
-                } else {
-                    @Suppress("DEPRECATION")
-                    vibrator?.vibrate(longArrayOf(0, 400, 200, 400), -1)
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+    fun toggleWorkoutSound() {
+        val current = _activeWorkout.value
+        val newVal = !current.isWorkoutSoundEnabled
+        _activeWorkout.value = current.copy(isWorkoutSoundEnabled = newVal)
+        _toastMessage.value = if (newVal) "Sons de treino ativados 🔊" else "Sons de treino silenciados 🔇"
+    }
+
+    fun toggleWorkoutHaptic() {
+        val current = _activeWorkout.value
+        val newVal = !current.isWorkoutHapticEnabled
+        _activeWorkout.value = current.copy(isWorkoutHapticEnabled = newVal)
+        _toastMessage.value = if (newVal) "Vibrações táteis ativadas 📳" else "Vibrações táteis desativadas"
     }
 
     fun cancelRestTimer() {
@@ -2243,9 +2270,75 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         logSetAndStartRest(exercise, reps, weight)
     }
 
+    fun updateLoggedSetDetails(exerciseId: Long, setIndex: Int, reps: Int, weightKg: Float) {
+        val current = _activeWorkout.value
+        val list = current.loggedExerciseSets[exerciseId]?.toMutableList() ?: return
+        val zeroBasedIdx = setIndex - 1
+        if (zeroBasedIdx in list.indices) {
+            list[zeroBasedIdx] = Pair(reps.coerceAtLeast(1), weightKg.coerceAtLeast(0f))
+            val updatedMap = current.loggedExerciseSets + (exerciseId to list.toList())
+            _activeWorkout.value = current.copy(loggedExerciseSets = updatedMap)
+            _toastMessage.value = "Série $setIndex ajustada: $reps reps @ ${weightKg.toInt()} kg"
+        }
+    }
+
+    fun removeLoggedSet(exerciseId: Long, setIndex: Int) {
+        val current = _activeWorkout.value
+        val list = current.loggedExerciseSets[exerciseId]?.toMutableList() ?: return
+        val zeroBasedIdx = setIndex - 1
+        if (zeroBasedIdx in list.indices) {
+            list.removeAt(zeroBasedIdx)
+            val updatedMap = current.loggedExerciseSets + (exerciseId to list.toList())
+            _activeWorkout.value = current.copy(
+                completedSetsCount = (current.completedSetsCount - 1).coerceAtLeast(0),
+                loggedExerciseSets = updatedMap
+            )
+            _toastMessage.value = "Série $setIndex desmarcada"
+        }
+    }
+
     fun updateExerciseWeight(exercise: WorkoutExercise, newWeight: Float) {
         viewModelScope.launch {
             repository.updateWorkoutExercise(exercise.copy(currentWeightKg = newWeight))
+            val currentActive = _activeWorkout.value
+            if (currentActive.isRunning) {
+                val updatedExercises = currentActive.exercises.map { ex ->
+                    if (ex.id == exercise.id) ex.copy(currentWeightKg = newWeight) else ex
+                }
+                _activeWorkout.value = currentActive.copy(exercises = updatedExercises)
+            }
+        }
+    }
+
+    fun addSetToExercise(exercise: WorkoutExercise) {
+        val newSets = exercise.sets + 1
+        viewModelScope.launch {
+            repository.updateWorkoutExercise(exercise.copy(sets = newSets))
+            val currentActive = _activeWorkout.value
+            WorkoutAudioHapticHelper.playSetLoggedTick(getApplication(), currentActive.isWorkoutHapticEnabled)
+            if (currentActive.isRunning) {
+                val updatedExercises = currentActive.exercises.map { ex ->
+                    if (ex.id == exercise.id) ex.copy(sets = newSets) else ex
+                }
+                _activeWorkout.value = currentActive.copy(exercises = updatedExercises)
+            }
+            _toastMessage.value = "+1 série adicionada ao ${exercise.exerciseName}! Total: $newSets séries"
+        }
+    }
+
+    fun removeSetFromExercise(exercise: WorkoutExercise) {
+        if (exercise.sets <= 1) return
+        val newSets = exercise.sets - 1
+        viewModelScope.launch {
+            repository.updateWorkoutExercise(exercise.copy(sets = newSets))
+            val currentActive = _activeWorkout.value
+            if (currentActive.isRunning) {
+                val updatedExercises = currentActive.exercises.map { ex ->
+                    if (ex.id == exercise.id) ex.copy(sets = newSets) else ex
+                }
+                _activeWorkout.value = currentActive.copy(exercises = updatedExercises)
+            }
+            _toastMessage.value = "Série removida do ${exercise.exerciseName}. Total: $newSets séries"
         }
     }
 
