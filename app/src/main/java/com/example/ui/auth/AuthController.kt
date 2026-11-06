@@ -2,12 +2,10 @@ package com.example.ui.auth
 
 import com.example.data.auth.FirebaseAuthService
 import com.example.data.firestore.FirestoreSyncManager
-import com.example.data.model.*
+import com.example.data.model.UserProfile
 import com.example.data.repository.VirtusRepository
-import com.example.util.AuthValidator
-import com.example.util.MacroCalculator
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -19,7 +17,8 @@ class AuthController(
     private val authService: FirebaseAuthService,
     private val firestoreSync: FirestoreSyncManager,
     private val profile: () -> UserProfile,
-    private val showMessage: (String) -> Unit
+    private val showMessage: (String) -> Unit,
+    private val onTriggerDeltaSync: () -> Unit = {}
 ) {
     private val _isAuthLoading = MutableStateFlow(false)
     val isAuthLoading = _isAuthLoading.asStateFlow()
@@ -31,6 +30,11 @@ class AuthController(
         _authError.value = null
     }
 
+    /**
+     * Preserves local Room records when transitioning from Guest/Local mode to Google Sign-In
+     * so Delta Sync can merge them with the cloud. Only clears local cache if switching between
+     * two distinct authenticated Google UIDs.
+     */
     private suspend fun localProfileForUser(uid: String): UserProfile {
         val current = profile()
         val previousUid = current.firebaseUid
@@ -83,7 +87,80 @@ class AuthController(
         }
     }
 
-    // Login state is persisted before notifying the UI.
+    /**
+     * Auto-login Google: Restaura automaticamente a sessão ativa do Firebase Auth ao abrir o app
+     * e dispara a sincronização incremental (Delta Sync) em segundo plano.
+     */
+    fun restoreActiveFirebaseSession(onRestored: () -> Unit = {}) {
+        val firebaseUser = authService.currentUser ?: return
+        val current = profile()
+        if (current.isLoggedIn && current.firebaseUid == firebaseUser.uid && current.hasCompletedOnboarding) {
+            onTriggerDeltaSync()
+            onRestored()
+            return
+        }
+
+        scope.launch {
+            try {
+                val baseProfile = localProfileForUser(firebaseUser.uid)
+                val remoteProfile = runCatching {
+                    firestoreSync.fetchProfileFromCloud(firebaseUser.uid).getOrNull()
+                }.getOrNull()
+
+                val merged = mergeLocalAndCloudProfile(
+                    local = baseProfile,
+                    remote = remoteProfile,
+                    uid = firebaseUser.uid,
+                    email = firebaseUser.email,
+                    displayName = firebaseUser.displayName
+                )
+                repository.saveUserProfile(merged)
+                onTriggerDeltaSync()
+                onRestored()
+            } catch (_: Exception) {
+                // Keep current state if background restoration fails
+            }
+        }
+    }
+
+    private fun mergeLocalAndCloudProfile(
+        local: UserProfile,
+        remote: UserProfile?,
+        uid: String,
+        email: String?,
+        displayName: String?
+    ): UserProfile {
+        val resolvedEmail = email?.takeIf { it.isNotBlank() }
+            ?: remote?.email?.takeIf { it.isNotBlank() && !it.endsWith("@growth.local") }
+            ?: local.email
+        val resolvedName = remote?.name?.takeIf { it.isNotBlank() && it != "Atleta" && it != "Atleta Growth" }
+            ?: local.name.takeIf { it.isNotBlank() && it != "Atleta" && it != "Atleta Growth" }
+            ?: displayName?.takeIf { it.isNotBlank() }
+            ?: "Atleta Virtus"
+
+        return if (remote != null) {
+            remote.copy(
+                id = 1,
+                isLoggedIn = true,
+                hasCompletedOnboarding = true,
+                email = resolvedEmail,
+                name = resolvedName,
+                firebaseUid = uid,
+                isBiometricLockEnabled = local.isBiometricLockEnabled || remote.isBiometricLockEnabled
+            )
+        } else {
+            local.copy(
+                id = 1,
+                isLoggedIn = true,
+                hasCompletedOnboarding = true,
+                email = resolvedEmail,
+                name = resolvedName,
+                firebaseUid = uid
+            )
+        }
+    }
+
+    // Login state is persisted and local data is merged via Delta Sync before notifying the UI.
     fun loginWithGoogleCredential(
         credential: com.google.firebase.auth.AuthCredential,
         onSuccess: () -> Unit
@@ -95,23 +172,28 @@ class AuthController(
 
             result.onSuccess { user ->
                 val current = localProfileForUser(user.uid)
+                val remoteProfile = runCatching {
+                    firestoreSync.fetchProfileFromCloud(user.uid)?.getOrNull()
+                }.getOrNull()
 
-                val hasOnboarded = true
-
-                val updated = current.copy(
-                    isLoggedIn = true,
-                    hasCompletedOnboarding = hasOnboarded,
-                    email = user.email ?: current.email,
-                    name = user.displayName ?: current.name,
-                    firebaseUid = user.uid
+                val updated = mergeLocalAndCloudProfile(
+                    local = current,
+                    remote = remoteProfile,
+                    uid = user.uid,
+                    email = user.email,
+                    displayName = user.displayName
                 )
 
                 repository.saveUserProfile(updated)
-                firestoreSync.syncProfileToCloud(updated)
+                runCatching {
+                    firestoreSync.recordLocalProfileMutation(user.uid)
+                    firestoreSync.syncProfileToCloud(updated)
+                }
+                onTriggerDeltaSync()
 
                 showMessage(
-                    "Login com Google realizado com sucesso! " +
-                        "Bem-vindo, ${user.displayName ?: current.name}."
+                    "Login Google confirmado! Dados sincronizados via Delta Sync — " +
+                        "Bem-vindo(a), ${updated.name.ifBlank { user.displayName ?: "Atleta" }} 💪"
                 )
 
                 onSuccess()
@@ -159,7 +241,7 @@ class AuthController(
 
             repository.saveUserProfile(updated)
 
-            showMessage("Bem-vindo! Modo local ativado.")
+            showMessage("Bem-vindo! Modo local ativado (dados serão mesclados ao conectar o Google).")
             onSuccess()
         }
     }
@@ -216,6 +298,7 @@ class AuthController(
             val updated = current.copy(isLoggedIn = true)
 
             repository.saveUserProfile(updated)
+            onTriggerDeltaSync()
 
             showMessage(
                 "Autenticação biométrica confirmada " +

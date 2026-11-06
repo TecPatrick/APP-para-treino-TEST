@@ -671,32 +671,44 @@ fun MultiExerciseLibraryPickerModal(
                                     .padding(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Animated GIF Preview Thumbnail Box
+                                // Uncropped 1:1 Exercise GIF Preview Thumbnail Box
                                 Box(
                                     modifier = Modifier
-                                        .size(width = 68.dp, height = 56.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(CarbonDark)
+                                        .size(58.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFF0D0F12))
+                                        .border(1.dp, CarbonBorder, RoundedCornerShape(10.dp))
                                 ) {
                                     SubcomposeAsyncImage(
                                         model = ImageRequest.Builder(context)
                                             .data(guide.gifUrl)
+                                            .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
                                             .crossfade(true)
                                             .build(),
                                         imageLoader = gifImageLoader,
                                         contentDescription = guide.exerciseName,
-                                        contentScale = ContentScale.Crop,
+                                        contentScale = ContentScale.Fit,
                                         loading = {
                                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                                CircularProgressIndicator(color = GrowthOrange, modifier = Modifier.size(20.dp))
+                                                CircularProgressIndicator(color = GrowthOrange, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                                             }
                                         },
                                         error = {
                                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                                Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = GrowthOrange, modifier = Modifier.size(20.dp))
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = GrowthOrange, modifier = Modifier.size(18.dp))
+                                                    Text(
+                                                        text = guide.muscleGroup.take(4).uppercase(),
+                                                        fontSize = 8.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = GrowthCyan
+                                                    )
+                                                }
                                             }
                                         },
-                                        modifier = Modifier.fillMaxSize()
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(3.dp)
                                     )
                                 }
 

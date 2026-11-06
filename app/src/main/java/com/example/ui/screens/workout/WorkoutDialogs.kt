@@ -156,13 +156,15 @@ fun ExerciseBiomechanicsGuideModal(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(180.dp)
+                        .height(210.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(CarbonDark)
+                        .background(Color(0xFF0D0F12))
+                        .border(1.dp, CarbonBorder, RoundedCornerShape(12.dp))
                 ) {
                     SubcomposeAsyncImage(
                         model = ImageRequest.Builder(context)
                             .data(guide.gifUrl)
+                            .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
                             .crossfade(true)
                             .build(),
                         imageLoader = gifImageLoader,
@@ -176,13 +178,25 @@ fun ExerciseBiomechanicsGuideModal(
                         error = {
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = GrowthOrange, modifier = Modifier.size(36.dp))
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Text(guide.muscleGroup, fontSize = 12.sp, color = GrowthOrangeLight)
+                                    Surface(
+                                        color = GrowthOrange.copy(alpha = 0.16f),
+                                        shape = CircleShape,
+                                        border = BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.5f)),
+                                        modifier = Modifier.size(56.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = GrowthOrange, modifier = Modifier.size(28.dp))
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(guide.muscleGroup.uppercase(), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = GrowthCyan)
+                                    Text("Demonstração Anatômica", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         },
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(6.dp)
                     )
                 }
 
@@ -382,18 +396,25 @@ fun WorkoutHistoryModal(
 @Composable
 fun AddExerciseDialog(
     routine: WorkoutRoutine? = null,
+    isWorkoutActive: Boolean = false,
     onDismiss: () -> Unit,
     onConfirm: ((name: String, group: String, sets: Int, rMin: Int, rMax: Int, weight: Float, rest: Int, notes: String) -> Unit)? = null,
+    onConfirmWithScope: ((name: String, group: String, sets: Int, rMin: Int, rMax: Int, weight: Float, rest: Int, notes: String, savePermanently: Boolean) -> Unit)? = null,
     onAdd: ((name: String, group: String, sets: Int, reps: Int, weight: Float) -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val isFreeWorkout = routine?.id == 99999L
     var selectedTab by remember { mutableStateOf(0) } // 0 = Biblioteca com GIFs, 1 = Personalizado
+    // Se estiver no meio de um treino ativo (não livre), permite escolher se vale só para hoje ou permanente (padrão: só hoje para agilidade, ou escolha rápida)
+    var savePermanently by remember(isWorkoutActive, isFreeWorkout) {
+        mutableStateOf(!isWorkoutActive && !isFreeWorkout)
+    }
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedMuscleFilter by remember { mutableStateOf("Todos") }
 
     var customName by remember { mutableStateOf("") }
-    var customGroup by remember { mutableStateOf("Peito") }
+    var customGroup by remember { mutableStateOf("Peitoral") }
     var setsText by remember { mutableStateOf("4") }
     var repsText by remember { mutableStateOf("10") }
     var weightText by remember { mutableStateOf("30") }
@@ -432,13 +453,87 @@ fun AddExerciseDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Adicionar Exercício", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onBackground)
+                    Text(
+                        text = if (isWorkoutActive) "Incluir Exercício no Treino" else "Adicionar Exercício",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
                     IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
                         Icon(Icons.Default.Close, contentDescription = "Fechar", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                // Seletor de Escopo quando o treino está ativo (Só Hoje vs Permanente na Ficha)
+                if (isWorkoutActive && !isFreeWorkout) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Como deseja salvar este exercício?",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            color = if (!savePermanently) GrowthGreen.copy(alpha = 0.2f) else CarbonDark,
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, if (!savePermanently) GrowthGreen else CarbonBorder),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { savePermanently = false }
+                                .testTag("scope_today_only_btn")
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp)) {
+                                Text(
+                                    text = "⚡ Só para hoje",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (!savePermanently) GrowthGreen else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Surface(
+                            color = if (savePermanently) GrowthOrange.copy(alpha = 0.2f) else CarbonDark,
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, if (savePermanently) GrowthOrange else CarbonBorder),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { savePermanently = true }
+                                .testTag("scope_permanent_btn")
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp)) {
+                                Text(
+                                    text = "📌 Fixar na ficha",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (savePermanently) GrowthOrange else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                } else if (isFreeWorkout) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Surface(
+                        color = GrowthGreen.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, GrowthGreen.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "⚡ Treino Livre: o exercício entra direto na sua sessão de hoje.",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = GrowthGreen,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Tab Selector (Biblioteca com GIFs vs Manual)
                 Row(modifier = Modifier.fillMaxWidth()) {
@@ -449,8 +544,8 @@ fun AddExerciseDialog(
                             .weight(1f)
                             .clickable { selectedTab = 0 }
                     ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 6.dp)) {
-                            Text("🎥 Biblioteca com GIFs", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (selectedTab == 0) Color.White else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 7.dp)) {
+                            Text("🎥 Catálogo com GIFs", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (selectedTab == 0) Color.White else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                     Surface(
@@ -460,8 +555,8 @@ fun AddExerciseDialog(
                             .weight(1f)
                             .clickable { selectedTab = 1 }
                     ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 6.dp)) {
-                            Text("✏️ Outro / Manual", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (selectedTab == 1) Color.White else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 7.dp)) {
+                            Text("✏️ Criar Manual", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (selectedTab == 1) Color.White else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -505,7 +600,7 @@ fun AddExerciseDialog(
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(260.dp),
+                            .height(250.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         items(filteredCatalog) { guide ->
@@ -521,6 +616,7 @@ fun AddExerciseDialog(
                                         val w = weightText.toFloatOrNull() ?: 30f
                                         val rest = restText.toIntOrNull() ?: 90
 
+                                        onConfirmWithScope?.invoke(guide.exerciseName, guide.muscleGroup, s, r, r, w, rest, guide.postureTip, savePermanently)
                                         onConfirm?.invoke(guide.exerciseName, guide.muscleGroup, s, r, r, w, rest, guide.postureTip)
                                         onAdd?.invoke(guide.exerciseName, guide.muscleGroup, s, r, w)
                                     }
@@ -531,32 +627,44 @@ fun AddExerciseDialog(
                                         .padding(8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // GIF Thumbnail
+                                    // Uncropped 1:1 Exercise GIF Thumbnail
                                     Box(
                                         modifier = Modifier
-                                            .size(width = 64.dp, height = 52.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(CarbonDark)
+                                            .size(58.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(Color(0xFF0D0F12))
+                                            .border(1.dp, CarbonBorder, RoundedCornerShape(10.dp))
                                     ) {
                                         SubcomposeAsyncImage(
                                             model = ImageRequest.Builder(context)
                                                 .data(guide.gifUrl)
+                                                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
                                                 .crossfade(true)
                                                 .build(),
                                             imageLoader = gifImageLoader,
                                             contentDescription = guide.exerciseName,
-                                            contentScale = ContentScale.Crop,
+                                            contentScale = ContentScale.Fit,
                                             loading = {
                                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                                    CircularProgressIndicator(color = GrowthOrange, modifier = Modifier.size(18.dp))
+                                                    CircularProgressIndicator(color = GrowthOrange, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                                                 }
                                             },
                                             error = {
                                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                                    Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = GrowthOrange, modifier = Modifier.size(18.dp))
+                                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                        Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = GrowthOrange, modifier = Modifier.size(18.dp))
+                                                        Text(
+                                                            text = guide.muscleGroup.take(4).uppercase(),
+                                                            fontSize = 8.sp,
+                                                            fontWeight = FontWeight.ExtraBold,
+                                                            color = GrowthCyan
+                                                        )
+                                                    }
                                                 }
                                             },
-                                            modifier = Modifier.fillMaxSize()
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(3.dp)
                                         )
                                     }
 
@@ -575,6 +683,7 @@ fun AddExerciseDialog(
                                             val w = weightText.toFloatOrNull() ?: 30f
                                             val rest = restText.toIntOrNull() ?: 90
 
+                                            onConfirmWithScope?.invoke(guide.exerciseName, guide.muscleGroup, s, r, r, w, rest, guide.postureTip, savePermanently)
                                             onConfirm?.invoke(guide.exerciseName, guide.muscleGroup, s, r, r, w, rest, guide.postureTip)
                                             onAdd?.invoke(guide.exerciseName, guide.muscleGroup, s, r, w)
                                         },
@@ -582,7 +691,7 @@ fun AddExerciseDialog(
                                         shape = RoundedCornerShape(6.dp),
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                                     ) {
-                                        Text("+ Add", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                        Text("+ Incluir", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                     }
                                 }
                             }
@@ -646,13 +755,14 @@ fun AddExerciseDialog(
                             val w = weightText.toFloatOrNull() ?: 20f
                             val rest = restText.toIntOrNull() ?: 90
 
+                            onConfirmWithScope?.invoke(customName, customGroup, s, r, r, w, rest, "", savePermanently)
                             onConfirm?.invoke(customName, customGroup, s, r, r, w, rest, "")
                             onAdd?.invoke(customName, customGroup, s, r, w)
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange)
                 ) {
-                    Text("Adicionar Customizado", color = Color.White)
+                    Text("Incluir Exercício", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         },
@@ -669,11 +779,17 @@ fun AddExerciseDialog(
 fun SubstituteExerciseDialog(
     currentExercise: WorkoutExercise,
     gifImageLoader: ImageLoader,
+    isWorkoutActive: Boolean = false,
+    isFreeWorkout: Boolean = false,
     onDismiss: () -> Unit,
-    onSelectSubstitute: (ExerciseVisualGuide) -> Unit
+    onSelectSubstitute: (ExerciseVisualGuide) -> Unit = {},
+    onSelectSubstituteWithScope: ((ExerciseVisualGuide, Boolean) -> Unit)? = null
 ) {
     val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
+    var savePermanently by remember(isWorkoutActive, isFreeWorkout) {
+        mutableStateOf(!isWorkoutActive && !isFreeWorkout)
+    }
     val allGuides = remember { ExerciseGifMapper.getAllAvailableExercises() }
     
     // Auto-detect target muscle group based on current exercise
@@ -703,7 +819,7 @@ fun SubstituteExerciseDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.SwapHoriz, contentDescription = null, tint = GrowthOrange, modifier = Modifier.size(24.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Substituir Exercício", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onBackground)
+                        Text("Trocar Exercício", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onBackground)
                     }
                     IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
                         Icon(Icons.Default.Close, contentDescription = "Fechar", tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -711,10 +827,43 @@ fun SubstituteExerciseDialog(
                 }
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "Aparelho ocupado? Escolha uma variação de mesmo músculo para trocar na ficha:",
+                    text = "Aparelho ocupado? Escolha uma variação do mesmo músculo:",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+
+                if (isWorkoutActive && !isFreeWorkout) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            color = if (!savePermanently) GrowthGreen.copy(alpha = 0.2f) else CarbonDark,
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, if (!savePermanently) GrowthGreen else CarbonBorder),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { savePermanently = false }
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 7.dp)) {
+                                Text("⚡ Trocar só hoje", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (!savePermanently) GrowthGreen else MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        Surface(
+                            color = if (savePermanently) GrowthOrange.copy(alpha = 0.2f) else CarbonDark,
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, if (savePermanently) GrowthOrange else CarbonBorder),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { savePermanently = true }
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(vertical = 7.dp)) {
+                                Text("📌 Trocar na ficha", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (savePermanently) GrowthOrange else MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
             }
         },
         text = {
@@ -758,7 +907,7 @@ fun SubstituteExerciseDialog(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(280.dp),
+                        .height(260.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     items(filteredList) { guide ->
@@ -768,7 +917,10 @@ fun SubstituteExerciseDialog(
                             border = BorderStroke(1.dp, CarbonBorder),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { onSelectSubstitute(guide) }
+                                .clickable {
+                                    onSelectSubstituteWithScope?.invoke(guide, savePermanently)
+                                    onSelectSubstitute(guide)
+                                }
                         ) {
                             Row(
                                 modifier = Modifier
@@ -778,29 +930,41 @@ fun SubstituteExerciseDialog(
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(width = 60.dp, height = 48.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(CarbonDark)
+                                        .size(56.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xFF0D0F12))
+                                        .border(1.dp, CarbonBorder, RoundedCornerShape(10.dp))
                                 ) {
                                     SubcomposeAsyncImage(
                                         model = ImageRequest.Builder(context)
                                             .data(guide.gifUrl)
+                                            .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
                                             .crossfade(true)
                                             .build(),
                                         imageLoader = gifImageLoader,
                                         contentDescription = guide.exerciseName,
-                                        contentScale = ContentScale.Crop,
+                                        contentScale = ContentScale.Fit,
                                         loading = {
                                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                                CircularProgressIndicator(color = GrowthOrange, modifier = Modifier.size(16.dp))
+                                                CircularProgressIndicator(color = GrowthOrange, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                                             }
                                         },
                                         error = {
                                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                                                Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = GrowthOrange.copy(alpha = 0.5f))
+                                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                    Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = GrowthOrange, modifier = Modifier.size(16.dp))
+                                                    Text(
+                                                        text = guide.muscleGroup.take(4).uppercase(),
+                                                        fontSize = 8.sp,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = GrowthCyan
+                                                    )
+                                                }
                                             }
                                         },
-                                        modifier = Modifier.fillMaxSize()
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .padding(3.dp)
                                     )
                                 }
 
@@ -823,7 +987,10 @@ fun SubstituteExerciseDialog(
                                 }
 
                                 Button(
-                                    onClick = { onSelectSubstitute(guide) },
+                                    onClick = {
+                                        onSelectSubstituteWithScope?.invoke(guide, savePermanently)
+                                        onSelectSubstitute(guide)
+                                    },
                                     colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
                                     shape = RoundedCornerShape(6.dp),
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
@@ -845,4 +1012,5 @@ fun SubstituteExerciseDialog(
         }
     )
 }
+
 

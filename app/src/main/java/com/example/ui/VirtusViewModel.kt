@@ -140,12 +140,21 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     val firestoreSync: FirestoreSyncManager = FirestoreSyncManager(application)
 
     private val authController by lazy {
-        com.example.ui.auth.AuthController(viewModelScope, repository, authService, firestoreSync,
-            { userProfile.value }, ::showToast)
+        com.example.ui.auth.AuthController(
+            scope = viewModelScope,
+            repository = repository,
+            authService = authService,
+            firestoreSync = firestoreSync,
+            profile = { userProfile.value },
+            showMessage = ::showToast,
+            onTriggerDeltaSync = { syncAllDataToFirestore() }
+        )
     }
     val isAuthLoading: StateFlow<Boolean> get() = authController.isAuthLoading
     val authError: StateFlow<String?> get() = authController.authError
     fun clearAuthError() = authController.clearAuthError()
+    fun restoreActiveFirebaseSession(onRestored: () -> Unit = {}) =
+        authController.restoreActiveFirebaseSession(onRestored)
 
     init {
         try {
@@ -258,8 +267,9 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 )
                 repository.addMealPlanItem(mealItem)
             }
+            repository.generateAutomatedShoppingList()
             _aiDietSuggestions.value = emptyList()
-            _toastMessage.value = "Plano alimentar IA aplicado com sucesso!"
+            _toastMessage.value = "Plano alimentar IA aplicado e Lista de Compras sincronizada!"
         }
     }
 
@@ -380,10 +390,14 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 val current = userProfile.value
                 val updated = current.copy(isBiometricLockEnabled = enabled)
                 repository.saveUserProfile(updated)
-                _toastMessage.value = if (enabled) "Bloqueio biométrico ativado nos diários" else "Bloqueio biométrico desativado"
+                if (updated.firebaseUid.isNotBlank() && !updated.firebaseUid.startsWith("guest_")) {
+                    firestoreSync.recordLocalProfileMutation(updated.firebaseUid)
+                    firestoreSync.syncProfileToCloud(updated)
+                }
+                _toastMessage.value = if (enabled) "Bloqueio por biometria ativado nos diários 🔒" else "Bloqueio por biometria desativado"
             } catch (e: Exception) {
                 e.printStackTrace()
-                _toastMessage.value = "Erro ao atualizar biometria: ${e.message}"
+                _toastMessage.value = "Não foi possível atualizar a biometria: ${e.message}"
             }
         }
     }
@@ -402,7 +416,7 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                     orderIndex = nextOrder
                 )
                 repository.addWorkoutRoutine(newRoutine)
-                _toastMessage.value = "Ficha $letter criada com sucesso!"
+                _toastMessage.value = "Ficha $letter criada! Agora é só incluir os exercícios 💪"
             } catch (e: Exception) {
                 e.printStackTrace()
                 _toastMessage.value = "Erro ao criar ficha: ${e.message}"
@@ -414,10 +428,43 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             try {
                 repository.insertFoods(com.example.data.local.PrepopulatedData.defaultFoods)
-                _toastMessage.value = "Tabela nutricional sincronizada com ${com.example.data.local.PrepopulatedData.defaultFoods.size} alimentos!"
+                _toastMessage.value = "Catálogo atualizado com ${com.example.data.local.PrepopulatedData.defaultFoods.size} alimentos!"
             } catch (e: Exception) {
                 e.printStackTrace()
                 _toastMessage.value = "Erro ao restaurar base alimentar: ${e.message}"
+            }
+        }
+    }
+
+    private var cloudProfileObserverJob: Job? = null
+    private var observedCloudUid: String? = null
+
+    private fun startCloudProfileObserverIfNeeded(uid: String) {
+        if (uid.isBlank() || uid.startsWith("guest_") || observedCloudUid == uid) return
+        observedCloudUid = uid
+        cloudProfileObserverJob?.cancel()
+        cloudProfileObserverJob = viewModelScope.launch {
+            firestoreSync.observeProfileSnapshotFromCloud(uid).collect { remoteSnapshot ->
+                if (remoteSnapshot != null) {
+                    val local = repository.getUserProfileDirect(1)
+                    val resolution = firestoreSync.reconcileRemoteProfileLWW(
+                        localProfile = local,
+                        remoteProfile = remoteSnapshot.profile,
+                        remoteUpdatedAtMillis = remoteSnapshot.updatedAtMillis,
+                        uid = uid
+                    )
+                    when (resolution.decision) {
+                        com.example.data.firestore.ConflictDecision.APPLY_REMOTE_DELTA -> {
+                            repository.saveUserProfile(resolution.mergedProfile)
+                        }
+                        com.example.data.firestore.ConflictDecision.KEEP_LOCAL_NEWER -> {
+                            if (local != null) {
+                                firestoreSync.syncProfileToCloud(local)
+                            }
+                        }
+                        com.example.data.firestore.ConflictDecision.NO_OP -> Unit
+                    }
+                }
             }
         }
     }
@@ -450,6 +497,7 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                                 } else {
                                     profile.copy(firebaseUid = firebaseUser.uid)
                                 }
+                                startCloudProfileObserverIfNeeded(firebaseUser.uid)
                                 viewModelScope.launch { syncDataFromCloud() }
                                 fallback.value = syncedProfile
                             } else {
@@ -791,8 +839,12 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 repository.clearAllLocalData()
             }.onSuccess {
                 authService.signOut()
+                com.example.data.auth.GoogleCredentialAuthHelper.clearCredentialManagerState(
+                    context = getApplication(),
+                    scope = viewModelScope
+                )
                 _toastMessage.value =
-                    "Você saiu da conta e os dados deste aparelho foram removidos."
+                    "Você saiu da conta e as credenciais deste aparelho foram desconectadas."
             }.onFailure {
                 _toastMessage.value =
                     "Não foi possível limpar os dados locais. " +
@@ -1002,6 +1054,18 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
             )
 
             repository.saveUserProfile(updated)
+            if (updated.firebaseUid.isNotBlank() && !updated.firebaseUid.startsWith("guest_")) {
+                firestoreSync.recordLocalProfileMutation(updated.firebaseUid)
+                firestoreSync.syncProfileToCloud(updated)
+                firestoreSync.syncCaloricGoalsToCloud(
+                    targetCalories = updated.targetCalories,
+                    targetProteinGrams = updated.targetProteinGrams,
+                    targetCarbsGrams = updated.targetCarbsGrams,
+                    targetFatGrams = updated.targetFatGrams,
+                    targetWaterMl = updated.targetWaterMl,
+                    customUid = updated.firebaseUid
+                )
+            }
             repository.saveDietaryProfile(
                 DietaryProfile(
                     id = 1,
@@ -1021,7 +1085,7 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                     fat = plan.fatGrams
                 )
             )
-            _toastMessage.value = "Metas de macros e perfil atualizados e salvos localmente!"
+            _toastMessage.value = "Metas e perfil atualizados com sucesso! 💪"
         }
     }
 
@@ -1090,6 +1154,20 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
             // Persist directly to Room database
             repository.saveUserProfile(updated)
 
+            // Auto-sync to cloud when signed in with a non-guest account
+            if (updated.firebaseUid.isNotBlank() && !updated.firebaseUid.startsWith("guest_")) {
+                firestoreSync.recordLocalProfileMutation(updated.firebaseUid)
+                firestoreSync.syncProfileToCloud(updated)
+                firestoreSync.syncCaloricGoalsToCloud(
+                    targetCalories = updated.targetCalories,
+                    targetProteinGrams = updated.targetProteinGrams,
+                    targetCarbsGrams = updated.targetCarbsGrams,
+                    targetFatGrams = updated.targetFatGrams,
+                    targetWaterMl = updated.targetWaterMl,
+                    customUid = updated.firebaseUid
+                )
+            }
+
             // Auto-log weight change into progress history in Room
             if (isWeightChanged) {
                 val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR"))
@@ -1103,8 +1181,94 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 repository.addProgressLog(log)
             }
 
-            _toastMessage.value = "Biometria atualizada com sucesso no banco de dados!"
+            _toastMessage.value = if (updated.firebaseUid.isNotBlank() && !updated.firebaseUid.startsWith("guest_")) {
+                "Medidas salvas e sincronizadas na nuvem! ☁️"
+            } else {
+                "Medidas atualizadas com sucesso! 💪"
+            }
             onSuccess?.invoke()
+        }
+    }
+
+    fun uploadProfileToCloud() {
+        viewModelScope.launch {
+            val current = repository.getUserProfileDirect(1) ?: userProfile.value
+            if (current.firebaseUid.isBlank() || current.firebaseUid.startsWith("guest_")) {
+                _toastMessage.value = "Vincule sua conta Google para enviar o perfil para a nuvem."
+                return@launch
+            }
+            _isFirestoreSyncing.value = true
+            try {
+                val profileRes = firestoreSync.syncProfileToCloud(current)
+                val goalsRes = firestoreSync.syncCaloricGoalsToCloud(
+                    targetCalories = current.targetCalories,
+                    targetProteinGrams = current.targetProteinGrams,
+                    targetCarbsGrams = current.targetCarbsGrams,
+                    targetFatGrams = current.targetFatGrams,
+                    targetWaterMl = current.targetWaterMl,
+                    customUid = current.firebaseUid
+                )
+                if (profileRes.isSuccess && goalsRes.isSuccess) {
+                    _toastMessage.value = "Perfil e metas enviados para a nuvem com sucesso! ☁️"
+                } else {
+                    _toastMessage.value = "Perfil salvo no cache! Será enviado assim que conectar à internet."
+                }
+            } catch (e: Exception) {
+                _toastMessage.value = "Não foi possível enviar o perfil agora: ${e.message}"
+            } finally {
+                _isFirestoreSyncing.value = false
+            }
+        }
+    }
+
+    fun downloadProfileFromCloud() {
+        viewModelScope.launch {
+            val current = repository.getUserProfileDirect(1) ?: userProfile.value
+            val uid = authService.currentUser?.uid ?: current.firebaseUid
+            if (uid.isBlank() || uid.startsWith("guest_")) {
+                _toastMessage.value = "Vincule sua conta Google para baixar seu perfil da nuvem."
+                return@launch
+            }
+            _isFirestoreSyncing.value = true
+            try {
+                val res = firestoreSync.fetchProfileSnapshotFromCloud(uid)
+                res.onSuccess { remoteSnapshot ->
+                    if (remoteSnapshot != null) {
+                        val resolution = firestoreSync.reconcileRemoteProfileLWW(
+                            localProfile = current,
+                            remoteProfile = remoteSnapshot.profile,
+                            remoteUpdatedAtMillis = remoteSnapshot.updatedAtMillis,
+                            uid = uid
+                        )
+                        val merged = remoteSnapshot.profile.copy(
+                            id = 1,
+                            isLoggedIn = true,
+                            firebaseUid = uid,
+                            email = remoteSnapshot.profile.email.ifBlank { current.email },
+                            name = remoteSnapshot.profile.name.ifBlank { current.name }
+                        )
+                        repository.saveUserProfile(merged)
+                        firestoreSync.deltaLedger.markProfileSynced(
+                            uid = uid,
+                            canonicalMap = com.example.data.firestore.FirestoreDeltaEngine.profileToCanonicalMap(merged, uid),
+                            updatedAtMillis = if (remoteSnapshot.updatedAtMillis > 0L) remoteSnapshot.updatedAtMillis else System.currentTimeMillis()
+                        )
+                        _toastMessage.value = if (resolution.changedFieldsCount == 0) {
+                            "Seu perfil já está idêntico ao da nuvem! ⚡"
+                        } else {
+                            "Perfil baixado da nuvem com sucesso! ✅"
+                        }
+                    } else {
+                        _toastMessage.value = "Nenhum perfil encontrado na nuvem ainda. Use 'Enviar Perfil' primeiro!"
+                    }
+                }.onFailure { err ->
+                    _toastMessage.value = "Erro ao baixar perfil da nuvem: ${err.message}"
+                }
+            } catch (e: Exception) {
+                _toastMessage.value = "Falha ao baixar perfil: ${e.message}"
+            } finally {
+                _isFirestoreSyncing.value = false
+            }
         }
     }
 
@@ -1174,6 +1338,7 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         com.example.ui.sync.SyncController(viewModelScope, repository, firestoreSync, ::showToast)
     }
     val isSyncing: StateFlow<Boolean> get() = syncController.isSyncing
+    val lastSyncReport: StateFlow<com.example.data.firestore.SyncReport?> get() = firestoreSync.lastSyncReport
 
     fun syncAllDataToFirestore() = syncController.sync()
 
@@ -1183,6 +1348,10 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
             val prof = userProfile.value
             val updated = prof.copy(isDarkMode = isDark)
             repository.saveUserProfile(updated)
+            if (updated.firebaseUid.isNotBlank() && !updated.firebaseUid.startsWith("guest_")) {
+                firestoreSync.recordLocalProfileMutation(updated.firebaseUid)
+                firestoreSync.syncProfileToCloud(updated)
+            }
         }
     }
 
@@ -1361,13 +1530,15 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 notes = notes
             )
             repository.addMealPlanItem(mealPlanItem)
-            _toastMessage.value = "${food.name} adicionado ao ${mealType.title}!"
+            repository.generateAutomatedShoppingList()
+            _toastMessage.value = "${food.name} adicionado ao ${mealType.title} e sincronizado na Lista de Compras!"
         }
     }
 
     fun removeMealItem(id: Long) {
         viewModelScope.launch {
             repository.deleteMealPlanItem(id)
+            repository.generateAutomatedShoppingList()
         }
     }
 
@@ -2297,9 +2468,100 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun addExerciseToRoutineOrSession(
+        routine: WorkoutRoutine,
+        newExercise: WorkoutExercise,
+        savePermanently: Boolean
+    ) {
+        viewModelScope.launch {
+            val currentActive = _activeWorkout.value
+            val isThisRoutineRunning = currentActive.isRunning && currentActive.routine?.id == routine.id
+            val isFreeWorkout = routine.id == 99999L
+
+            if (savePermanently && !isFreeWorkout) {
+                val nextIndex = allExercises.value.count { it.routineId == routine.id }
+                val exToInsert = newExercise.copy(
+                    id = 0L,
+                    routineId = routine.id,
+                    orderIndex = nextIndex
+                )
+                val insertedId = repository.addWorkoutExercise(exToInsert)
+                val persistedEx = exToInsert.copy(id = insertedId)
+                firestoreSync.syncWorkoutExerciseToCloud(persistedEx, workoutId = routine.id.toString())
+
+                if (isThisRoutineRunning) {
+                    _activeWorkout.value = currentActive.copy(
+                        exercises = currentActive.exercises + persistedEx
+                    )
+                    _toastMessage.value = "${newExercise.exerciseName} salvo na ficha e incluído no treino de hoje! 💪"
+                } else {
+                    _toastMessage.value = "${newExercise.exerciseName} adicionado na ficha ${routine.letter}! 💪"
+                }
+            } else {
+                // Apenas para o treino de hoje (ou Treino Livre)
+                val tempSessionId = -(System.currentTimeMillis() % 1_000_000_000L).coerceAtLeast(1L)
+                val sessionEx = newExercise.copy(
+                    id = tempSessionId,
+                    routineId = routine.id,
+                    orderIndex = currentActive.exercises.size
+                )
+                if (isThisRoutineRunning) {
+                    _activeWorkout.value = currentActive.copy(
+                        exercises = currentActive.exercises + sessionEx
+                    )
+                } else {
+                    // Se ainda não iniciou o treino, inicia ou prepara com este exercício extra na sessão
+                    val baseExercises = if (isFreeWorkout) emptyList() else allExercises.value.filter { it.routineId == routine.id }
+                    startActiveWorkout(routine, baseExercises + sessionEx)
+                }
+                _toastMessage.value = "${newExercise.exerciseName} incluído no treino de hoje! 🔥"
+            }
+        }
+    }
+
+    fun substituteExerciseInRoutineOrSession(
+        routine: WorkoutRoutine,
+        currentExercise: WorkoutExercise,
+        newGuide: com.example.util.ExerciseVisualGuide,
+        savePermanently: Boolean
+    ) {
+        viewModelScope.launch {
+            val currentActive = _activeWorkout.value
+            val isThisRoutineRunning = currentActive.isRunning && currentActive.routine?.id == routine.id
+            val isFreeWorkout = routine.id == 99999L
+
+            val replaced = currentExercise.copy(
+                exerciseName = newGuide.exerciseName,
+                muscleGroup = newGuide.muscleGroup,
+                biomechanicsGuide = newGuide.postureTip,
+                gifDemonstrationUrl = newGuide.gifUrl
+            )
+
+            if (savePermanently && !isFreeWorkout && currentExercise.id > 0L) {
+                repository.updateWorkoutExercise(replaced)
+                firestoreSync.syncWorkoutExerciseToCloud(replaced, workoutId = routine.id.toString())
+            }
+
+            if (isThisRoutineRunning) {
+                val updatedList = currentActive.exercises.map { ex ->
+                    if (ex.id == currentExercise.id) replaced else ex
+                }
+                _activeWorkout.value = currentActive.copy(exercises = updatedList)
+            }
+
+            _toastMessage.value = if (savePermanently && !isFreeWorkout) {
+                "Trocado para ${newGuide.exerciseName} na ficha! 🔄"
+            } else {
+                "Trocado para ${newGuide.exerciseName} no treino de hoje! ⚡"
+            }
+        }
+    }
+
     fun updateExerciseWeight(exercise: WorkoutExercise, newWeight: Float) {
         viewModelScope.launch {
-            repository.updateWorkoutExercise(exercise.copy(currentWeightKg = newWeight))
+            if (exercise.id > 0L) {
+                repository.updateWorkoutExercise(exercise.copy(currentWeightKg = newWeight))
+            }
             val currentActive = _activeWorkout.value
             if (currentActive.isRunning) {
                 val updatedExercises = currentActive.exercises.map { ex ->
@@ -2313,7 +2575,9 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     fun addSetToExercise(exercise: WorkoutExercise) {
         val newSets = exercise.sets + 1
         viewModelScope.launch {
-            repository.updateWorkoutExercise(exercise.copy(sets = newSets))
+            if (exercise.id > 0L) {
+                repository.updateWorkoutExercise(exercise.copy(sets = newSets))
+            }
             val currentActive = _activeWorkout.value
             WorkoutAudioHapticHelper.playSetLoggedTick(getApplication(), currentActive.isWorkoutHapticEnabled)
             if (currentActive.isRunning) {
@@ -2322,7 +2586,7 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 _activeWorkout.value = currentActive.copy(exercises = updatedExercises)
             }
-            _toastMessage.value = "+1 série adicionada ao ${exercise.exerciseName}! Total: $newSets séries"
+            _toastMessage.value = "+1 série em ${exercise.exerciseName}! Total: $newSets séries 💪"
         }
     }
 
@@ -2330,7 +2594,9 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
         if (exercise.sets <= 1) return
         val newSets = exercise.sets - 1
         viewModelScope.launch {
-            repository.updateWorkoutExercise(exercise.copy(sets = newSets))
+            if (exercise.id > 0L) {
+                repository.updateWorkoutExercise(exercise.copy(sets = newSets))
+            }
             val currentActive = _activeWorkout.value
             if (currentActive.isRunning) {
                 val updatedExercises = currentActive.exercises.map { ex ->
@@ -2338,7 +2604,7 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 _activeWorkout.value = currentActive.copy(exercises = updatedExercises)
             }
-            _toastMessage.value = "Série removida do ${exercise.exerciseName}. Total: $newSets séries"
+            _toastMessage.value = "Série removida de ${exercise.exerciseName}. Total: $newSets séries"
         }
     }
 
@@ -2357,7 +2623,7 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
             letter = "L",
             title = "Treino Livre",
             dayOfWeekLabel = "Hoje",
-            targetMuscleGroups = "Geral",
+            targetMuscleGroups = "Livre • Escolha seus exercícios na hora",
             estimatedDurationMinutes = 60
         )
         startActiveWorkout(freeRoutine, emptyList())
@@ -2373,17 +2639,42 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
                 setList.sumOf { (reps, weight) -> (reps * weight).toDouble() }
             }.toFloat()
 
-            repository.logCompletedWorkout(
-                routineId = active.routine?.id ?: 99999L,
-                routineName = active.routine?.title ?: "Treino Livre",
-                durationMinutes = (active.elapsedSeconds / 60).coerceAtLeast(1),
+            val now = System.currentTimeMillis()
+            val durationMin = (active.elapsedSeconds / 60).coerceAtLeast(1)
+            val routineId = active.routine?.id ?: 99999L
+            val routineName = active.routine?.title ?: "Treino Livre"
+
+            val logId = repository.logCompletedWorkout(
+                routineId = routineId,
+                routineName = routineName,
+                durationMinutes = durationMin,
                 totalVolumeKg = totalVolume,
                 totalSetsCompleted = active.completedSetsCount,
                 perceivedExertion = rpe,
-                notes = notes
+                notes = notes,
+                dateMillis = now
             )
+
+            val uid = userProfile.value.firebaseUid
+            if (uid.isNotBlank() && !uid.startsWith("guest_")) {
+                firestoreSync.syncWorkoutLogToCloud(
+                    WorkoutLog(
+                        id = logId,
+                        routineId = routineId,
+                        routineName = routineName,
+                        dateMillis = now,
+                        durationMinutes = durationMin,
+                        totalVolumeKg = totalVolume,
+                        totalSetsCompleted = active.completedSetsCount,
+                        perceivedExertion = rpe,
+                        notes = notes
+                    ),
+                    uid
+                )
+            }
+
             _activeWorkout.value = ActiveWorkoutSession()
-            _toastMessage.value = "Treino finalizado e registrado com sucesso!"
+            _toastMessage.value = "Treino concluído! Mais um pra conta 🏆💪"
         }
     }
 
@@ -2505,22 +2796,60 @@ class VirtusViewModel(application: Application) : AndroidViewModel(application) 
     fun getMuscleVolume(days: Int): Map<String, Float> {
         val now = System.currentTimeMillis()
         val limit = if (days <= 0) 0L else now - (days.toLong() * 86400000L)
-        
-        return workoutLogs.value
-            .asSequence()
-            .filter { it.dateMillis >= limit }
+
+        val logsInPeriod = workoutLogs.value.filter { it.dateMillis >= limit }
+        val loggedVolumes = logsInPeriod
             .mapNotNull { log ->
-                workoutRoutines.value.find { it.id == log.routineId }?.let { routine ->
-                    val muscles = routine.targetMuscleGroups.split(",").map { it.trim() }.filter { it.isNotBlank() }
-                    if (muscles.isEmpty()) emptyMap() else {
-                        val volPerMuscle = log.totalVolumeKg / muscles.size
-                        muscles.associateWith { volPerMuscle }
-                    }
+                val routine = workoutRoutines.value.find {
+                    it.id == log.routineId ||
+                        it.title.equals(log.routineName, ignoreCase = true) ||
+                        log.routineName.contains(it.title, ignoreCase = true)
+                }
+                val musclesFromRoutine = routine?.targetMuscleGroups
+                    ?.split(",", "•", "/", "e", "&")
+                    ?.map { it.trim() }
+                    ?.filter { it.isNotBlank() }
+                    .orEmpty()
+
+                val routineExercises = allExercises.value.filter { it.routineId == (routine?.id ?: log.routineId) }
+                val musclesFromExercises = routineExercises
+                    .map { it.muscleGroup.trim() }
+                    .filter { it.isNotBlank() }
+                    .distinct()
+
+                val targetMuscles = when {
+                    musclesFromExercises.isNotEmpty() -> musclesFromExercises
+                    musclesFromRoutine.isNotEmpty() -> musclesFromRoutine
+                    else -> emptyList()
+                }
+
+                if (targetMuscles.isEmpty()) {
+                    null
+                } else {
+                    val effectiveVolume = if (log.totalVolumeKg > 0f) log.totalVolumeKg else 1200f
+                    val volPerMuscle = effectiveVolume / targetMuscles.size
+                    targetMuscles.associateWith { volPerMuscle }
                 }
             }
             .flatMap { it.entries }
             .groupBy({ it.key }, { it.value })
             .mapValues { (_, volumes) -> volumes.sum() }
+
+        if (loggedVolumes.isNotEmpty()) {
+            return loggedVolumes
+        }
+
+        // Fallback to active routine exercises planned volume when no completed workout logs exist yet
+        return allExercises.value
+            .filter { it.muscleGroup.isNotBlank() }
+            .groupBy { it.muscleGroup.trim() }
+            .mapValues { (_, exercises) ->
+                exercises.sumOf { ex ->
+                    val avgReps = ((ex.repsMin + ex.repsMax) / 2f).coerceAtLeast(8f)
+                    val weight = ex.currentWeightKg.coerceAtLeast(10f)
+                    (ex.sets.coerceAtLeast(1) * avgReps * weight).toDouble()
+                }.toFloat()
+            }
     }
 
 

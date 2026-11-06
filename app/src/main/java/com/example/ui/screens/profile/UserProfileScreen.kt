@@ -167,7 +167,7 @@ fun UserProfileScreen(
         // Header
         GrowthHeader(
             title = "Perfil & Biometria",
-            subtitle = "Medidas corporais e persistência Room",
+            subtitle = "Suas medidas, metas e evolução corporal",
             badgeText = "DADOS PESSOAIS",
             trailingContent = {
                 IconButton(
@@ -185,7 +185,12 @@ fun UserProfileScreen(
 
         
     var heatmapDays by remember { mutableStateOf(30) }
-    val muscleVolume = viewModel.getMuscleVolume(heatmapDays)
+    val workoutLogs by viewModel.workoutLogs.collectAsStateWithLifecycle()
+    val workoutRoutines by viewModel.workoutRoutines.collectAsStateWithLifecycle()
+    val allExercises by viewModel.allExercises.collectAsStateWithLifecycle()
+    val muscleVolume = remember(heatmapDays, workoutLogs, workoutRoutines, allExercises) {
+        viewModel.getMuscleVolume(heatmapDays)
+    }
 
     LazyColumn(
             modifier = Modifier
@@ -207,23 +212,23 @@ fun UserProfileScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth().testTag("account_card"),
                     colors = CardDefaults.cardColors(containerColor = CarbonCard),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, if (isGuest) GrowthOrange else GrowthGreen)
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, if (isGuest) GrowthOrange else GrowthCyan)
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Email, contentDescription = null, tint = if (isGuest) GrowthOrange else GrowthGreen)
+                            Icon(Icons.Default.Email, contentDescription = null, tint = if (isGuest) GrowthOrange else GrowthCyan)
                             Spacer(modifier = Modifier.width(8.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = if (isGuest) "Perfil local (visitante)" else "Conta vinculada",
+                                    text = if (isGuest) "Perfil local (visitante)" else "Conta Google vinculada",
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
                                 Text(
-                                    text = if (isGuest) "Vincule um e-mail para login e sincronização." else profile.email,
+                                    text = if (isGuest) "Conecte sua conta Google para mesclar dados via Delta Sync." else profile.email,
                                     fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = if (isGuest) MaterialTheme.colorScheme.onSurfaceVariant else GrowthCyan
                                 )
                             }
                         }
@@ -231,9 +236,16 @@ fun UserProfileScreen(
                         Button(
                             onClick = onNavigateToAccount,
                             modifier = Modifier.fillMaxWidth().testTag("manage_account_btn"),
-                            colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = GrowthOrange,
+                                contentColor = Color.White
+                            )
                         ) {
-                            Text(if (isGuest) "Vincular e-mail ou criar conta" else "Trocar ou acessar conta")
+                            Text(
+                                text = if (isGuest) "Conectar Conta Google (Delta Sync)" else "Gerenciar Conta & Biometria",
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
                         }
                     }
                 }
@@ -286,11 +298,14 @@ fun UserProfileScreen(
                                 }
                             }
 
-                            // Storage Indicator
+                            // Storage & Cloud Sync Indicator
+                            val isCloudLinked = profile.firebaseUid.isNotBlank() &&
+                                !profile.firebaseUid.startsWith("guest_") &&
+                                !profile.email.endsWith("@growth.local")
                             Surface(
-                                color = GrowthGreen.copy(alpha = 0.15f),
+                                color = if (isCloudLinked) GrowthGreen.copy(alpha = 0.15f) else GrowthOrange.copy(alpha = 0.15f),
                                 shape = RoundedCornerShape(20.dp),
-                                border = BorderStroke(1.dp, GrowthGreen.copy(alpha = 0.35f))
+                                border = BorderStroke(1.dp, if (isCloudLinked) GrowthGreen.copy(alpha = 0.35f) else GrowthOrange.copy(alpha = 0.35f))
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -299,14 +314,14 @@ fun UserProfileScreen(
                                     Box(
                                         modifier = Modifier
                                             .size(6.dp)
-                                            .background(GrowthGreen, CircleShape)
+                                            .background(if (isCloudLinked) GrowthGreen else GrowthOrange, CircleShape)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = "Room Local",
+                                        text = if (isCloudLinked) "Nuvem Ativa" else "Modo Local",
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = GrowthGreen
+                                        color = if (isCloudLinked) GrowthGreen else GrowthOrangeLight
                                     )
                                 }
                             }
@@ -1175,6 +1190,14 @@ fun UserProfileScreen(
 
             // 9.1 Firestore Cloud & Offline Persistence Sync Card
             item {
+                val isCloudLinked = profile.firebaseUid.isNotBlank() &&
+                    !profile.firebaseUid.startsWith("guest_") &&
+                    !profile.email.endsWith("@growth.local")
+                val isSyncBusy = viewModel.isSyncing.collectAsStateWithLifecycle().value ||
+                    viewModel.isFirestoreSyncing.collectAsStateWithLifecycle().value
+                val lastSyncReport by viewModel.lastSyncReport.collectAsStateWithLifecycle()
+                var showDeltaDetails by remember { mutableStateOf(false) }
+
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1185,51 +1208,218 @@ fun UserProfileScreen(
                 ) {
                     Column(
                         modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Row(
+                            modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.CloudDone,
-                                contentDescription = null,
-                                tint = GrowthCyan,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Text(
-                                text = "Sincronização na nuvem",
-                                color = GrowthCyan,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudDone,
+                                    contentDescription = null,
+                                    tint = GrowthCyan,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "Backup & Nuvem do Perfil",
+                                    color = GrowthCyan,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Surface(
+                                color = if (isCloudLinked) GrowthGreen.copy(alpha = 0.15f) else CarbonCardElevated,
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, if (isCloudLinked) GrowthGreen.copy(alpha = 0.4f) else CarbonBorder)
+                            ) {
+                                Text(
+                                    text = if (isCloudLinked) "Delta Sync Ativo" else "Conta Visitante",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isCloudLinked) GrowthGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
                         }
                         Text(
-                            text = "Seus dados são salvos no aparelho. Com uma conta conectada, os envios pendentes são retomados pelo Firebase ao reconectar. Confira abaixo a confirmação da nuvem.",
+                            text = if (isCloudLinked) {
+                                "Sincronização inteligente ativa: apenas campos e históricos alterados são transmitidos (o registro mais recente vence)."
+                            } else {
+                                "Seus dados estão salvos neste aparelho. Vincule sua conta Google no topo da tela para liberar o backup e download na nuvem."
+                            },
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp,
                             lineHeight = 15.sp
                         )
+
+                        // Simple status row + 1 small clickable icon for sent vs skipped details
+                        Surface(
+                            color = CarbonCardElevated,
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, CarbonBorder),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = GrowthGreen,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Text(
+                                            text = lastSyncReport?.shortMessage()
+                                                ?: if (isCloudLinked) "Sincronização em dia! ✅" else "Modo local pronto",
+                                            color = MaterialTheme.colorScheme.onBackground,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { showDeltaDetails = !showDeltaDetails },
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .testTag("delta_sync_info_btn")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = "Ver detalhes de itens enviados vs ignorados",
+                                            tint = if (showDeltaDetails) GrowthCyan else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+
+                                AnimatedVisibility(visible = showDeltaDetails) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 6.dp, bottom = 2.dp)
+                                            .testTag("delta_sync_details_panel"),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Text(
+                                            text = "Resumo do Delta Sync (Mais recente vence):",
+                                            color = GrowthCyan,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "• Enviados (modificados): ${lastSyncReport?.successful ?: 0}  |  • Ignorados (sem mudança): ${lastSyncReport?.skipped ?: 0}",
+                                            color = MaterialTheme.colorScheme.onBackground,
+                                            fontSize = 10.sp
+                                        )
+                                        Text(
+                                            text = "• Campos de perfil alterados: ${lastSyncReport?.updatedFieldsCount ?: 0}" +
+                                                if ((lastSyncReport?.pending ?: 0) > 0) "  |  • Pendentes: ${lastSyncReport?.pending}" else "",
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { viewModel.uploadProfileToCloud() },
+                                enabled = !isSyncBusy,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(42.dp)
+                                    .testTag("upload_profile_cloud_btn"),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.6f)),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = CarbonCardElevated,
+                                    contentColor = GrowthCyan
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Save,
+                                    contentDescription = null,
+                                    tint = GrowthCyan,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Enviar Perfil",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = { viewModel.downloadProfileFromCloud() },
+                                enabled = !isSyncBusy,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(42.dp)
+                                    .testTag("download_profile_cloud_btn"),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.65f)),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = CarbonCardElevated,
+                                    contentColor = GrowthCyan
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Restore,
+                                    contentDescription = null,
+                                    tint = GrowthCyan,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Baixar Perfil",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+
                         Button(
                             onClick = { viewModel.syncAllDataToFirestore() },
-                            enabled = !viewModel.isSyncing.collectAsStateWithLifecycle().value,
+                            enabled = !isSyncBusy,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(44.dp)
                                 .testTag("sync_firestore_btn"),
                             shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = GrowthCyan)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = GrowthOrange,
+                                contentColor = Color.White
+                            )
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Sync,
                                 contentDescription = null,
-                                tint = Color.Black,
+                                tint = Color.White,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Sincronizar perfil e históricos",
-                                color = Color.Black,
+                                text = "Sincronizar Tudo (Delta Sync)",
+                                color = Color.White,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -1256,18 +1446,21 @@ fun UserProfileScreen(
                         .height(46.dp)
                         .testTag("restore_biometrics_btn"),
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, CarbonBorder),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant)
+                    border = BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.45f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = GrowthCyan)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Restore,
                         contentDescription = null,
+                        tint = GrowthCyan,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Restaurar Medidas Originais",
-                        fontSize = 12.sp
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = GrowthCyan
                     )
                 }
             }
@@ -1286,16 +1479,17 @@ fun UserProfileScreen(
                             .height(46.dp)
                             .testTag("logout_btn"),
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, CarbonBorder),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground)
+                        border = BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.5f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = GrowthCyan)
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ExitToApp,
                             contentDescription = null,
+                            tint = GrowthCyan,
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = "Sair da Conta", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(text = "Sair da Conta", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GrowthCyan)
                     }
 
                     OutlinedButton(

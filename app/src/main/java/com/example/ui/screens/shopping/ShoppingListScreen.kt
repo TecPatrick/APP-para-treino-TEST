@@ -85,6 +85,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.FoodCategory
 import com.example.data.model.ShoppingItem
+import com.example.ui.MacronutrientAisle
 import com.example.ui.ShoppingListViewModel
 import com.example.ui.VirtusViewModel
 import com.example.ui.components.GrowthHeader
@@ -108,7 +109,7 @@ fun ShoppingListScreen(
     val context = LocalContext.current
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
     val shoppingList by shoppingListViewModel.shoppingList.collectAsStateWithLifecycle()
-    val categorizedItems by shoppingListViewModel.categorizedItems.collectAsStateWithLifecycle()
+    val aisleGroupedItems by shoppingListViewModel.aisleGroupedItems.collectAsStateWithLifecycle()
     val selectedPeriodDays by shoppingListViewModel.selectedPeriodDays.collectAsStateWithLifecycle()
     val uiMessage by shoppingListViewModel.uiMessage.collectAsStateWithLifecycle()
 
@@ -142,8 +143,8 @@ fun ShoppingListScreen(
         Column(modifier = Modifier.fillMaxSize()) {
             GrowthHeader(
                 title = if (isJointShoppingActive) "Compra Conjunta 🤝" else "Lista de Compras",
-                subtitle = if (isJointShoppingActive) "Lista somada com $partnerName" else "Gerada automaticamente com base na sua dieta",
-                badgeText = if (isJointShoppingActive) "MODO COMPRA COLETIVA" else "MERCADO & SUPLEMENTAÇÃO",
+                subtitle = if (isJointShoppingActive) "Lista somada com $partnerName" else "Sincronizada com sua dieta • Agrupada por Corredor de Macros",
+                badgeText = if (isJointShoppingActive) "MODO COMPRA COLETIVA" else "CORREDORES DE MACRONUTRIENTES",
                 trailingContent = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         // Receipts & Price Inflation shortcut
@@ -185,7 +186,7 @@ fun ShoppingListScreen(
                                 onClick = { shoppingListViewModel.clearCheckedShoppingItems() },
                                 modifier = Modifier.testTag("clear_checked_shopping_btn")
                             ) {
-                                Icon(Icons.Default.DeleteSweep, contentDescription = "Limpar Comprados", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Icon(Icons.Default.DeleteSweep, contentDescription = "Limpar Adquiridos", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -337,7 +338,7 @@ fun ShoppingListScreen(
                                             letterSpacing = 1.sp
                                         )
                                         Text(
-                                            "Investimento mensal por grupo alimentar",
+                                            "Investimento estimado para $selectedPeriodDays dias",
                                             fontSize = 10.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -347,7 +348,6 @@ fun ShoppingListScreen(
 
                                 Spacer(modifier = Modifier.height(20.dp))
 
-                                // Native Bar Chart Implementation
                                 val categoryCosts = remember(shoppingList) {
                                     shoppingList.groupBy { it.category }
                                         .mapValues { entry -> entry.value.sumOf { it.estimatedPrice.toDouble() }.toFloat() }
@@ -433,13 +433,32 @@ fun ShoppingListScreen(
                             .padding(bottom = 12.dp)
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
-                            Text(
-                                text = "CALCULAR PROVISÃO DA DIETA",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = GrowthOrangeLight,
-                                letterSpacing = 1.sp
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "SINCRONIZAÇÃO AUTOMÁTICA COM A DIETA",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GrowthOrangeLight,
+                                    letterSpacing = 1.sp
+                                )
+                                Surface(
+                                    color = GrowthCyan.copy(alpha = 0.16f),
+                                    shape = RoundedCornerShape(6.dp),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.45f))
+                                ) {
+                                    Text(
+                                        text = "AUTO-SYNC ATIVO",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = GrowthCyan,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
                             Spacer(modifier = Modifier.height(8.dp))
 
                             Row(
@@ -496,7 +515,7 @@ fun ShoppingListScreen(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "GERAR LISTA AUTOMÁTICA DA DIETA",
+                                    text = "RECALCULAR LISTA DA DIETA AGORA",
                                     fontWeight = FontWeight.Black,
                                     fontSize = 12.sp,
                                     color = Color.White
@@ -525,14 +544,14 @@ fun ShoppingListScreen(
                                 ) {
                                     Column {
                                         Text(
-                                            text = "PROGRESSO NO MERCADO",
+                                            text = "PROGRESSO DOS ITENS ADQUIRIDOS",
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = GrowthOrangeLight,
                                             letterSpacing = 1.sp
                                         )
                                         Text(
-                                            text = "$completedItems de $totalItems itens no carrinho",
+                                            text = "$completedItems de $totalItems produtos marcados como Adquirido",
                                             fontSize = 13.sp,
                                             color = MaterialTheme.colorScheme.onBackground
                                         )
@@ -540,7 +559,7 @@ fun ShoppingListScreen(
 
                                     Column(horizontalAlignment = Alignment.End) {
                                         Text(
-                                            text = "Estimativa",
+                                            text = "Estimativa Total",
                                             fontSize = 10.sp,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -548,7 +567,7 @@ fun ShoppingListScreen(
                                             text = "R$ ${String.format("%.2f", totalEstimatedCost)}",
                                             fontSize = 15.sp,
                                             fontWeight = FontWeight.Black,
-                                            color = GrowthGreen
+                                            color = GrowthCyan
                                         )
                                     }
                                 }
@@ -561,7 +580,7 @@ fun ShoppingListScreen(
                                         .fillMaxWidth()
                                         .height(6.dp)
                                         .clip(RoundedCornerShape(3.dp)),
-                                    color = GrowthGreen,
+                                    color = GrowthCyan,
                                     trackColor = CarbonCardElevated
                                 )
                             }
@@ -599,7 +618,7 @@ fun ShoppingListScreen(
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "Toque em 'Gerar Lista Automática' acima para calcular automaticamente os mantimentos da sua dieta para $selectedPeriodDays dias.",
+                                    text = "Toque em 'Recalcular Lista da Dieta Agora' acima para gerar automaticamente os mantimentos da sua dieta para $selectedPeriodDays dias.",
                                     fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -608,30 +627,126 @@ fun ShoppingListScreen(
                         }
                     }
                 } else {
-                    // Group by categories
-                    val groupedShopping = shoppingList.groupBy { it.category }
-
-                    groupedShopping.forEach { (category, items) ->
-                        item {
-                            Text(
-                                text = category.label.uppercase(),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = GrowthOrangeLight,
-                                letterSpacing = 1.sp,
-                                modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
-                            )
+                    // Grouped strictly by Macronutrient Aisles (Proteínas, Carboidratos, Gorduras)
+                    // Inside each aisle, pending items are at the top and 'Adquirido' items move to the bottom.
+                    aisleGroupedItems.forEach { (aisle, aisleItems) ->
+                        val aisleTotal = aisleItems.size
+                        val aisleAcquired = aisleItems.count { it.isChecked }
+                        val aisleSubtotal = aisleItems.sumOf { it.estimatedPrice.toDouble() }.toFloat()
+                        val aisleProgress = if (aisleTotal > 0) aisleAcquired.toFloat() / aisleTotal else 0f
+                        val aisleAccentColor = when (aisle) {
+                            MacronutrientAisle.PROTEIN -> GrowthOrange
+                            MacronutrientAisle.CARBOHYDRATE -> GrowthCyan
+                            MacronutrientAisle.FAT -> GrowthYellow
                         }
 
-                        items(items) { item ->
+                        item(key = "aisle_header_${aisle.name}") {
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = CarbonCardElevated),
+                                shape = RoundedCornerShape(12.dp),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    aisleAccentColor.copy(alpha = 0.45f)
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 12.dp, bottom = 6.dp)
+                                    .testTag("aisle_header_${aisle.name.lowercase()}")
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Surface(
+                                                    color = aisleAccentColor.copy(alpha = 0.2f),
+                                                    shape = RoundedCornerShape(5.dp),
+                                                    border = androidx.compose.foundation.BorderStroke(
+                                                        1.dp,
+                                                        aisleAccentColor.copy(alpha = 0.55f)
+                                                    )
+                                                ) {
+                                                    Text(
+                                                        text = aisle.badgeLabel,
+                                                        fontSize = 9.sp,
+                                                        fontWeight = FontWeight.Black,
+                                                        color = aisleAccentColor,
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = aisle.title.uppercase(),
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = Color.White,
+                                                    letterSpacing = 0.8.sp
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = aisle.subtitle,
+                                                fontSize = 10.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Surface(
+                                                color = if (aisleAcquired == aisleTotal && aisleTotal > 0) {
+                                                    GrowthGreen.copy(alpha = 0.2f)
+                                                } else {
+                                                    GrowthCyan.copy(alpha = 0.16f)
+                                                },
+                                                shape = RoundedCornerShape(6.dp)
+                                            ) {
+                                                Text(
+                                                    text = "$aisleAcquired/$aisleTotal Adquiridos",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (aisleAcquired == aisleTotal && aisleTotal > 0) GrowthGreen else GrowthCyan,
+                                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = "~R$ ${String.format("%.2f", aisleSubtotal)}",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = aisleAccentColor
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    LinearProgressIndicator(
+                                        progress = { aisleProgress },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(4.dp)
+                                            .clip(RoundedCornerShape(2.dp)),
+                                        color = if (aisleAcquired == aisleTotal && aisleTotal > 0) GrowthGreen else aisleAccentColor,
+                                        trackColor = CarbonDark
+                                    )
+                                }
+                            }
+                        }
+
+                        items(
+                            items = aisleItems,
+                            key = { item -> item.id }
+                        ) { item ->
                             Card(
                                 colors = CardDefaults.cardColors(
-                                    containerColor = if (item.isChecked) CarbonCardElevated.copy(alpha = 0.6f) else CarbonCard
+                                    containerColor = if (item.isChecked) CarbonDark.copy(alpha = 0.72f) else CarbonCard
                                 ),
                                 shape = RoundedCornerShape(10.dp),
                                 border = androidx.compose.foundation.BorderStroke(
                                     1.dp,
-                                    if (item.isChecked) CarbonBorder.copy(alpha = 0.5f) else CarbonBorder
+                                    if (item.isChecked) GrowthCyan.copy(alpha = 0.35f) else CarbonBorder
                                 ),
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -651,21 +766,21 @@ fun ShoppingListScreen(
                                         modifier = Modifier.weight(1f)
                                     ) {
                                         Surface(
-                                            color = if (item.isChecked) GrowthGreen else CarbonCardElevated,
+                                            color = if (item.isChecked) GrowthCyan else CarbonCardElevated,
                                             shape = CircleShape,
                                             border = androidx.compose.foundation.BorderStroke(
-                                                1.dp,
-                                                if (item.isChecked) GrowthGreen else CarbonBorder
+                                                1.5.dp,
+                                                if (item.isChecked) GrowthCyan else aisleAccentColor.copy(alpha = 0.7f)
                                             ),
-                                            modifier = Modifier.size(24.dp)
+                                            modifier = Modifier.size(26.dp)
                                         ) {
                                             Box(contentAlignment = Alignment.Center) {
                                                 if (item.isChecked) {
                                                     Icon(
                                                         imageVector = Icons.Default.Check,
-                                                        contentDescription = null,
+                                                        contentDescription = "Adquirido",
                                                         tint = Color.Black,
-                                                        modifier = Modifier.size(14.dp)
+                                                        modifier = Modifier.size(15.dp)
                                                     )
                                                 }
                                             }
@@ -673,14 +788,39 @@ fun ShoppingListScreen(
 
                                         Spacer(modifier = Modifier.width(10.dp))
 
-                                        Column {
-                                            Text(
-                                                text = item.name,
-                                                fontSize = 13.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = if (item.isChecked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onBackground,
-                                                textDecoration = if (item.isChecked) TextDecoration.LineThrough else TextDecoration.None
-                                            )
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Text(
+                                                    text = item.name,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = if (item.isChecked) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onBackground,
+                                                    textDecoration = if (item.isChecked) TextDecoration.LineThrough else TextDecoration.None
+                                                )
+
+                                                if (item.isChecked) {
+                                                    Surface(
+                                                        color = GrowthCyan.copy(alpha = 0.18f),
+                                                        shape = RoundedCornerShape(4.dp),
+                                                        border = androidx.compose.foundation.BorderStroke(
+                                                            1.dp,
+                                                            GrowthCyan.copy(alpha = 0.5f)
+                                                        ),
+                                                        modifier = Modifier.testTag("acquired_badge_${item.id}")
+                                                    ) {
+                                                        Text(
+                                                            text = "ADQUIRIDO",
+                                                            fontSize = 8.sp,
+                                                            fontWeight = FontWeight.Black,
+                                                            color = GrowthCyan,
+                                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                                        )
+                                                    }
+                                                }
+                                            }
 
                                             // Combined breakdown pill if joint item
                                             if (item.isJointItem) {
@@ -708,7 +848,7 @@ fun ShoppingListScreen(
                                             text = "${item.totalCombinedQuantity} ${item.unit}",
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.Black,
-                                            color = if (item.isChecked) MaterialTheme.colorScheme.onSurfaceVariant else if (item.isJointItem) GrowthCyan else GrowthOrangeLight
+                                            color = if (item.isChecked) GrowthCyan else if (item.isJointItem) GrowthCyan else GrowthOrangeLight
                                         )
                                         if (item.estimatedPrice > 0f) {
                                             Text(
@@ -733,11 +873,11 @@ fun ShoppingListScreen(
                             .fillMaxWidth()
                             .testTag("add_manual_shopping_item_btn"),
                         shape = RoundedCornerShape(10.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder)
+                        border = androidx.compose.foundation.BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.6f))
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = GrowthCyan, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Adicionar Item Manual à Lista", color = GrowthCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("Adicionar Produto Extra ao Corredor", color = GrowthCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -928,20 +1068,64 @@ fun AddManualShoppingItemDialog(
     var quantityText by remember { mutableStateOf("1") }
     var unit by remember { mutableStateOf("un") }
     var priceText by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf(FoodCategory.OTHER) }
+    var category by remember { mutableStateOf(FoodCategory.PROTEIN) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = CarbonCard,
         title = {
-            Text("Adicionar Item à Lista", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+            Text("Adicionar Produto ao Corredor", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Corredor de Macronutriente:",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = GrowthOrangeLight
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    FilterChip(
+                        selected = category == FoodCategory.PROTEIN,
+                        onClick = { category = FoodCategory.PROTEIN },
+                        label = { Text("Proteína", fontSize = 11.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = GrowthOrange,
+                            selectedLabelColor = Color.White
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilterChip(
+                        selected = category == FoodCategory.CARBOHYDRATE,
+                        onClick = { category = FoodCategory.CARBOHYDRATE },
+                        label = { Text("Carbo", fontSize = 11.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = GrowthCyan,
+                            selectedLabelColor = Color.Black
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                    FilterChip(
+                        selected = category == FoodCategory.FAT,
+                        onClick = { category = FoodCategory.FAT },
+                        label = { Text("Gordura", fontSize = 11.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = GrowthYellow,
+                            selectedLabelColor = Color.Black
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Nome do Produto (Ex: Café, Adoçante)") },
+                    label = { Text("Nome do Produto (Ex: Filé de Tilápia, Aveia)") },
                     modifier = Modifier.fillMaxWidth().testTag("manual_item_name_input"),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = GrowthOrange,

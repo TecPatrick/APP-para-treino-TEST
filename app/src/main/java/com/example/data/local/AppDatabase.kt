@@ -101,10 +101,16 @@ abstract class AppDatabase : RoomDatabase() {
                     "app_database"
                 )
                     .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigrationOnDowngrade()
                     .addCallback(object : RoomDatabase.Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) {
-                            // Older versions stored the raw password in this legacy column.
-                            db.execSQL("UPDATE user_profile SET passwordHash = '' WHERE passwordHash != ''")
+                            try {
+                                // Older versions stored the raw password in this legacy column.
+                                db.execSQL("UPDATE user_profile SET passwordHash = '' WHERE passwordHash != ''")
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
                         }
                     })
                     .build()

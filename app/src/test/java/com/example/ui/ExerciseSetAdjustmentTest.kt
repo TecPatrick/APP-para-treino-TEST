@@ -78,4 +78,36 @@ class ExerciseSetAdjustmentTest {
         assertEquals(90, session.restTimerTotalSeconds)
         assertFalse(session.isRestTimerRunning)
     }
+
+    @Test
+    fun testTemporarySessionExerciseUsesNegativeIdAndAppendsToActiveSession() {
+        val baseExercise = WorkoutExercise(
+            id = 10L,
+            routineId = 1L,
+            exerciseName = "Supino Reto",
+            muscleGroup = "Peitoral",
+            sets = 4,
+            repsMin = 8,
+            repsMax = 12,
+            currentWeightKg = 80f
+        )
+        val tempExercise = WorkoutExercise(
+            id = -12345L,
+            routineId = 1L,
+            exerciseName = "Crucifixo Máquina",
+            muscleGroup = "Peitoral",
+            sets = 3,
+            repsMin = 12,
+            repsMax = 15,
+            currentWeightKg = 50f
+        )
+        val session = ActiveWorkoutSession(
+            exercises = listOf(baseExercise, tempExercise),
+            isRunning = true
+        )
+        assertEquals(2, session.exercises.size)
+        assertTrue(session.exercises[1].id < 0L)
+        assertEquals("Crucifixo Máquina", session.exercises[1].exerciseName)
+    }
 }
+

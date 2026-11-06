@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -83,11 +84,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import com.example.R
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -181,7 +185,13 @@ fun WorkoutScreen(
     if (viewingRoutineDetail != null) {
         // --- VIEW 2: DEDICATED ROUTINE DETAIL & ACTIVE EXERCISES VIEW ---
         val currentRoutine = viewingRoutineDetail!!
-        val routineExercises = allExercises.filter { it.routineId == currentRoutine.id }
+        val isThisRoutineActive = activeWorkout.isRunning && activeWorkout.routine?.id == currentRoutine.id
+        val dbRoutineExercises = allExercises.filter { it.routineId == currentRoutine.id }
+        val routineExercises = if (isThisRoutineActive) {
+            activeWorkout.exercises
+        } else {
+            dbRoutineExercises
+        }
 
         RoutineDetailView(
             routine = currentRoutine,
@@ -190,7 +200,7 @@ fun WorkoutScreen(
             gifImageLoader = gifImageLoader,
             onBackClick = { viewingRoutineDetail = null },
             onStartWorkout = {
-                viewModel.startActiveWorkout(currentRoutine, routineExercises)
+                viewModel.startActiveWorkout(currentRoutine, dbRoutineExercises)
             },
             onFinishWorkout = { showFinishWorkoutDialog = true },
             onSkipRest = { viewModel.cancelRestTimer() },
@@ -226,8 +236,8 @@ fun WorkoutScreen(
             item {
                 GrowthHeader(
                     title = "Fichas de Treino",
-                    subtitle = "Dia ativo: ${SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR")).format(Date(selectedDateMillis))}",
-                    badgeText = "FICHAS",
+                    subtitle = "Dia selecionado: ${SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR")).format(Date(selectedDateMillis))}",
+                    badgeText = "TREINOS",
                     trailingContent = {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             IconButton(
@@ -260,6 +270,74 @@ fun WorkoutScreen(
                 )
             }
 
+            // Fitness Dark Premium Workout Hero Banner
+            item {
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.45f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .height(108.dp)
+                ) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        Image(
+                            painter = painterResource(id = R.drawable.img_virtus_workout_banner_1793897885821),
+                            contentDescription = "Banner de Treinos Virtus",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.horizontalGradient(
+                                        colors = listOf(
+                                            CarbonDark.copy(alpha = 0.90f),
+                                            CarbonDark.copy(alpha = 0.55f),
+                                            Color.Transparent
+                                        )
+                                    )
+                                )
+                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Surface(
+                                color = GrowthOrange.copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(6.dp),
+                                border = BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.5f))
+                            ) {
+                                Text(
+                                    text = "ALTA PERFORMANCE",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = GrowthOrangeLight,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Periodização & Sobrecarga Progressiva",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "Registre cada série, controle o descanso e evolua suas cargas.",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+
             // Active Session Quick Banner (if session is currently running)
             if (activeWorkout.isRunning) {
                 item {
@@ -274,40 +352,47 @@ fun WorkoutScreen(
                                 activeWorkout.routine?.let { viewingRoutineDetail = it }
                             }
                     ) {
-                        Column(
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                                .padding(14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
                                 Icon(Icons.Default.Timer, contentDescription = null, tint = GrowthGreen, modifier = Modifier.size(24.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Column {
-                                    Text("SESSÃO ATIVA EM ANDAMENTO", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = GrowthGreen)
+                                    Text("TREINO EM ANDAMENTO 🔥", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = GrowthGreen)
                                     Text(
                                         activeWorkout.routine?.title ?: "Treino Livre",
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onBackground
+                                        color = MaterialTheme.colorScheme.onBackground,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
+                            Spacer(modifier = Modifier.width(8.dp))
                             Button(
                                 onClick = {
                                     activeWorkout.routine?.let { viewingRoutineDetail = it }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = GrowthGreen),
-                                modifier = Modifier.fillMaxWidth()
+                                shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("Abrir", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+                                Text("Continuar", color = Color.Black, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp, maxLines = 1)
                             }
                         }
                     }
                 }
             }
 
-            // Action Toolbar
+            // Action Toolbar HUD (2x2 Grid)
             item {
                 Column(
                     modifier = Modifier
@@ -315,127 +400,146 @@ fun WorkoutScreen(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Button(
-                        onClick = {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                routineToEdit = null
+                                presetLetterForNewRoutine = "A"
+                                presetSplitForNewRoutine = WorkoutSplitType.CUSTOM
+                                showRoutineEditorDialog = true
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
+                                .testTag("add_routine_action_btn")
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Nova Ficha", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+
+                        Button(
+                            onClick = {
+                                viewModel.startFreeWorkout()
+                                viewingRoutineDetail = WorkoutRoutine(
+                                    id = 99999L,
+                                    letter = "L",
+                                    title = "Treino Livre",
+                                    dayOfWeekLabel = "Hoje",
+                                    targetMuscleGroups = "Livre • Escolha seus exercícios na hora"
+                                )
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = GrowthGreen),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(44.dp)
+                                .testTag("free_workout_action_btn")
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Treino Livre", fontWeight = FontWeight.ExtraBold, color = Color.Black, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { showHistoryDialog = true },
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = GrowthCyan),
+                            border = BorderStroke(1.dp, CarbonBorder),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(42.dp)
+                        ) {
+                            Icon(Icons.Default.History, contentDescription = null, tint = GrowthCyan, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Histórico", fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+                        }
+
+                        OutlinedButton(
+                            onClick = onNavigateToProgression,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = GrowthOrange),
+                            border = BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.5f)),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(42.dp)
+                                .testTag("workout_progression_chart_btn")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.TrendingUp,
+                                contentDescription = null,
+                                tint = GrowthOrange,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Evolução de Carga", fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
+
+            // ROUTINE CARDS / SLOTS LIST
+            item { Spacer(modifier = Modifier.height(6.dp)) }
+            if (allRoutines.isEmpty()) {
+                item {
+                    EmptyWorkoutGroupCard(
+                        title = "Nenhuma Ficha Cadastrada",
+                        subtitle = "Crie sua própria ficha personalizada ou carregue nossa divisão completa recomendada.",
+                        onCreateClick = {
                             routineToEdit = null
                             presetLetterForNewRoutine = "A"
                             presetSplitForNewRoutine = WorkoutSplitType.CUSTOM
                             showRoutineEditorDialog = true
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("add_routine_action_btn")
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Nova Ficha", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-
-                    Button(
-                        onClick = {
-                            viewModel.startFreeWorkout()
-                            viewingRoutineDetail = activeWorkout.routine ?: WorkoutRoutine(
-                                id = 99999L,
-                                letter = "L",
-                                title = "Treino Livre"
-                            )
+                        onRestoreDefaultClick = {
+                            viewModel.restoreDefaultRoutines()
+                        }
+                    )
+                }
+            } else {
+                items(allRoutines) { routine ->
+                    val exercisesForRoutine = allExercises.filter { it.routineId == routine.id }
+                    RoutineCardItem(
+                        routine = routine,
+                        exerciseCount = exercisesForRoutine.size,
+                        onOpenRoutine = {
+                            viewingRoutineDetail = routine
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = GrowthGreen),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("free_workout_action_btn")
-                    ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Treino Livre", fontWeight = FontWeight.ExtraBold, color = Color.Black, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-
-                    OutlinedButton(
-                        onClick = { showHistoryDialog = true },
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = GrowthCyan),
-                        border = BorderStroke(1.dp, CarbonBorder),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Histórico", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-
-                    OutlinedButton(
-                        onClick = onNavigateToProgression,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = GrowthOrange),
-                        border = BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.5f)),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("workout_progression_chart_btn")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.TrendingUp,
-                            contentDescription = null,
-                            tint = GrowthOrange,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Visualizar Progressão de Carga dos Exercícios", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
+                        onStartClick = {
+                            viewModel.startActiveWorkout(routine, exercisesForRoutine)
+                            viewingRoutineDetail = routine
+                        },
+                        onEditClick = {
+                            routineToEdit = routine
+                            showRoutineEditorDialog = true
+                        },
+                        onShareClick = {
+                            val text = viewModel.formatRoutineForSharing(routine)
+                            val sendIntent = Intent().apply {
+                                action = Intent.ACTION_SEND
+                                putExtra(Intent.EXTRA_TEXT, text)
+                                type = "text/plain"
+                            }
+                            context.startActivity(Intent.createChooser(sendIntent, "Compartilhar Ficha"))
+                        },
+                        onDeleteClick = { routineToDelete = routine }
+                    )
                 }
             }
+        }
+    }
 
-            
-// ROUTINE CARDS / SLOTS LIST
-
-                    item { Spacer(modifier = Modifier.height(8.dp)) }
-                    if (allRoutines.isEmpty()) {
-                        item {
-                            EmptyWorkoutGroupCard(
-                                title = "Nenhuma Ficha Cadastrada",
-                                subtitle = "Crie fichas em branco personalizadas ou inicie com a divisão recomendada ABCDE completa.",
-                                onCreateClick = {
-                                    routineToEdit = null
-                                    presetLetterForNewRoutine = "A"
-                                    presetSplitForNewRoutine = WorkoutSplitType.CUSTOM
-                                    showRoutineEditorDialog = true
-                                },
-                                onRestoreDefaultClick = {
-                                    viewModel.restoreDefaultRoutines()
-                                }
-                            )
-                        }
-                    } else {
-                        items(allRoutines) { routine ->
-                            val exercisesForRoutine = allExercises.filter { it.routineId == routine.id }
-                            RoutineCardItem(
-                                routine = routine,
-                                exerciseCount = exercisesForRoutine.size,
-                                onOpenRoutine = {
-                                    viewingRoutineDetail = routine
-                                },
-                                onStartClick = {
-                                    viewModel.startActiveWorkout(routine, exercisesForRoutine)
-                                    viewingRoutineDetail = routine
-                                },
-                                onEditClick = {
-                                    routineToEdit = routine
-                                    showRoutineEditorDialog = true
-                                },
-                                onShareClick = {
-                                    val text = viewModel.formatRoutineForSharing(routine)
-                                    val sendIntent = Intent().apply {
-                                        action = Intent.ACTION_SEND
-                                        putExtra(Intent.EXTRA_TEXT, text)
-                                        type = "text/plain"
-                                    }
-                                    context.startActivity(Intent.createChooser(sendIntent, "Compartilhar Ficha"))
-                                },
-                                onDeleteClick = { routineToDelete = routine }
-                            )
-                        }
-                    }
-}
-// 1. Routine Editor Dialog
+    // 1. Routine Editor Dialog
     if (showRoutineEditorDialog) {
         WorkoutRoutineEditorDialog(
             existingRoutine = routineToEdit,
@@ -467,15 +571,18 @@ fun WorkoutScreen(
         )
     }
 
-    // 3. Add Single Exercise to Current Routine
+    // 3. Add Single Exercise to Current Routine or Active Workout Session
     if (showSingleExerciseAddDialog && viewingRoutineDetail != null) {
+        val targetRoutine = viewingRoutineDetail!!
+        val isCurrentWorkoutRunning = activeWorkout.isRunning && activeWorkout.routine?.id == targetRoutine.id
         AddExerciseDialog(
-            routine = viewingRoutineDetail,
+            routine = targetRoutine,
+            isWorkoutActive = isCurrentWorkoutRunning,
             onDismiss = { showSingleExerciseAddDialog = false },
-            onConfirm = { name, group, sets, rMin, rMax, weight, rest, notes ->
+            onConfirmWithScope = { name, group, sets, rMin, rMax, weight, rest, notes, savePermanently ->
                 val guide = ExerciseGifMapper.getGuideForExercise(name)
                 val newEx = WorkoutExercise(
-                    routineId = viewingRoutineDetail!!.id,
+                    routineId = targetRoutine.id,
                     exerciseName = name,
                     muscleGroup = group,
                     sets = sets,
@@ -487,16 +594,10 @@ fun WorkoutScreen(
                     biomechanicsGuide = guide.postureTip,
                     gifDemonstrationUrl = guide.gifUrl
                 )
-                val currentList = allExercises.filter { it.routineId == viewingRoutineDetail!!.id }
-                viewModel.saveFullRoutineWithExercises(
-                    existingRoutineId = viewingRoutineDetail!!.id,
-                    splitType = viewingRoutineDetail!!.splitType,
-                    letter = viewingRoutineDetail!!.letter,
-                    title = viewingRoutineDetail!!.title,
-                    dayOfWeekLabel = viewingRoutineDetail!!.dayOfWeekLabel,
-                    targetMuscleGroups = viewingRoutineDetail!!.targetMuscleGroups,
-                    estimatedDurationMinutes = viewingRoutineDetail!!.estimatedDurationMinutes,
-                    exercises = currentList + newEx
+                viewModel.addExerciseToRoutineOrSession(
+                    routine = targetRoutine,
+                    newExercise = newEx,
+                    savePermanently = savePermanently
                 )
                 showSingleExerciseAddDialog = false
             }
@@ -540,7 +641,7 @@ fun WorkoutScreen(
             onDismissRequest = { routineToDelete = null },
             containerColor = CarbonCard,
             title = { Text("Excluir Ficha de Treino?", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground) },
-            text = { Text("Tem certeza que deseja excluir a ficha '${routineToDelete?.title}'? Esta ação não pode ser desfeita.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            text = { Text("Tem certeza que deseja excluir a ficha '${routineToDelete?.title}'? Essa ação não pode ser desfeita.", color = MaterialTheme.colorScheme.onSurfaceVariant) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -563,39 +664,26 @@ fun WorkoutScreen(
         )
     }
 
-    // 7. Substitute Exercise Dialog (1-tap swap machine/exercise)
+    // 7. Substitute Exercise Dialog (1-tap swap machine/exercise, with scope choice if workout is running)
     if (exerciseToSubstitute != null && viewingRoutineDetail != null) {
+        val targetRoutine = viewingRoutineDetail!!
+        val isCurrentWorkoutRunning = activeWorkout.isRunning && activeWorkout.routine?.id == targetRoutine.id
         SubstituteExerciseDialog(
             currentExercise = exerciseToSubstitute!!,
             gifImageLoader = gifImageLoader,
+            isWorkoutActive = isCurrentWorkoutRunning,
+            isFreeWorkout = targetRoutine.id == 99999L,
             onDismiss = { exerciseToSubstitute = null },
-            onSelectSubstitute = { newGuide ->
-                val currentEx = exerciseToSubstitute!!
-                val currentList = allExercises.filter { it.routineId == viewingRoutineDetail!!.id }
-                val updatedList = currentList.map { ex ->
-                    if (ex.id == currentEx.id) {
-                        ex.copy(
-                            exerciseName = newGuide.exerciseName,
-                            muscleGroup = newGuide.muscleGroup,
-                            biomechanicsGuide = newGuide.postureTip,
-                            gifDemonstrationUrl = newGuide.gifUrl
-                        )
-                    } else {
-                        ex
-                    }
-                }
-                viewModel.saveFullRoutineWithExercises(
-                    existingRoutineId = viewingRoutineDetail!!.id,
-                    splitType = viewingRoutineDetail!!.splitType,
-                    letter = viewingRoutineDetail!!.letter,
-                    title = viewingRoutineDetail!!.title,
-                    dayOfWeekLabel = viewingRoutineDetail!!.dayOfWeekLabel,
-                    targetMuscleGroups = viewingRoutineDetail!!.targetMuscleGroups,
-                    estimatedDurationMinutes = viewingRoutineDetail!!.estimatedDurationMinutes,
-                    exercises = updatedList
+            onSelectSubstituteWithScope = { newGuide, savePermanently ->
+                viewModel.substituteExerciseInRoutineOrSession(
+                    routine = targetRoutine,
+                    currentExercise = exerciseToSubstitute!!,
+                    newGuide = newGuide,
+                    savePermanently = savePermanently
                 )
                 exerciseToSubstitute = null
             }
         )
     }
-}}
+}
+

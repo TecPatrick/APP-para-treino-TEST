@@ -73,15 +73,20 @@ fun GrowthHeader(
         val text: @Composable (Modifier) -> Unit = { modifier ->
             Column(modifier = modifier) {
                 Surface(
-                    color = GrowthOrange.copy(alpha = 0.15f),
+                    color = GrowthOrange.copy(alpha = 0.16f),
                     shape = RoundedCornerShape(6.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.35f))
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        Brush.horizontalGradient(
+                            colors = listOf(GrowthOrange.copy(alpha = 0.65f), GrowthCyan.copy(alpha = 0.55f))
+                        )
+                    )
                 ) {
                     Text(
                         text = badgeText,
                         color = GrowthOrangeLight,
                         fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.ExtraBold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
                         letterSpacing = 1.sp
                     )
@@ -218,7 +223,7 @@ fun CircularCalorieGauge(
 
             // Background Track Arc
             drawArc(
-                color = Color(0xFF222730),
+                color = CarbonCardElevated,
                 startAngle = 135f,
                 sweepAngle = 270f,
                 useCenter = false,
@@ -227,12 +232,12 @@ fun CircularCalorieGauge(
                 style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
             )
 
-            // Progress Arc
+            // Progress Arc (Fitness Dark Premium Orange -> Cyan transition)
             val sweep = (animatedProgress.coerceAtMost(1f) * 270f)
             if (sweep > 0f) {
                 drawArc(
                     brush = Brush.sweepGradient(
-                        colors = listOf(GrowthYellow, GrowthOrange, Color(0xFFFF3D00))
+                        colors = listOf(GrowthCyan, GrowthOrangeLight, GrowthOrange, GrowthCyan)
                     ),
                     startAngle = 135f,
                     sweepAngle = sweep,

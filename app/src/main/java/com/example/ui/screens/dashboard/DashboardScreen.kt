@@ -1,6 +1,7 @@
 package com.example.ui.screens.dashboard
 
 import android.content.Intent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -67,12 +69,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.R
 import com.example.data.model.MealPlanItem
 import com.example.data.model.MealType
 import com.example.ui.VirtusViewModel
@@ -174,6 +179,151 @@ fun DashboardScreen(
             )
         }
 
+        // --- Banner Promocional Fitness Dark Premium (Topo da Tela Inicial) ---
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .testTag("home_promo_banner"),
+                shape = RoundedCornerShape(18.dp),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            GrowthOrange.copy(alpha = 0.65f),
+                            GrowthCyan.copy(alpha = 0.55f)
+                        )
+                    )
+                ),
+                colors = CardDefaults.cardColors(containerColor = CarbonCard)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.img_virtus_top_banner_1793914003348),
+                        contentDescription = "Banner promocional Virtus Fitness Dark Premium",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.horizontalGradient(
+                                    colors = listOf(
+                                        Color(0xF0080B10),
+                                        Color(0xCC080B10),
+                                        Color(0x40080B10)
+                                    )
+                                )
+                            )
+                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Surface(
+                                color = GrowthOrange.copy(alpha = 0.22f),
+                                shape = RoundedCornerShape(6.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.5f))
+                            ) {
+                                Text(
+                                    text = "ALTA PERFORMANCE",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = GrowthOrangeLight,
+                                    letterSpacing = 1.sp,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                            Surface(
+                                color = GrowthCyan.copy(alpha = 0.16f),
+                                shape = RoundedCornerShape(6.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.4f))
+                            ) {
+                                Text(
+                                    text = "DIETA & TREINO",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GrowthCyan,
+                                    letterSpacing = 0.8.sp,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+
+                        Column(modifier = Modifier.fillMaxWidth(0.76f)) {
+                            Text(
+                                text = "Domine sua rotina com precisão científica",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color.White,
+                                lineHeight = 20.sp
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = todayRoutine?.let { "Treino ${it.letter}: ${it.title} • Meta ${profile.targetCalories} kcal" }
+                                    ?: "Controle de cargas, macros e evolução diária em tempo real",
+                                fontSize = 11.sp,
+                                color = Color(0xFFD5DCE6),
+                                maxLines = 2
+                            )
+                        }
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Button(
+                                onClick = onNavigateToWorkout,
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = GrowthOrange,
+                                    contentColor = Color.White
+                                ),
+                                modifier = Modifier.height(34.dp).testTag("promo_workout_cta")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.FitnessCenter,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Treinar Agora", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                            OutlinedButton(
+                                onClick = onNavigateToDiet,
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.7f)),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = GrowthCyan),
+                                modifier = Modifier.height(34.dp).testTag("promo_diet_cta")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Restaurant,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Plano Alimentar", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // --- Diário & Calendário ---
         item {
             val workoutLogs by viewModel.workoutLogs.collectAsStateWithLifecycle()
@@ -265,7 +415,7 @@ fun DashboardScreen(
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             MacroProgressBar("Proteína", consumedProtein, profile.targetProteinGrams.toFloat(), "g", GrowthCyan)
-                            MacroProgressBar("Carboidratos", consumedCarbs, profile.targetCarbsGrams.toFloat(), "g", GrowthYellow)
+                            MacroProgressBar("Carboidratos", consumedCarbs, profile.targetCarbsGrams.toFloat(), "g", GrowthOrangeLight)
                             MacroProgressBar("Gorduras", consumedFat, profile.targetFatGrams.toFloat(), "g", GrowthOrange)
                         }
                     }
@@ -294,7 +444,7 @@ fun DashboardScreen(
                         text = "Meta alimentar: ${profile.targetCalories} kcal  •  Saldo estimado: ${if (plannedBalance > 0) "+" else ""}$plannedBalance kcal",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = if (plannedBalance <= 0) GrowthGreen else GrowthYellow
+                        color = if (plannedBalance <= 0) GrowthCyan else GrowthOrangeLight
                     )
                 }
             }
@@ -305,7 +455,7 @@ fun DashboardScreen(
             Card(
                 colors = CardDefaults.cardColors(containerColor = CarbonCard),
                 shape = RoundedCornerShape(16.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
+                border = androidx.compose.foundation.BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.35f)),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 6.dp)
@@ -322,27 +472,38 @@ fun DashboardScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        FilledTonalButton(
+                        Button(
                             onClick = { viewModel.addWater(250) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = GrowthOrange,
+                                contentColor = Color.White
+                            ),
+                            shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.weight(1f).testTag("add_water_250_btn")
-                        ) { Text("+250 ml", maxLines = 1) }
-                        FilledTonalButton(
+                        ) { Text("+250 ml", fontWeight = FontWeight.Bold, maxLines = 1) }
+                        OutlinedButton(
                             onClick = { viewModel.addWater(500) },
+                            border = androidx.compose.foundation.BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.7f)),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = GrowthCyan.copy(alpha = 0.12f),
+                                contentColor = GrowthCyan
+                            ),
+                            shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.weight(1f).testTag("add_water_500_btn")
-                        ) { Text("+500 ml", maxLines = 1) }
+                        ) { Text("+500 ml", fontWeight = FontWeight.Bold, maxLines = 1) }
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         TextButton(onClick = { viewModel.resetWater() }) {
-                            Text("Zerar hoje")
+                            Text("Zerar hoje", color = GrowthOrangeLight)
                         }
                         TextButton(onClick = {
                             newWaterGoalInput = profile.targetWaterMl.toString()
                             showWaterGoalDialog = true
                         }) {
-                            Text("Ajustar meta")
+                            Text("Ajustar meta", color = GrowthCyan)
                         }
                     }
                 }
@@ -360,7 +521,7 @@ fun DashboardScreen(
                     .padding(horizontal = 16.dp, vertical = 6.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("EVOLUÇÃO DO PESO", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GrowthGreen, letterSpacing = 1.sp)
+                    Text("EVOLUÇÃO DO PESO", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GrowthCyan, letterSpacing = 1.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     WeightProgressionChart(logs = progressLogs, targetWeightKg = profile.monthlyTargetWeightKg)
                 }
@@ -384,7 +545,7 @@ fun DashboardScreen(
             text = {
                 Column {
                     TextButton(onClick = { onNavigateToProfile(); showMoreDialog = false }) {
-                        Text("Perfil, conta e biometria", color = MaterialTheme.colorScheme.onBackground)
+                        Text("Perfil, conta e biometria", color = GrowthCyan)
                     }
                     Text(
                         text = "Estimativa-base: $recommendedWater ml por dia. Ela usa peso de referência e deve ser ajustada por sede, suor, clima e orientação profissional.",
@@ -400,8 +561,8 @@ fun DashboardScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GrowthCyan,
-                            unfocusedBorderColor = CarbonBorder
+                            focusedBorderColor = GrowthOrange,
+                            unfocusedBorderColor = GrowthCyan.copy(alpha = 0.5f)
                         )
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -424,9 +585,9 @@ fun DashboardScreen(
                         viewModel.updateDailyWaterGoal(parsed)
                         showWaterGoalDialog = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = GrowthCyan)
+                    colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange)
                 ) {
-                    Text("Salvar Meta", color = Color.Black, fontWeight = FontWeight.Bold)
+                    Text("Salvar Meta", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {

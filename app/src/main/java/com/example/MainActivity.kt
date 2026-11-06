@@ -87,11 +87,15 @@ import com.example.ui.screens.workout.ExerciseProgressionScreen
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.automirrored.outlined.DirectionsRun
 import com.example.ui.screens.gps.GpsTrackerScreen
+import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
 import com.example.ui.theme.CarbonDark
+import com.example.ui.theme.GrowthCyan
 import com.example.ui.theme.GrowthOrange
 import com.example.ui.theme.GrowthOrangeLight
 import com.example.ui.theme.MyApplicationTheme
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.graphics.Brush
 
 enum class AppNavigationScreen(
     val title: String,
@@ -136,6 +140,11 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
     var isDietBiometricVerified by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val toastMessage by viewModel.toastMessage.collectAsStateWithLifecycle()
+
+    // Auto-login Google + sincronização Delta ao iniciar caso sessão Firebase esteja ativa
+    LaunchedEffect(Unit) {
+        viewModel.restoreActiveFirebaseSession()
+    }
 
     LaunchedEffect(toastMessage) {
         toastMessage?.let {
@@ -182,50 +191,50 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
                         tonalElevation = 8.dp
                     ) {
                         val navItems = listOf(
-                        AppNavigationScreen.DASHBOARD,
-                        AppNavigationScreen.DIET,
-                        AppNavigationScreen.WORKOUT,
-                        AppNavigationScreen.GPS,
-                        AppNavigationScreen.SHOPPING,
-                        AppNavigationScreen.ANALYTICS
-                    )
-
-                    navItems.forEach { screen ->
-                        val isSelected = currentScreen == screen
-                        NavigationBarItem(
-                            selected = isSelected,
-                            onClick = { currentScreen = screen },
-                            icon = {
-                                Icon(
-                                    imageVector = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
-                                    contentDescription = screen.title,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            },
-                            label = if (compactNavigation) null else {
-                                {
-                                    Text(
-                                        text = screen.title,
-                                        fontSize = 9.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        maxLines = 1,
-                                        softWrap = false,
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
-                            },
-                            alwaysShowLabel = !compactNavigation,
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = GrowthOrange,
-                                selectedTextColor = GrowthOrangeLight,
-                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                indicatorColor = GrowthOrange.copy(alpha = 0.20f)
-                            ),
-                            modifier = Modifier.testTag(screen.testTag)
+                            AppNavigationScreen.DASHBOARD,
+                            AppNavigationScreen.DIET,
+                            AppNavigationScreen.WORKOUT,
+                            AppNavigationScreen.GPS,
+                            AppNavigationScreen.SHOPPING,
+                            AppNavigationScreen.ANALYTICS
                         )
+
+                        navItems.forEach { screen ->
+                            val isSelected = currentScreen == screen
+                            NavigationBarItem(
+                                selected = isSelected,
+                                onClick = { currentScreen = screen },
+                                icon = {
+                                    Icon(
+                                        imageVector = if (isSelected) screen.selectedIcon else screen.unselectedIcon,
+                                        contentDescription = screen.title,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                },
+                                label = if (compactNavigation) null else {
+                                    {
+                                        Text(
+                                            text = screen.title,
+                                            fontSize = 9.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                },
+                                alwaysShowLabel = !compactNavigation,
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = GrowthOrange,
+                                    selectedTextColor = GrowthOrangeLight,
+                                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    indicatorColor = GrowthOrange.copy(alpha = 0.22f)
+                                ),
+                                modifier = Modifier.testTag(screen.testTag)
+                            )
+                        }
                     }
-                }
                 }
             }
         }
@@ -355,7 +364,13 @@ fun BiometricDiaryLockScreen(
     ) {
         Card(
             colors = CardDefaults.cardColors(containerColor = CarbonCard),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(18.dp),
+            border = BorderStroke(
+                1.dp,
+                Brush.linearGradient(
+                    colors = listOf(GrowthOrange.copy(alpha = 0.65f), GrowthCyan.copy(alpha = 0.55f))
+                )
+            ),
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
@@ -365,7 +380,7 @@ fun BiometricDiaryLockScreen(
                 Icon(
                     imageVector = Icons.Default.Fingerprint,
                     contentDescription = null,
-                    tint = GrowthOrange,
+                    tint = GrowthCyan,
                     modifier = Modifier.size(56.dp)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -398,7 +413,7 @@ fun BiometricDiaryLockScreen(
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange)
                 ) {
                     Text("Desbloquear com Biometria", fontWeight = FontWeight.Bold, color = Color.White)
@@ -407,10 +422,11 @@ fun BiometricDiaryLockScreen(
                 OutlinedButton(
                     onClick = onFallbackToFirebase,
                     modifier = Modifier.fillMaxWidth().height(48.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.LightGray)
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.55f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = GrowthCyan)
                 ) {
-                    Text("Fallback: Autenticação Firebase / Google", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Fallback: Autenticação Firebase / Google", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = GrowthCyan)
                 }
             }
         }

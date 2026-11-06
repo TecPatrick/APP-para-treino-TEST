@@ -109,7 +109,6 @@ import com.example.data.model.WorkoutRoutine
 import com.example.data.model.WorkoutSplitType
 import com.example.ui.VirtusViewModel
 import com.example.ui.components.GrowthHeader
-import com.example.ui.components.RoutineMuscleSummaryCard
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
 import com.example.ui.theme.CarbonCardElevated
@@ -505,7 +504,10 @@ fun RoutineDetailView(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
                         IconButton(onClick = onBackClick) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = MaterialTheme.colorScheme.onBackground)
                         }
@@ -520,17 +522,20 @@ fun RoutineDetailView(
                             }
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(routine.title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("${routine.dayOfWeekLabel} • ${exercises.size} Exercícios", fontSize = 11.sp, color = GrowthOrangeLight)
+                            Text("${routine.dayOfWeekLabel} • ${exercises.size} exercícios", fontSize = 11.sp, color = GrowthOrangeLight, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
+
+                    Spacer(modifier = Modifier.width(8.dp))
 
                     Button(
                         onClick = onAddExerciseClick,
                         colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
                         shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.testTag("header_add_exercise_btn")
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
@@ -593,7 +598,7 @@ fun RoutineDetailView(
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Icon(Icons.Default.Check, contentDescription = null, tint = GrowthGreen, modifier = Modifier.size(16.dp))
                                                 Spacer(modifier = Modifier.width(4.dp))
-                                                Text("⏱️ Descanso Concluído! Próxima série pronta.", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GrowthGreen)
+                                                Text("⏱️ Descanso concluído! Bora pra próxima série 💪", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GrowthGreen)
                                             }
                                         } else {
                                             Text("⏸️ Descanso: ${activeWorkout.restTimerRemainingSeconds}s", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = GrowthOrange)
@@ -666,10 +671,12 @@ fun RoutineDetailView(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
-                                Text("Ficha Pronta para Iniciar", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                                Text("Marque as séries conforme executa no treino.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Tudo pronto pro treino!", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                                Text("Inicie a sessão para marcar séries e controlar o descanso.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
+
+                            Spacer(modifier = Modifier.width(8.dp))
 
                             Button(
                                 onClick = onStartWorkout,
@@ -686,21 +693,11 @@ fun RoutineDetailView(
             }
         }
 
-        // Routine Muscle Summary (Routine Summary & Foco Muscular)
-        if (exercises.isNotEmpty()) {
-            item {
-                RoutineMuscleSummaryCard(
-                    exercises = exercises,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                )
-            }
-        }
-
         // Section Title: EXERCÍCIOS DA FICHA
         item {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                 Text(
-                    text = "EXERCÍCIOS DA FICHA (${exercises.size})",
+                    text = "EXERCÍCIOS DO TREINO (${exercises.size})",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 1.sp,
@@ -723,9 +720,9 @@ fun RoutineDetailView(
                         modifier = Modifier.padding(20.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("Esta ficha está vazia.", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                        Text("Nenhum exercício nesta sessão ainda", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text("Adicione os exercícios que você deseja realizar neste treino.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                        Text("Adicione os exercícios que você vai fazer hoje para acompanhar suas séries e cargas.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
                         Spacer(modifier = Modifier.height(12.dp))
                         Button(
                             onClick = onAddExerciseClick,
@@ -775,7 +772,7 @@ fun RoutineDetailView(
                     Icon(Icons.Default.Add, contentDescription = null, tint = GrowthOrange, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "ADICIONAR NOVO EXERCÍCIO NESTE TREINO",
+                        text = "INCLUIR EXERCÍCIO NESTE TREINO",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = GrowthOrange
@@ -851,11 +848,28 @@ fun ExerciseExecutionCard(
                             color = MaterialTheme.colorScheme.onBackground,
                             maxLines = 3
                         )
-                        Text(
-                            text = exercise.muscleGroup,
-                            fontSize = 11.sp,
-                            color = GrowthOrangeLight
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(
+                                text = exercise.muscleGroup,
+                                fontSize = 11.sp,
+                                color = GrowthOrangeLight
+                            )
+                            if (exercise.id < 0L) {
+                                Surface(
+                                    color = GrowthGreen.copy(alpha = 0.18f),
+                                    shape = RoundedCornerShape(4.dp),
+                                    border = BorderStroke(0.5.dp, GrowthGreen)
+                                ) {
+                                    Text(
+                                        text = "⚡ SÓ HOJE",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = GrowthGreen,
+                                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 

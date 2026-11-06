@@ -15,69 +15,139 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    function hasValidOwnerField(data, userId) {
+      return !('userId' in data) || data.userId == userId;
     }
 
     // --- Validation Helpers ---
-
-    function isValidUserProfile(data) {
-      return data.userId == request.auth.uid &&
-             data.email is string &&
-             (!('name' in data) || data.name is string) &&
-             (!('age' in data) || data.age is int) &&
-             (!('weightKg' in data) || data.weightKg is number) &&
-             (!('heightCm' in data) || data.heightCm is number) &&
-             (!('hasCompletedOnboarding' in data) || data.hasCompletedOnboarding is bool);
+    function isValidUserProfile(data, userId) {
+      return hasValidOwnerField(data, userId) &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 320)) &&
+             (!('name' in data) || (data.name is string && data.name.size() <= 120)) &&
+             (!('age' in data) || (data.age is int && data.age >= 10 && data.age <= 120)) &&
+             (!('weightKg' in data) || (data.weightKg is number && data.weightKg >= 20 && data.weightKg <= 400)) &&
+             (!('heightCm' in data) || (data.heightCm is number && data.heightCm >= 80 && data.heightCm <= 260)) &&
+             (!('hasCompletedOnboarding' in data) || data.hasCompletedOnboarding is bool) &&
+             (!('isBiometricLockEnabled' in data) || data.isBiometricLockEnabled is bool) &&
+             (!('isDarkMode' in data) || data.isDarkMode is bool);
     }
 
-    function isValidWorkoutLog(data) {
-      return data.userId == request.auth.uid &&
+    function isValidWorkoutLog(data, userId) {
+      return hasValidOwnerField(data, userId) &&
              data.dateMillis is int &&
              (!('durationMinutes' in data) || data.durationMinutes is int);
     }
 
-    function isValidCardioLog(data) {
-      return data.userId == request.auth.uid &&
+    function isValidCardioLog(data, userId) {
+      return hasValidOwnerField(data, userId) &&
              data.dateMillis is int &&
              data.type is string;
     }
 
-    // --- Collections ---
+    function isValidSubcollectionDoc(data, userId) {
+      return hasValidOwnerField(data, userId);
+    }
 
+    // --- Collections ---
     match /users/{userId} {
       allow get: if isOwner(userId);
-      allow create: if isOwner(userId) && 
-                       isValidUserProfile(request.resource.data) &&
-                       request.resource.data.createdAt <= request.time;
-      allow update: if isOwner(userId) && 
-                       isValidUserProfile(request.resource.data) &&
-                       request.resource.data.userId == resource.data.userId &&
-                       request.resource.data.createdAt == resource.data.createdAt;
+      allow create: if isOwner(userId) &&
+                       isValidUserProfile(request.resource.data, userId) &&
+                       (!('createdAt' in request.resource.data) || request.resource.data.createdAt <= request.time);
+      allow update: if isOwner(userId) &&
+                       isValidUserProfile(request.resource.data, userId) &&
+                       (!('userId' in resource.data) || !('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId) &&
+                       (!('createdAt' in resource.data) || !('createdAt' in request.resource.data) || request.resource.data.createdAt == resource.data.createdAt);
       allow delete: if isOwner(userId);
 
       match /workout_logs/{logId} {
-        allow list: if isOwner(userId);
-        allow get: if isOwner(userId);
-        allow create: if isOwner(userId) && 
-                         isValidWorkoutLog(request.resource.data) &&
-                         request.resource.data.createdAt <= request.time;
-        allow update: if isOwner(userId) && 
-                         isValidWorkoutLog(request.resource.data) &&
-                         request.resource.data.createdAt == resource.data.createdAt;
+        allow list, get: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidWorkoutLog(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /workoutLogs/{logId} {
+        allow list, get: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidWorkoutLog(request.resource.data, userId);
         allow delete: if isOwner(userId);
       }
 
       match /cardio_logs/{logId} {
-        allow list: if isOwner(userId);
-        allow get: if isOwner(userId);
-        allow create: if isOwner(userId) && 
-                         isValidCardioLog(request.resource.data) &&
-                         request.resource.data.createdAt <= request.time;
-        allow update: if isOwner(userId) && 
-                         isValidCardioLog(request.resource.data) &&
-                         request.resource.data.createdAt == resource.data.createdAt;
+        allow list, get: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidCardioLog(request.resource.data, userId);
         allow delete: if isOwner(userId);
+      }
+
+      match /cardioLogs/{logId} {
+        allow list, get: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidCardioLog(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /calorieGoals/{goalId} {
+        allow list, get: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /gpsRouteLogs/{logId} {
+        allow list, get: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /foodRecords/{recordId} {
+        allow list, get: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /dailyIntake/{dateKey} {
+        allow list, get: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /favoriteFoods/{foodId} {
+        allow list, get: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /mealPlans/{planId} {
+        allow list, get: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /shoppingItems/{itemId} {
+        allow list, get: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /progressLogs/{logId} {
+        allow list, get: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /workoutRoutines/{routineId} {
+        allow list, get: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+
+      match /workouts/{workoutId} {
+        allow list, get: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+
+        match /exercises/{exerciseId} {
+          allow list, get: if isOwner(userId);
+          allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
+          allow delete: if isOwner(userId);
+        }
       }
     }
   }

@@ -1,32 +1,47 @@
 # Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
-
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
-
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
-
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
 
 # Preserve useful crash line numbers while removing original source file names.
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
 
-# Keep model metadata used reflectively by Firebase/Room/Moshi.
+# Preserve annotations and inner classes
 -keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
+
+# Keep Application, MainActivity & ViewModels
+-keep class com.example.MainApplication { *; }
+-keep class com.example.VirtusApplication { *; }
+-keep class com.example.MainActivity { *; }
+-keep class com.example.ui.** { *; }
+-keep class com.example.service.** { *; }
+-keep class com.example.util.** { *; }
+
+# Keep data models used by Room, Firebase & Serializers
 -keep class com.example.data.model.** { *; }
+-keep class com.example.data.local.** { *; }
+-keep class com.example.data.repository.** { *; }
+
+# Room Database Rules (CRITICAL for R8 release builds)
+-keep class * extends androidx.room.RoomDatabase
+-keep class * extends androidx.room.RoomDatabase { *; }
+-keep class * implements androidx.room.EntityDeletionOrUpdateAdapter { *; }
+-keep class * implements androidx.room.EntityInsertionAdapter { *; }
+-dontwarn androidx.room.paging.**
+
+# Kotlinx Serialization & Navigation Compose
+-keepclassmembers class * {
+    @kotlinx.serialization.Serializable *;
+}
+-keepclassmembers class * {
+    ** Companion;
+}
+-keep class kotlinx.serialization.** { *; }
+
+# Firebase & Google Play Services
+-keep class com.google.firebase.** { *; }
+-keep class com.google.android.gms.** { *; }
+
+# Coil Image Loader
+-keep class coil.** { *; }
 
 # Never emit verbose Android logging calls in release builds.
 -assumenosideeffects class android.util.Log {

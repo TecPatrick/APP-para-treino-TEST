@@ -2,6 +2,7 @@ package com.example.ui.screens.diet
 
 import android.content.Intent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
@@ -73,9 +74,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import com.example.R
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -297,6 +302,73 @@ fun DietScreen(
                         .padding(horizontal = 16.dp),
                     contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp)
                 ) {
+                    // Fitness Dark Premium Nutrition Hero Banner
+                    item {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.45f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 10.dp)
+                                .height(106.dp)
+                        ) {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.img_virtus_nutrition_banner_1793897887293),
+                                    contentDescription = "Banner de Nutrição Virtus",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            Brush.horizontalGradient(
+                                                colors = listOf(
+                                                    CarbonDark.copy(alpha = 0.90f),
+                                                    CarbonDark.copy(alpha = 0.55f),
+                                                    Color.Transparent
+                                                )
+                                            )
+                                        )
+                                )
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Surface(
+                                        color = GrowthCyan.copy(alpha = 0.18f),
+                                        shape = RoundedCornerShape(6.dp),
+                                        border = BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.45f))
+                                    ) {
+                                        Text(
+                                            text = "NUTRIÇÃO DE PRECISÃO",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = GrowthCyan,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "Meta: ${profile.targetCalories} kcal • ${profile.targetProteinGrams}g Proteína",
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color.White
+                                    )
+                                    Text(
+                                        text = "Balanço energético dinâmico ajustado ao seu biotipo.",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                    }
 
                     // Gasto Calórico Diário & TMB Card (Regra: Parado = TMB; Treino soma gasto)
                     item {
@@ -467,6 +539,74 @@ fun DietScreen(
                                         fontWeight = FontWeight.Bold,
                                         color = Color.White,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Card de Sincronização Automática com Lista de Compras (Corredores de Macros)
+                    item {
+                        Surface(
+                            onClick = {
+                                viewModel.generateShoppingList(30)
+                                onNavigateToShopping()
+                            },
+                            color = CarbonCard,
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.45f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                                .testTag("sync_diet_to_shopping_card")
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ShoppingCart,
+                                        contentDescription = null,
+                                        tint = GrowthCyan,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "SINCRONIZADO COM LISTA DE COMPRAS",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = GrowthCyan,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "Agrupamento automático por Corredor de Macros (Proteína, Carbo, Gordura)",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Surface(
+                                    color = GrowthCyan,
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = "Abrir Lista",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = Color.Black,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                     )
                                 }
                             }

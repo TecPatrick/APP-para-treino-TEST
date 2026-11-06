@@ -19,8 +19,8 @@ android {
     applicationId = "com.aistudio.growthdiet.kxmfzq"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "0.9.0"
+    versionCode = 3
+    versionName = "0.9.1-alpha"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
@@ -53,7 +53,17 @@ android {
         appId = "1:204365877775:android:f77650214127790642497a"
         artifactType = "APK"
         groups = "alpha, beta"
-        releaseNotes = System.getenv("FIREBASE_RELEASE_NOTES") ?: "Virtus - Dieta & Treino - Release Beta v0.9.0"
+        releaseNotes = System.getenv("FIREBASE_RELEASE_NOTES")
+          ?: """
+          Virtus - Dieta & Treino (v0.9.0 Beta)
+          -------------------------------------
+          Novidades e melhorias desta versao:
+          • Cronometro de descanso integrado com efeitos sonoros (SoundPool) e vibracoes tateis (Haptic).
+          • Botoes compactos de controle de series (+) e (-) lado a lado acima dos exercicios.
+          • Edicao e ajuste fino de cargas e repeticoes executadas em cada serie.
+          • Barra flutuante inferior de descanso visivel durante toda a navegacao do treino.
+          • Calculo inteligente de metas caloricas, diario alimentar e historico de evolucao.
+          """.trimIndent()
         val credentialsPath = System.getenv("FIREBASE_APP_DISTRIBUTION_CREDENTIALS")
           ?: System.getenv("GOOGLE_APPLICATION_CREDENTIALS")
         if (!credentialsPath.isNullOrEmpty()) {
@@ -67,7 +77,8 @@ android {
         appId = "1:204365877775:android:f77650214127790642497a"
         artifactType = "APK"
         groups = "alpha, beta"
-        releaseNotes = System.getenv("FIREBASE_RELEASE_NOTES") ?: "Virtus Growth - Debug Alpha & Beta"
+        releaseNotes = System.getenv("FIREBASE_RELEASE_NOTES")
+          ?: "Virtus Growth v0.9.1-alpha: Heatmap Anatomico Hevy no Perfil (Frontal, Posterior e Lado a Lado), Lista de Compras Automatica por Corredores de Macros e Login Fitness Dark Premium."
         val credentialsPath = System.getenv("FIREBASE_APP_DISTRIBUTION_CREDENTIALS")
           ?: System.getenv("GOOGLE_APPLICATION_CREDENTIALS")
         if (!credentialsPath.isNullOrEmpty()) {

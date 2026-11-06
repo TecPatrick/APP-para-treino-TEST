@@ -1,6 +1,5 @@
 package com.example.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -14,8 +13,8 @@ private val DarkColorScheme = darkColorScheme(
     onPrimaryContainer = GrowthOnOrangeContainer,
     secondary = GrowthCyan,
     onSecondary = Color.Black,
-    secondaryContainer = Color(0xFF00363A),
-    onSecondaryContainer = Color(0xFFB2EBF2),
+    secondaryContainer = GrowthCyanContainer,
+    onSecondaryContainer = GrowthOnCyanContainer,
     tertiary = GrowthGreen,
     onTertiary = Color.Black,
     tertiaryContainer = Color(0xFF00391A),
@@ -27,6 +26,7 @@ private val DarkColorScheme = darkColorScheme(
     surfaceVariant = CarbonCardElevated,
     onSurfaceVariant = TextSecondaryDark,
     outline = CarbonBorder,
+    outlineVariant = GrowthCyan.copy(alpha = 0.35f),
     error = GrowthRed,
     onError = Color.White
 )
@@ -61,7 +61,7 @@ fun MyApplicationTheme(
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    // Sleek dark theme native for fitness performance aesthetic
+    // Fitness Dark Premium theme: Primary Orange (#FF6D00) & Secondary Cyan (#00E5FF) on Obsidian Carbon
     MaterialTheme(
         colorScheme = DarkColorScheme,
         typography = Typography,

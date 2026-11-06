@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -572,7 +573,7 @@ fun AnalyticsScreen(
                                                 contentScale = ContentScale.Crop,
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .height(140.dp)
+                                                    .aspectRatio(3f / 4f)
                                                     .clip(RoundedCornerShape(10.dp))
                                             )
                                             Text("${oldest.weightKg} kg", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
@@ -596,7 +597,7 @@ fun AnalyticsScreen(
                                                 contentScale = ContentScale.Crop,
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .height(140.dp)
+                                                    .aspectRatio(3f / 4f)
                                                     .clip(RoundedCornerShape(10.dp))
                                             )
                                             Text("${newest.weightKg} kg", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = GrowthGreen)

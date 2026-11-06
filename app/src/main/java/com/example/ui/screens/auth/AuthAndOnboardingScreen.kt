@@ -1,11 +1,9 @@
 package com.example.ui.screens.auth
 
 import android.app.Activity
-import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,38 +14,32 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.FitnessCenter
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Security
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.fragment.app.FragmentActivity
-import com.example.util.BiometricAuthHelper
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -62,7 +54,6 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -71,6 +62,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -87,15 +79,15 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.data.model.ActivityLevel
@@ -113,11 +105,8 @@ import com.example.ui.theme.GrowthOrange
 import com.example.ui.theme.GrowthOrangeLight
 import com.example.ui.theme.GrowthRed
 import com.example.ui.theme.GrowthYellow
-import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
-import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.Companion.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
-import com.google.firebase.auth.GoogleAuthProvider
-import com.example.util.AuthValidator
+import com.example.data.auth.GoogleCredentialAuthHelper
+import com.example.util.BiometricAuthHelper
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -126,22 +115,16 @@ fun AuthAndOnboardingScreen(
     viewModel: VirtusViewModel,
     onAuthSuccess: () -> Unit
 ) {
-    var isRegisterMode by remember { mutableStateOf(false) }
-    var onboardingStep by remember { mutableStateOf(0) } // 0: Login/Register, 1: Dados Corporais, 2: Biotipo, 3: Treinos & Metas
+    var onboardingStep by remember { mutableStateOf(0) } // 0: Hub de Acesso, 1: Dados Corporais, 2: Biotipo, 3: Treinos & Metas
+    var showCreateProfileSetup by remember { mutableStateOf(false) }
 
     val isAuthLoading by viewModel.isAuthLoading.collectAsStateWithLifecycle()
     val authError by viewModel.authError.collectAsStateWithLifecycle()
+    val userProfile by viewModel.userProfile.collectAsStateWithLifecycle()
 
     var name by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
-    var showPassword by remember { mutableStateOf(false) }
-    var showConfirmPassword by remember { mutableStateOf(false) }
-    var lgpdAccepted by remember { mutableStateOf(false) }
+    var lgpdAccepted by remember { mutableStateOf(true) }
     var showLgpdDialog by remember { mutableStateOf(false) }
-    var showForgotPasswordDialog by remember { mutableStateOf(false) }
-    var forgotEmailInput by remember { mutableStateOf("") }
 
     // Onboarding values
     var gender by remember { mutableStateOf(Gender.MASCULINO) }
@@ -150,28 +133,9 @@ fun AuthAndOnboardingScreen(
     var heightText by remember { mutableStateOf("178") }
     var selectedBiotype by remember { mutableStateOf(BodyType.MESOMORPH) }
     var trainingDays by remember { mutableStateOf(5) }
-    var activityLevel by remember { mutableStateOf(ActivityLevel.MODERATE) }
     var goal by remember { mutableStateOf(FitnessGoal.BULKING_CLEAN) }
     var isAthlete by remember { mutableStateOf(true) }
 
-    // Password criteria computation using AuthValidator
-    val strengthScore = AuthValidator.calculatePasswordStrength(password)
-    val hasMinLength = password.length >= 8
-    val hasUpper = password.any { it.isUpperCase() }
-    val hasLower = password.any { it.isLowerCase() }
-    val hasDigit = password.any { it.isDigit() }
-    val hasSpecial = password.any { !it.isLetterOrDigit() }
-    val passwordsMatch = password.isNotEmpty() && password == confirmPassword
-
-    val (strengthLabel, strengthColor) = when (strengthScore) {
-        0, 1 -> "Muito Fraca" to GrowthRed
-        2 -> "Fraca" to GrowthOrange
-        3 -> "Média" to GrowthYellow
-        4 -> "Forte" to GrowthCyan
-        else -> "Excelente & Segura" to GrowthGreen
-    }
-
-    // Handle back button when inside onboarding steps
     if (onboardingStep > 0) {
         BackHandler {
             onboardingStep -= 1
@@ -182,108 +146,163 @@ fun AuthAndOnboardingScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(CarbonDark)
-            .safeDrawingPadding()
     ) {
-        if (onboardingStep == 0) {
-            Image(
-                painter = painterResource(id = R.drawable.login_gym_bg),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                CarbonDark.copy(alpha = 0.80f),
-                                CarbonDark.copy(alpha = 0.95f)
-                            )
+        // High-impact Fitness Dark Premium Hero Background with Orange & Cyan Neon Rim Lighting
+        Image(
+            painter = painterResource(id = R.drawable.img_virtus_login_hero_1793897881271),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            CarbonDark.copy(alpha = if (onboardingStep == 0) 0.42f else 0.78f),
+                            CarbonDark.copy(alpha = 0.85f),
+                            CarbonDark.copy(alpha = 0.96f)
                         )
                     )
-            )
-        }
+                )
+        )
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .safeDrawingPadding()
                 .verticalScroll(rememberScrollState())
                 .imePadding()
-                .padding(horizontal = 20.dp, vertical = 24.dp),
+                .padding(horizontal = 20.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header Branding
+            // Top Brand Crest & Identity
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                    if (onboardingStep > 0) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(onClick = { onboardingStep -= 1 }) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Voltar",
-                                    tint = MaterialTheme.colorScheme.onBackground
-                                )
-                            }
-                            Text(
-                                text = "Etapa $onboardingStep de 3",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = GrowthOrangeLight
+                if (onboardingStep > 0) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        IconButton(onClick = { onboardingStep -= 1 }) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Voltar",
+                                tint = MaterialTheme.colorScheme.onBackground
                             )
                         }
-                    }
-
-                    Surface(
-                        color = GrowthOrange,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.size(56.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
+                        Surface(
+                            color = GrowthOrange.copy(alpha = 0.18f),
+                            shape = RoundedCornerShape(20.dp),
+                            border = BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.5f))
+                        ) {
+                            Text(
+                                text = "PASSO $onboardingStep DE 3",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = GrowthOrangeLight,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                            )
                         }
+                        Spacer(modifier = Modifier.width(40.dp))
                     }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "Victus Dieta & Treino",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        letterSpacing = 1.sp
-                    )
-                    Text(
-                        text = when (onboardingStep) {
-                            0 -> if (isRegisterMode) "Cadastro de Nova Conta" else ""
-                            1 -> "Passo 1/3: Informações Biométricas"
-                            2 -> "Passo 2/3: Guia e Escolha de Biotipo"
-                            else -> "Passo 3/3: Rotina e Metas Nutricionais"
-                        },
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(18.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                 }
 
-            // Error banner if any auth error occurs
+                // Virtus Metallic Neon Crest Emblem (1:1 aspect ratio, zero distortion)
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(if (onboardingStep == 0) 92.dp else 64.dp)
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(Color(0xFF0D0F12))
+                        .border(
+                            width = 1.5.dp,
+                            brush = Brush.linearGradient(
+                                colors = listOf(GrowthOrange, GrowthCyan)
+                            ),
+                            shape = RoundedCornerShape(22.dp)
+                        )
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.img_virtus_brand_emblem_1793897882182),
+                        contentDescription = "Emblema Virtus - Dieta & Treino",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(4.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Surface(
+                    color = CarbonCardElevated.copy(alpha = 0.85f),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.35f))
+                ) {
+                    Text(
+                        text = "PERFORMANCE • HIPERTROFIA • NUTRIÇÃO",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = GrowthCyan,
+                        letterSpacing = 1.2.sp,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Virtus - Dieta & Treino",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White,
+                    letterSpacing = 0.5.sp,
+                    textAlign = TextAlign.Center
+                )
+
+                Text(
+                    text = when (onboardingStep) {
+                        0 -> "Seu ecossistema inteligente de treinos, macros e evolução física."
+                        1 -> "Passo 1/3: Medidas Biométricas para Cálculo de TMB"
+                        2 -> "Passo 2/3: Guia Visual e Escolha do seu Biotipo"
+                        else -> "Passo 3/3: Frequência Semanal e Meta Nutricional"
+                    },
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            // Dismissible Error Banner
             if (authError != null && onboardingStep == 0) {
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = GrowthRed.copy(alpha = 0.15f)),
+                    colors = CardDefaults.cardColors(containerColor = GrowthRed.copy(alpha = 0.16f)),
                     shape = RoundedCornerShape(12.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, GrowthRed.copy(alpha = 0.5f)),
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp)
+                    border = BorderStroke(1.dp, GrowthRed.copy(alpha = 0.5f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 14.dp)
                 ) {
                     Row(
                         modifier = Modifier.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = GrowthRed, modifier = Modifier.size(20.dp))
+                        Icon(
+                            Icons.Default.ErrorOutline,
+                            contentDescription = null,
+                            tint = GrowthRed,
+                            modifier = Modifier.size(20.dp)
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = authError ?: "",
@@ -295,341 +314,290 @@ fun AuthAndOnboardingScreen(
                             onClick = { viewModel.clearAuthError() },
                             modifier = Modifier.size(24.dp)
                         ) {
-                            Icon(Icons.Default.Close, contentDescription = "Fechar", tint = GrowthRed, modifier = Modifier.size(16.dp))
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Fechar",
+                                tint = GrowthRed,
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
                     }
                 }
             }
 
             if (onboardingStep == 0) {
-                // Step 0: Firebase Auth Login / Registration
+                val context = LocalContext.current
+                val coroutineScope = rememberCoroutineScope()
+                val credentialManager = remember { CredentialManager.create(context) }
+                val fragmentActivity = context as? FragmentActivity
+                val biometricSupport = remember(context) {
+                    BiometricAuthHelper.checkBiometricSupport(context)
+                }
+
+                // Auto-login Google silencioso ao abrir se já houver sessão Firebase ou credencial autorizada
+                LaunchedEffect(Unit) {
+                    if (!userProfile.isLoggedIn) {
+                        GoogleCredentialAuthHelper.attemptSilentAutoSignIn(
+                            context = context,
+                            credentialManager = credentialManager,
+                            scope = coroutineScope,
+                            onCredentialObtained = { authCredential ->
+                                viewModel.loginWithGoogleCredential(authCredential, onAuthSuccess)
+                            },
+                            onAlreadyAuthenticated = {
+                                viewModel.restoreActiveFirebaseSession(onRestored = onAuthSuccess)
+                            }
+                        )
+                    }
+                }
+
+                val hasConfiguredEmail = userProfile.email.isNotBlank() &&
+                    userProfile.email.contains("@") &&
+                    userProfile.email.contains(".") &&
+                    !userProfile.email.endsWith("@growth.local") &&
+                    !userProfile.firebaseUid.startsWith("guest_")
+                val hasConfiguredProfile = userProfile.hasCompletedOnboarding &&
+                    userProfile.weightKg > 30f &&
+                    userProfile.name.isNotBlank() &&
+                    userProfile.name != "Atleta"
+                val isBiometricsReady = hasConfiguredEmail && hasConfiguredProfile
+
+                // Main Access Hub Card (Google + Biometria + Criar Perfil + Visitante)
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = CarbonCard),
-                    shape = RoundedCornerShape(16.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
+                    colors = CardDefaults.cardColors(containerColor = CarbonCard.copy(alpha = 0.94f)),
+                    shape = RoundedCornerShape(20.dp),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        brush = Brush.linearGradient(
+                            colors = listOf(GrowthOrange.copy(alpha = 0.65f), GrowthCyan.copy(alpha = 0.55f))
+                        )
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = if (isRegisterMode) "CRIAR CONTA" else "ENTRAR",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = GrowthOrangeLight,
-                                    letterSpacing = 1.sp
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            val context = LocalContext.current
-                            val coroutineScope = rememberCoroutineScope()
-                            val credentialManager = remember { CredentialManager.create(context) }
-                            val userProfile by viewModel.userProfile.collectAsStateWithLifecycle()
-
-                            // Biometric Sign In Option (Fingerprint / Face Unlock)
-                            if (!isRegisterMode) {
-                                val fragmentActivity = context as? FragmentActivity
-                                val hasConfiguredEmail = userProfile.email.isNotBlank() &&
-                                    userProfile.email.contains("@") &&
-                                    userProfile.email.contains(".") &&
-                                    !userProfile.email.endsWith("@growth.local") &&
-                                    !userProfile.firebaseUid.startsWith("guest_")
-                                val hasConfiguredProfile = userProfile.hasCompletedOnboarding && userProfile.weightKg > 30f && userProfile.name.isNotBlank() && userProfile.name != "Atleta"
-                                val isBiometricsReady = hasConfiguredEmail && hasConfiguredProfile
-
-                                Button(
-                                    onClick = {
-                                        if (!isBiometricsReady) {
-                                            viewModel.showToast("Nenhum perfil configurado com e-mail válido. Cadastre-se ou entre com seu e-mail primeiro.")
-                                            return@Button
-                                        }
-                                        if (fragmentActivity != null) {
-                                            BiometricAuthHelper.promptBiometricAuth(
-                                                activity = fragmentActivity,
-                                                title = "Login com Biometria",
-                                                subtitle = "Perfil: ${userProfile.email}",
-                                                description = "Confirme sua digital ou Face para entrar no seu plano.",
-                                                onSuccess = {
-                                                    viewModel.loginWithBiometrics(onSuccess = onAuthSuccess)
-                                                },
-                                                onError = { errorMsg ->
-                                                    viewModel.showToast(errorMsg)
-                                                }
-                                            )
-                                        } else {
-                                            viewModel.showToast("Sensor biométrico não suportado neste ambiente.")
-                                        }
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // 1. GOOGLE SIGN-IN (Ação Principal — Laranja #FF6D00 + Delta Sync Merge)
+                        Button(
+                            onClick = {
+                                GoogleCredentialAuthHelper.launchInteractiveGoogleSignIn(
+                                    context = context,
+                                    credentialManager = credentialManager,
+                                    scope = coroutineScope,
+                                    onCredentialObtained = { authCredential ->
+                                        viewModel.loginWithGoogleCredential(authCredential, onAuthSuccess)
                                     },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(48.dp)
-                                        .testTag("biometric_login_btn"),
-                                    shape = RoundedCornerShape(10.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (isBiometricsReady) GrowthOrange else CarbonCardElevated,
-                                        contentColor = Color.White
-                                    )
+                                    onCancelled = {
+                                        viewModel.clearAuthError()
+                                    },
+                                    onError = { friendlyError ->
+                                        viewModel.showToast(friendlyError)
+                                    }
+                                )
+                            },
+                            enabled = !isAuthLoading,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(54.dp)
+                                .testTag("google_signin_btn"),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = GrowthOrange,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            if (isAuthLoading) {
+                                CircularProgressIndicator(
+                                    color = Color.White,
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Fingerprint,
-                                            contentDescription = "Biometria",
-                                            tint = if (isBiometricsReady) Color.White else GrowthOrange,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = if (isBiometricsReady) "Entrar com Biometria (${userProfile.email})" else "Entrar com Biometria",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(10.dp))
-                            }
-
-                            OutlinedButton(
-                                onClick = {
-                                    val clientId = try {
-                                        context.getString(R.string.default_web_client_id)
-                                    } catch (_: Exception) { "" }
-                                    if (clientId.isNotBlank()) {
-                                        val signInOption = GetSignInWithGoogleOption.Builder(serverClientId = clientId).build()
-                                        val request = GetCredentialRequest.Builder().addCredentialOption(signInOption).build()
-                                        coroutineScope.launch {
-                                            try {
-                                                val result = credentialManager.getCredential(context as Activity, request)
-                                                val cred = result.credential
-                                                if (cred is CustomCredential && cred.type == TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-                                                    val googleIdToken = GoogleIdTokenCredential.createFrom(cred.data).idToken
-                                                    val authCredential = GoogleAuthProvider.getCredential(googleIdToken, null)
-                                                    viewModel.loginWithGoogleCredential(authCredential, onAuthSuccess)
-                                                }
-                                            } catch (_: GetCredentialCancellationException) {
-                                                // user cancelled
-                                            } catch (e: Exception) {
-                                                val detail = e.message?.take(120)?.takeIf { it.isNotBlank() }
-                                                viewModel.showToast(
-                                                    if (detail != null) "Falha no Google Sign-In: $detail"
-                                                    else "Google Sign-In indisponível. Verifique a configuração Firebase."
-                                                )
-                                            }
-                                        }
-                                    } else {
-                                        viewModel.showToast("Google Sign-In não configurado. Utilize seu e-mail/senha ou o Acesso Rápido abaixo.")
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth().height(48.dp).testTag("google_signin_btn"),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = CarbonCardElevated,
-                                    contentColor = Color.White
-                                ),
-                                border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder)
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         imageVector = Icons.Default.Security,
                                         contentDescription = null,
-                                        tint = GrowthCyan,
-                                        modifier = Modifier.size(18.dp)
+                                        tint = Color.White,
+                                        modifier = Modifier.size(20.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Entrar com Conta Google",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f)
-                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column(horizontalAlignment = Alignment.Start) {
+                                        Text(
+                                            text = "Entrar com Conta Google",
+                                            fontWeight = FontWeight.Black,
+                                            fontSize = 13.sp,
+                                            color = Color.White
+                                        )
+                                        Text(
+                                            text = "Mescla seus dados locais com a nuvem (Delta Sync)",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color.White.copy(alpha = 0.88f)
+                                        )
+                                    }
                                 }
                             }
+                        }
 
-                            Spacer(modifier = Modifier.height(14.dp))
-
+                        // 2. BIOMETRIC SIGN-IN (Ação Secundária — Ciano #00E5FF)
+                        OutlinedButton(
+                            onClick = {
+                                if (!isBiometricsReady) {
+                                    viewModel.showToast("Vincule sua conta Google ou conclua seu perfil primeiro para liberar a biometria.")
+                                    return@OutlinedButton
+                                }
+                                if (fragmentActivity != null) {
+                                    BiometricAuthHelper.promptBiometricAuth(
+                                        activity = fragmentActivity,
+                                        title = "Login Biométrico Virtus",
+                                        subtitle = "Perfil: ${userProfile.email}",
+                                        description = "Confirme sua digital ou reconhecimento facial para entrar.",
+                                        onSuccess = {
+                                            viewModel.loginWithBiometrics(onSuccess = onAuthSuccess)
+                                        },
+                                        onError = { errorMsg ->
+                                            viewModel.showToast(errorMsg)
+                                        }
+                                    )
+                                } else {
+                                    viewModel.showToast("Sensor biométrico (${biometricSupport.label}) indisponível neste momento.")
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp)
+                                .testTag("biometric_login_btn"),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, if (isBiometricsReady) GrowthCyan else GrowthCyan.copy(alpha = 0.45f)),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = if (isBiometricsReady) GrowthCyan.copy(alpha = 0.14f) else CarbonCardElevated,
+                                contentColor = GrowthCyan
+                            )
+                        ) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                HorizontalDivider(modifier = Modifier.weight(1f), color = CarbonBorder)
-                                Text(
-                                    text = " OU E-MAIL ",
-                                    fontSize = 10.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 8.dp)
+                                Icon(
+                                    imageVector = Icons.Default.Fingerprint,
+                                    contentDescription = "Biometria",
+                                    tint = GrowthCyan,
+                                    modifier = Modifier.size(22.dp)
                                 )
-                                HorizontalDivider(modifier = Modifier.weight(1f), color = CarbonBorder)
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = if (isBiometricsReady) {
+                                        "Entrar com Biometria (${userProfile.name})"
+                                    } else {
+                                        "Entrar com Biometria (Digital / Face)"
+                                    },
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = GrowthCyan,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
+                        }
 
-                            Spacer(modifier = Modifier.height(14.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            HorizontalDivider(modifier = Modifier.weight(1f), color = CarbonBorder)
+                            Text(
+                                text = " OU INICIAR NO APARELHO ",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 8.dp)
+                            )
+                            HorizontalDivider(modifier = Modifier.weight(1f), color = CarbonBorder)
+                        }
 
-                            if (isRegisterMode) {
+                        // 3. CRIAR PERFIL & CALCULAR METAS (3-Step Guided Onboarding)
+                        Button(
+                            onClick = {
+                                if (!showCreateProfileSetup) {
+                                    showCreateProfileSetup = true
+                                } else if (lgpdAccepted) {
+                                    onboardingStep = 1
+                                } else {
+                                    viewModel.showToast("Confirme os Termos de Privacidade (LGPD) para criar seu perfil.")
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (showCreateProfileSetup) GrowthOrange else CarbonCardElevated,
+                                contentColor = Color.White
+                            ),
+                            border = BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.65f)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp)
+                                .testTag("auth_submit_btn")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = if (showCreateProfileSetup) Color.White else GrowthOrangeLight,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (showCreateProfileSetup) {
+                                    "AVANÇAR PARA MEDIDAS & BIOTIPO (1/3)"
+                                } else {
+                                    "Criar Meu Perfil & Calcular Metas"
+                                },
+                                fontWeight = FontWeight.Black,
+                                fontSize = 12.sp,
+                                color = if (showCreateProfileSetup) Color.White else GrowthOrangeLight
+                            )
+                        }
+
+                        AnimatedVisibility(visible = showCreateProfileSetup) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
                                 OutlinedTextField(
                                     value = name,
                                     onValueChange = { name = it },
-                                    label = { Text("Nome Completo") },
-                                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = GrowthOrange) },
-                                    modifier = Modifier.fillMaxWidth().testTag("auth_name_input"),
+                                    label = { Text("Como prefere ser chamado(a)?") },
+                                    placeholder = { Text("Ex: Patrick") },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Default.Person,
+                                            contentDescription = null,
+                                            tint = GrowthOrange
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("auth_name_input"),
                                     singleLine = true,
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedBorderColor = GrowthOrange,
-                                        unfocusedBorderColor = CarbonBorder
-                                    )
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                            }
-
-                            val hasLoginError = authError != null && !isRegisterMode
-
-                            OutlinedTextField(
-                                value = email,
-                                onValueChange = { 
-                                    email = it
-                                    if (authError != null) viewModel.clearAuthError()
-                                },
-                                isError = hasLoginError,
-                                label = { Text("E-mail do Atleta") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                                modifier = Modifier.fillMaxWidth().testTag("auth_email_input"),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = if (hasLoginError) GrowthRed else GrowthOrange,
-                                    unfocusedBorderColor = if (hasLoginError) GrowthRed else CarbonBorder
-                                )
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            OutlinedTextField(
-                                value = password,
-                                onValueChange = { 
-                                    password = it
-                                    if (authError != null) viewModel.clearAuthError()
-                                },
-                                isError = hasLoginError,
-                                label = { Text(if (isRegisterMode) "Senha Forte" else "Senha") },
-                                visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                                singleLine = true,
-                                trailingIcon = {
-                                    IconButton(onClick = { showPassword = !showPassword }) {
-                                        Icon(
-                                            imageVector = if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth().testTag("auth_password_input"),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = if (hasLoginError) GrowthRed else GrowthOrange,
-                                    unfocusedBorderColor = if (hasLoginError) GrowthRed else CarbonBorder
-                                )
-                            )
-                            if (hasLoginError) {
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = authError ?: "E-mail ou senha incorretos.",
-                                    color = GrowthRed,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-
-                            // Registration Mode: Confirm Password & Password Strength Checklist
-                            if (isRegisterMode) {
-                                Spacer(modifier = Modifier.height(12.dp))
-                                OutlinedTextField(
-                                    value = confirmPassword,
-                                    onValueChange = { confirmPassword = it },
-                                    label = { Text("Confirmar Senha") },
-                                    visualTransformation = if (showConfirmPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                                    singleLine = true,
-                                    trailingIcon = {
-                                        IconButton(onClick = { showConfirmPassword = !showConfirmPassword }) {
-                                            Icon(
-                                                imageVector = if (showConfirmPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth().testTag("auth_confirm_password_input"),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = if (confirmPassword.isNotEmpty() && !passwordsMatch) GrowthRed else GrowthOrange,
-                                        unfocusedBorderColor = CarbonBorder
+                                        unfocusedBorderColor = GrowthCyan.copy(alpha = 0.4f)
                                     )
                                 )
 
-                                if (confirmPassword.isNotEmpty() && !passwordsMatch) {
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "As senhas não coincidem.",
-                                        fontSize = 11.sp,
-                                        color = GrowthRed
-                                    )
-                                }
-
-                                // Password Strength Meter Bar
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("Força da Senha:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(strengthLabel, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = strengthColor)
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                LinearProgressIndicator(
-                                    progress = { (strengthScore / 5f).coerceIn(0.05f, 1f) },
-                                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                                    color = strengthColor,
-                                    trackColor = CarbonCardElevated
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                // Itemized requirements checklist
-                                Surface(
-                                    color = CarbonCardElevated,
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Column(modifier = Modifier.padding(10.dp)) {
-                                        Text("Requisitos de Segurança da Senha:", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        PasswordRuleItem(isValid = hasMinLength, label = "Mínimo 8 caracteres")
-                                        PasswordRuleItem(isValid = hasUpper, label = "Pelo menos 1 letra maiúscula (A-Z)")
-                                        PasswordRuleItem(isValid = hasLower, label = "Pelo menos 1 letra minúscula (a-z)")
-                                        PasswordRuleItem(isValid = hasDigit, label = "Pelo menos 1 número (0-9)")
-                                        PasswordRuleItem(isValid = hasSpecial, label = "Pelo menos 1 caractere especial (!@#$...)")
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(14.dp))
-
-                                // LGPD Consent Checkbox Box
                                 Surface(
                                     color = CarbonCardElevated,
                                     shape = RoundedCornerShape(10.dp),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, if (lgpdAccepted) GrowthGreen else CarbonBorder),
+                                    border = BorderStroke(1.dp, if (lgpdAccepted) GrowthCyan.copy(alpha = 0.5f) else CarbonBorder),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(
-                                        modifier = Modifier.padding(10.dp),
+                                        modifier = Modifier.padding(8.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Checkbox(
@@ -641,475 +609,417 @@ fun AuthAndOnboardingScreen(
                                             ),
                                             modifier = Modifier.testTag("lgpd_checkbox")
                                         )
-                                        Spacer(modifier = Modifier.width(6.dp))
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Default.Shield, contentDescription = null, tint = GrowthGreen, modifier = Modifier.size(14.dp))
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                Text("Termos de Privacidade & LGPD", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                                            }
                                             Text(
-                                                text = "Concordo com a coleta e tratamento de dados corporais, nutricionais e treinos conforme a Lei 13.709/18.",
+                                                text = "Proteção de Dados (LGPD)",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onBackground
+                                            )
+                                            Text(
+                                                text = "Seus dados corporais são usados apenas para calcular suas metas de treino e dieta.",
                                                 fontSize = 10.sp,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
-                                        TextButton(
-                                            onClick = { showLgpdDialog = true },
-                                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
-                                        ) {
-                                            Text("Ler termos", fontSize = 10.sp, color = GrowthCyan)
+                                        TextButton(onClick = { showLgpdDialog = true }) {
+                                            Text("Termos", fontSize = 10.sp, color = GrowthCyan)
                                         }
                                     }
                                 }
-                            } else {
-                                // Login Mode: Forgot password link
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End
-                                ) {
-                                    TextButton(onClick = { 
-                                        forgotEmailInput = email
-                                        showForgotPasswordDialog = true 
-                                    }) {
-                                        Text("Esqueceu a senha?", fontSize = 11.sp, color = GrowthCyan)
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            // Submit Button validation using AuthValidator
-                            val emailValidation = AuthValidator.validateEmail(email)
-                            val passwordValidation = AuthValidator.validatePassword(password, if (isRegisterMode) 8 else 1)
-                            val nameValidation = AuthValidator.validateName(name)
-                            
-                            val isSubmitEnabled = if (isRegisterMode) {
-                                nameValidation.isValid && emailValidation.isValid && strengthScore >= 4 && passwordsMatch && lgpdAccepted && !isAuthLoading
-                            } else {
-                                emailValidation.isValid && passwordValidation.isValid && !isAuthLoading
-                            }
-
-                            Button(
-                                onClick = {
-                                    val sanitizedEmail = AuthValidator.sanitizeEmail(email)
-                                    val sanitizedPassword = AuthValidator.sanitizePassword(password)
-                                    
-                                    if (isRegisterMode) {
-                                        onboardingStep = 1 // Proceed to biometric onboarding
-                                    } else {
-                                        viewModel.enterAsGuest(onSuccess = onAuthSuccess)
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = GrowthOrange,
-                                    disabledContainerColor = GrowthOrange.copy(alpha = 0.4f)
-                                ),
-                                shape = RoundedCornerShape(10.dp),
-                                enabled = isSubmitEnabled,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp)
-                                    .testTag("auth_submit_btn")
-                            ) {
-                                if (isAuthLoading) {
-                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                                } else {
-                                    Text(
-                                        text = if (isRegisterMode) "AVANÇAR PARA DADOS CORPORAIS (1/3)" else "ENTRAR NO APP",
-                                        fontWeight = FontWeight.Black,
-                                        fontSize = 12.sp,
-                                        color = Color.White
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            TextButton(
-                                onClick = { 
-                                    isRegisterMode = !isRegisterMode
-                                    viewModel.clearAuthError()
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = if (isRegisterMode) "Já tem conta? Entrar com e-mail" else "Não tem conta? Cadastre-se com segurança LGPD",
-                                    color = GrowthCyan,
-                                    fontSize = 12.sp,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-
-                            if (!isRegisterMode) {
-                                Spacer(modifier = Modifier.height(6.dp))
-                                OutlinedButton(
-                                    onClick = { viewModel.enterAsGuest(onSuccess = onAuthSuccess) },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(44.dp)
-                                        .testTag("guest_login_btn"),
-                                    shape = RoundedCornerShape(10.dp),
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        containerColor = Color.Transparent,
-                                        contentColor = Color.LightGray
-                                    ),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder)
-                                ) {
-                                    Text("ACESSO RÁPIDO (MODO LOCAL OFFLINE)", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                }
                             }
                         }
+
+                        // 4. CONTINUAR COMO VISITANTE (Modo Local com fusão futura via Delta Sync)
+                        OutlinedButton(
+                            onClick = { viewModel.enterAsGuest(onSuccess = onAuthSuccess) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .testTag("guest_login_btn"),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                containerColor = CarbonCardElevated.copy(alpha = 0.5f),
+                                contentColor = GrowthCyan
+                            ),
+                            border = BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.35f))
+                        ) {
+                            Text(
+                                text = "Explorar como Visitante (Mescla com Google depois)",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = GrowthCyan
+                            )
+                        }
                     }
+                }
             } else if (onboardingStep == 1) {
                 // Step 1: Body Metrics (Altura, Peso, Idade, Gênero)
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = CarbonCard),
-                    shape = RoundedCornerShape(16.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
+                    colors = CardDefaults.cardColors(containerColor = CarbonCard.copy(alpha = 0.95f)),
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(1.dp, CarbonBorder),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
-                            Text(
-                                text = "PASSO 1 DE 3: DADOS BIOMÉTRICOS",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = GrowthOrangeLight,
-                                letterSpacing = 1.sp
+                        Text(
+                            text = "PASSO 1 DE 3: SUAS MEDIDAS ATUAIS",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = GrowthOrangeLight,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Base para Taxa Metabólica Basal & Macros",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Text("Sexo Biológico:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilterChip(
+                                selected = gender == Gender.MASCULINO,
+                                onClick = { gender = Gender.MASCULINO },
+                                label = { Text("Masculino", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = GrowthOrange,
+                                    selectedLabelColor = Color.White
+                                ),
+                                modifier = Modifier.weight(1f)
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Informações para Cálculo de TMB & Macros",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground
+                            FilterChip(
+                                selected = gender == Gender.FEMININO,
+                                onClick = { gender = Gender.FEMININO },
+                                label = { Text("Feminino", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = GrowthOrange,
+                                    selectedLabelColor = Color.White
+                                ),
+                                modifier = Modifier.weight(1f)
                             )
-                            Spacer(modifier = Modifier.height(14.dp))
+                        }
 
-                            // Gender selection
-                            Text("Gênero Biológico:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                FilterChip(
-                                    selected = gender == Gender.MASCULINO,
-                                    onClick = { gender = Gender.MASCULINO },
-                                    label = { Text("Masculino", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = GrowthOrange,
-                                        selectedLabelColor = Color.White
-                                    ),
-                                    modifier = Modifier.weight(1f)
-                                )
-                                FilterChip(
-                                    selected = gender == Gender.FEMININO,
-                                    onClick = { gender = Gender.FEMININO },
-                                    label = { Text("Feminino", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = GrowthOrange,
-                                        selectedLabelColor = Color.White
-                                    ),
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
+                        Spacer(modifier = Modifier.height(14.dp))
 
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                OutlinedTextField(
-                                    value = weightText,
-                                    onValueChange = { weightText = it },
-                                    label = { Text("Peso (kg)") },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                    modifier = Modifier.weight(1f).testTag("onboard_weight_input"),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = GrowthOrange,
-                                        unfocusedBorderColor = CarbonBorder
-                                    )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = weightText,
+                                onValueChange = { weightText = it },
+                                label = { Text("Peso (kg)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("onboard_weight_input"),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = GrowthOrange,
+                                    unfocusedBorderColor = CarbonBorder
                                 )
-                                OutlinedTextField(
-                                    value = heightText,
-                                    onValueChange = { heightText = it },
-                                    label = { Text("Altura (cm)") },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.weight(1f).testTag("onboard_height_input"),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = GrowthOrange,
-                                        unfocusedBorderColor = CarbonBorder
-                                    )
+                            )
+                            OutlinedTextField(
+                                value = heightText,
+                                onValueChange = { heightText = it },
+                                label = { Text("Altura (cm)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("onboard_height_input"),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = GrowthOrange,
+                                    unfocusedBorderColor = CarbonBorder
                                 )
-                                OutlinedTextField(
-                                    value = ageText,
-                                    onValueChange = { ageText = it },
-                                    label = { Text("Idade") },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                    modifier = Modifier.weight(1f),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = GrowthOrange,
-                                        unfocusedBorderColor = CarbonBorder
-                                    )
+                            )
+                            OutlinedTextField(
+                                value = ageText,
+                                onValueChange = { ageText = it },
+                                label = { Text("Idade") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.weight(1f),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = GrowthOrange,
+                                    unfocusedBorderColor = CarbonBorder
                                 )
-                            }
+                            )
+                        }
 
-                            Spacer(modifier = Modifier.height(20.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
 
-                            Button(
-                                onClick = { onboardingStep = 2 },
-                                colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.fillMaxWidth().height(48.dp)
-                            ) {
-                                Text("PRÓXIMO: ESCOLHER BIOTIPO", fontWeight = FontWeight.Bold, color = Color.White)
-                            }
+                        Button(
+                            onClick = { onboardingStep = 2 },
+                            colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                        ) {
+                            Text("PRÓXIMO: ESCOLHER BIOTIPO", fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
+                }
             } else if (onboardingStep == 2) {
-                // Step 2: Biotype Guide & Selection (Ectomorfo, Mesomorfo, Endomorfo)
+                // Step 2: Biotype Guide & Selection (Uncropped 16:9 Fit Illustration)
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = CarbonCard),
-                    shape = RoundedCornerShape(16.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
+                    colors = CardDefaults.cardColors(containerColor = CarbonCard.copy(alpha = 0.95f)),
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(1.dp, CarbonBorder),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = "PASSO 2 DE 3: SEU BIOTIPO CORPORAL",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = GrowthOrangeLight,
-                                letterSpacing = 1.sp
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Guia Visual de Biotipos",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "PASSO 2 DE 3: SEU BIOTIPO CORPORAL",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = GrowthOrangeLight,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Guia Visual de Biotipos (Corpo Inteiro)",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
 
-                            // Infographic Image Banner
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = CarbonCardElevated,
-                                modifier = Modifier.fillMaxWidth().height(160.dp)
+                        // Uncropped 16:9 Biotype Guide Image with ContentScale.Fit
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFF0D0F12),
+                            border = BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.35f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(16f / 9f)
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.img_virtus_biotypes_guide_1793897883995),
+                                contentDescription = "Guia Ilustrado de Biotipos: Ectomorfo, Mesomorfo e Endomorfo",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(4.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        BodyType.values().forEach { biotype ->
+                            val isSelected = selectedBiotype == biotype
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isSelected) GrowthOrange.copy(alpha = 0.15f) else CarbonCardElevated
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (isSelected) GrowthOrange else CarbonBorder
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .clickable { selectedBiotype = biotype }
+                                    .testTag("biotype_card_${biotype.name}")
                             ) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.body_types_guide_1791310055094),
-                                    contentDescription = "Guia Ilustrado de Biotipos",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            BodyType.values().forEach { biotype ->
-                                val isSelected = selectedBiotype == biotype
-                                Card(
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = if (isSelected) GrowthOrange.copy(alpha = 0.15f) else CarbonCardElevated
-                                    ),
-                                    shape = RoundedCornerShape(12.dp),
-                                    border = androidx.compose.foundation.BorderStroke(
-                                        1.dp,
-                                        if (isSelected) GrowthOrange else CarbonBorder
-                                    ),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp)
-                                        .clickable { selectedBiotype = biotype }
-                                        .testTag("biotype_card_${biotype.name}")
-                                ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = biotype.title,
-                                                fontSize = 15.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (isSelected) GrowthOrangeLight else MaterialTheme.colorScheme.onBackground
-                                            )
-                                            if (isSelected) {
-                                                Icon(Icons.Default.Check, contentDescription = null, tint = GrowthOrange, modifier = Modifier.size(18.dp))
-                                            }
-                                        }
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
                                         Text(
-                                            text = biotype.subtitle,
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = GrowthCyan
+                                            text = biotype.title,
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) GrowthOrangeLight else MaterialTheme.colorScheme.onBackground
                                         )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Text(
-                                            text = biotype.description,
-                                            fontSize = 11.sp,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        Surface(
-                                            color = CarbonCard,
-                                            shape = RoundedCornerShape(6.dp),
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Text(
-                                                text = "💡 Dieta: ${biotype.dietStrategy}",
-                                                fontSize = 10.sp,
-                                                color = GrowthYellow,
-                                                modifier = Modifier.padding(6.dp)
+                                        if (isSelected) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = GrowthOrange,
+                                                modifier = Modifier.size(18.dp)
                                             )
                                         }
                                     }
+                                    Text(
+                                        text = biotype.subtitle,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = GrowthCyan
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = biotype.description,
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Surface(
+                                        color = CarbonCard,
+                                        shape = RoundedCornerShape(6.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            text = "💡 Estratégia: ${biotype.dietStrategy}",
+                                            fontSize = 10.sp,
+                                            color = GrowthYellow,
+                                            modifier = Modifier.padding(6.dp)
+                                        )
+                                    }
                                 }
                             }
+                        }
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                            Button(
-                                onClick = { onboardingStep = 3 },
-                                colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.fillMaxWidth().height(48.dp)
-                            ) {
-                                Text("PRÓXIMO: ROTINA DE TREINOS", fontWeight = FontWeight.Bold, color = Color.White)
-                            }
+                        Button(
+                            onClick = { onboardingStep = 3 },
+                            colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                        ) {
+                            Text("PRÓXIMO: FREQUÊNCIA E OBJETIVO", fontWeight = FontWeight.Bold, color = Color.White)
                         }
                     }
+                }
             } else {
-                // Step 3: Training frequency & Goal & Firebase Creation
+                // Step 3: Training frequency & Goal
                 Card(
-                    colors = CardDefaults.cardColors(containerColor = CarbonCard),
-                    shape = RoundedCornerShape(16.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, CarbonBorder),
+                    colors = CardDefaults.cardColors(containerColor = CarbonCard.copy(alpha = 0.95f)),
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(1.dp, CarbonBorder),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
-                            Text(
-                                text = "PASSO 3 DE 3: FREQUÊNCIA & METAS",
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = GrowthOrangeLight,
-                                letterSpacing = 1.sp
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "Sua Rotina de Treinos",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Spacer(modifier = Modifier.height(14.dp))
+                        Text(
+                            text = "PASSO 3 DE 3: FREQUÊNCIA & METAS",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = GrowthOrangeLight,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Sua Rotina de Treinos e Objetivo",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
 
-                            Text("Quantos dias você treina por semana?", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(modifier = Modifier.height(8.dp))
+                        Text("Quantos dias você treina por semana?", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                (3..6).forEach { days ->
-                                    FilterChip(
-                                        selected = trainingDays == days,
-                                        onClick = { trainingDays = days },
-                                        label = { Text("${days}x/sem", fontSize = 11.sp) },
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = GrowthOrange,
-                                            selectedLabelColor = Color.White
-                                        ),
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(14.dp))
-                            Text("Objetivo Nutricional Principal:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            FitnessGoal.values().forEach { fg ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { goal = fg }
-                                        .padding(vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Surface(
-                                        color = if (goal == fg) GrowthGreen else CarbonCardElevated,
-                                        shape = CircleShape,
-                                        modifier = Modifier.size(18.dp)
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            if (goal == fg) {
-                                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black, modifier = Modifier.size(12.dp))
-                                            }
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = fg.label,
-                                        fontSize = 12.sp,
-                                        fontWeight = if (goal == fg) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (goal == fg) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-
-                            if (authError != null) {
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Text(
-                                    text = authError ?: "",
-                                    fontSize = 12.sp,
-                                    color = GrowthRed
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            (3..6).forEach { days ->
+                                FilterChip(
+                                    selected = trainingDays == days,
+                                    onClick = { trainingDays = days },
+                                    label = { Text("${days}x/sem", fontSize = 11.sp) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = GrowthOrange,
+                                        selectedLabelColor = Color.White
+                                    ),
+                                    modifier = Modifier.weight(1f)
                                 )
                             }
+                        }
 
-                            Spacer(modifier = Modifier.height(20.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Text("Objetivo Principal:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                            Button(
-                                onClick = {
-                                    val w = weightText.toFloatOrNull() ?: 78f
-                                    val h = heightText.toFloatOrNull() ?: 178f
-                                    val a = ageText.toIntOrNull() ?: 25
-
-                                    viewModel.completeOnboardingProfile(
-                                        name = name.ifBlank { "Atleta" },
-                                        email = email.ifBlank { "atleta@growth.local" },
-                                        gender = gender,
-                                        age = a,
-                                        weightKg = w,
-                                        heightCm = h,
-                                        biotype = selectedBiotype,
-                                        trainingDays = trainingDays,
-                                        activityLevel = if (trainingDays >= 5) ActivityLevel.VERY_ACTIVE else ActivityLevel.MODERATE,
-                                        goal = goal,
-                                        isAthlete = isAthlete
-                                    )
-                                    onAuthSuccess()
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
-                                shape = RoundedCornerShape(10.dp),
-                                enabled = !isAuthLoading,
+                        FitnessGoal.values().forEach { fg ->
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(50.dp)
-                                    .testTag("finish_onboarding_btn")
+                                    .clickable { goal = fg }
+                                    .padding(vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                if (isAuthLoading) {
-                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                                } else {
-                                    Text("CRIAR CONTA NO FIREBASE & ATIVAR PROTOCOLO", fontWeight = FontWeight.Black, fontSize = 11.sp, color = Color.White)
+                                Surface(
+                                    color = if (goal == fg) GrowthGreen else CarbonCardElevated,
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(18.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        if (goal == fg) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = Color.Black,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                        }
+                                    }
                                 }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = fg.label,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (goal == fg) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (goal == fg) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        Button(
+                            onClick = {
+                                val w = weightText.replace(",", ".").toFloatOrNull() ?: 78f
+                                val h = heightText.replace(",", ".").toFloatOrNull() ?: 178f
+                                val a = ageText.toIntOrNull() ?: 25
+
+                                viewModel.completeOnboardingProfile(
+                                    name = name.ifBlank { "Atleta Virtus" },
+                                    email = userProfile.email.ifBlank { "atleta@growth.local" },
+                                    gender = gender,
+                                    age = a,
+                                    weightKg = w,
+                                    heightCm = h,
+                                    biotype = selectedBiotype,
+                                    trainingDays = trainingDays,
+                                    activityLevel = if (trainingDays >= 5) ActivityLevel.VERY_ACTIVE else ActivityLevel.MODERATE,
+                                    goal = goal,
+                                    isAthlete = isAthlete
+                                )
+                                onAuthSuccess()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = !isAuthLoading,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp)
+                                .testTag("finish_onboarding_btn")
+                        ) {
+                            if (isAuthLoading) {
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                            } else {
+                                Text(
+                                    text = "ATIVAR MEU PROTOCOLO VIRTUS 💪",
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 12.sp,
+                                    color = Color.White
+                                )
                             }
                         }
                     }
+                }
             }
         }
 
@@ -1122,32 +1032,34 @@ fun AuthAndOnboardingScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Shield, contentDescription = null, tint = GrowthGreen, modifier = Modifier.size(24.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Termos de Privacidade & LGPD", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
+                        Text(
+                            "Termos de Privacidade & LGPD",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
                     }
                 },
                 text = {
-                    Column {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            text = "Em estrita conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018 - LGPD):",
+                            text = "Conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018 - LGPD):",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = GrowthOrangeLight
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "1. Finalidade: Os dados informados (nome, e-mail, idade, peso, altura, gênero, frequência de treino e compras de alimentos) são utilizados exclusivamente para o cálculo científico de taxas metabólicas, macronutrientes, periodização de treinos e listas de compras.",
+                            text = "1. Finalidade: Seus dados biométricos (peso, altura, idade, biotipo e rotina) são utilizados exclusivamente para calcular suas metas calóricas, divisão de macronutrientes e evolução de cargas.",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "2. Segurança & Armazenamento: A autenticação é provida via Firebase Auth com padrões de criptografia de ponta a ponta. Seus dados corporais ficam persistidos em banco de dados seguro no seu dispositivo.",
+                            text = "2. Armazenamento & Delta Sync: Os dados ficam salvos no seu dispositivo e, quando vinculado à sua Conta Google, são sincronizados com segurança via Cloud Firestore.",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "3. Direitos do Titular: Você possui o direito de exportar seus dados em formato PDF e revogar o consentimento ou excluir sua conta e registros a qualquer momento através do aplicativo.",
+                            text = "3. Controle Total: Você pode exportar relatórios ou excluir sua conta e todos os dados locais/remotos a qualquer momento na aba Perfil.",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1161,7 +1073,7 @@ fun AuthAndOnboardingScreen(
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange)
                     ) {
-                        Text("Aceitar & Prosseguir", color = Color.White)
+                        Text("Aceitar & Continuar", color = Color.White)
                     }
                 },
                 dismissButton = {
@@ -1171,89 +1083,5 @@ fun AuthAndOnboardingScreen(
                 }
             )
         }
-
-        // Forgot Password Dialog
-        if (showForgotPasswordDialog) {
-            AlertDialog(
-                onDismissRequest = { showForgotPasswordDialog = false },
-                containerColor = CarbonCard,
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Lock, contentDescription = null, tint = GrowthCyan, modifier = Modifier.size(24.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Recuperar Senha", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                    }
-                },
-                text = {
-                    Column {
-                        Text(
-                            text = "Digite o e-mail cadastrado. O Firebase enviará um link de redefinição.\n\n" +
-                                    "Atenção:\n" +
-                                    "• O e-mail só é enviado se a conta estiver cadastrada no Firebase.\n" +
-                                    "• Verifique sua caixa de Spam ou Lixo Eletrônico caso não encontre na Caixa de Entrada.",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        OutlinedTextField(
-                            value = forgotEmailInput,
-                            onValueChange = { forgotEmailInput = it },
-                            label = { Text("Seu E-mail") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = GrowthCyan,
-                                unfocusedBorderColor = CarbonBorder
-                            )
-                        )
-                    }
-                },
-                confirmButton = {
-                    Button(
-                        onClick = {
-                            if (forgotEmailInput.isNotBlank()) {
-                                viewModel.showToast("Utilize sua Conta Google para entrar com segurança.")
-                                showForgotPasswordDialog = false
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = GrowthCyan),
-                        enabled = forgotEmailInput.isNotBlank() && !isAuthLoading
-                    ) {
-                        if (isAuthLoading) {
-                            CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                        } else {
-                            Text("Enviar Link de Redefinição", color = Color.Black, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showForgotPasswordDialog = false }) {
-                        Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun PasswordRuleItem(isValid: Boolean, label: String) {
-    Row(
-        modifier = Modifier.padding(vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = if (isValid) Icons.Default.Check else Icons.Default.Close,
-            contentDescription = null,
-            tint = if (isValid) GrowthGreen else GrowthRed.copy(alpha = 0.6f),
-            modifier = Modifier.size(13.dp)
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-            text = label,
-            fontSize = 10.sp,
-            color = if (isValid) GrowthGreen else MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }

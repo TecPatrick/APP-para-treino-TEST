@@ -23,17 +23,23 @@ class SyncController(
         if (!busy.compareAndSet(false, true)) return
         scope.launch {
             try {
-                showMessage("Verificando envios à nuvem...")
+                showMessage("Verificando alterações (Delta Sync)...")
+                val favoriteFoods = try {
+                    repository.allFoods.first().filter { it.isFavorite }
+                } catch (_: Exception) {
+                    emptyList()
+                }
                 val result = syncManager.syncAllData(
-                    repository.getUserProfileDirect(1),
-                    repository.workoutLogs.first(),
-                    repository.progressLogs.first(),
-                    repository.allGpsRouteLogs.first(),
-                    repository.allFoodRecords.first(),
-                    repository.allCardioLogs.first(),
-                    repository.recentIntakeHistory.first()
+                    profile = repository.getUserProfileDirect(1),
+                    workoutLogs = repository.workoutLogs.first(),
+                    progressLogs = repository.progressLogs.first(),
+                    gpsLogs = repository.allGpsRouteLogs.first(),
+                    foodRecords = repository.allFoodRecords.first(),
+                    cardioLogs = repository.allCardioLogs.first(),
+                    dailyIntakes = repository.recentIntakeHistory.first(),
+                    favoriteFoods = favoriteFoods
                 )
-                result.onSuccess { showMessage(it.message()) }
+                result.onSuccess { showMessage(it.shortMessage()) }
                     .onFailure { showMessage(it.message ?: "Falha na sincronização. Tente novamente.") }
             } catch (e: CancellationException) {
                 throw e
