@@ -94,7 +94,7 @@ import com.example.data.model.ActivityLevel
 import com.example.data.model.BodyType
 import com.example.data.model.FitnessGoal
 import com.example.data.model.Gender
-import com.example.ui.VirtusViewModel
+import com.example.ui.AuthViewModel
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
 import com.example.ui.theme.CarbonCardElevated
@@ -112,7 +112,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthAndOnboardingScreen(
-    viewModel: VirtusViewModel,
+    viewModel: AuthViewModel,
     onAuthSuccess: () -> Unit
 ) {
     var onboardingStep by remember { mutableStateOf(0) } // 0: Hub de Acesso, 1: Dados Corporais, 2: Biotipo, 3: Treinos & Metas
@@ -149,7 +149,7 @@ fun AuthAndOnboardingScreen(
     ) {
         // High-impact Fitness Dark Premium Hero Background with Orange & Cyan Neon Rim Lighting
         Image(
-            painter = painterResource(id = R.drawable.img_virtus_login_hero_1793897881271),
+            painter = painterResource(id = R.drawable.img_virtus_login_hero),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
@@ -230,7 +230,7 @@ fun AuthAndOnboardingScreen(
                         )
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.img_virtus_brand_emblem_1793897882182),
+                        painter = painterResource(id = R.drawable.img_virtus_brand_emblem),
                         contentDescription = "Emblema Virtus - Dieta & Treino",
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
@@ -800,7 +800,7 @@ fun AuthAndOnboardingScreen(
                                 .aspectRatio(16f / 9f)
                         ) {
                             Image(
-                                painter = painterResource(id = R.drawable.img_virtus_biotypes_guide_1793897883995),
+                                painter = painterResource(id = R.drawable.img_virtus_biotypes_guide),
                                 contentDescription = "Guia Ilustrado de Biotipos: Ectomorfo, Mesomorfo e Endomorfo",
                                 contentScale = ContentScale.Fit,
                                 modifier = Modifier

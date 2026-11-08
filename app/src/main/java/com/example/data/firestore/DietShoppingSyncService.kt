@@ -3,6 +3,7 @@ package com.example.data.firestore
 import android.content.Context
 import android.util.Log
 import com.example.BuildConfig
+import com.example.R
 import com.example.data.model.FoodCategory
 import com.example.data.model.MealPlanItem
 import com.example.data.model.ShoppingItem
@@ -19,7 +20,9 @@ import kotlin.math.ceil
  */
 class DietShoppingSyncService(private val context: Context) {
 
-    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(
+        context.applicationContext.getString(R.string.firestore_database_id)
+    )
 
     /**
      * Processa os itens de dieta (meal plans) salvos no Firestore para o usuário [userId],

@@ -1,6 +1,0 @@
-{
-  "summary":  "Plano para reestruturar as regras de segurança do Firestore (caminho aninhado para exercícios) e atualizar a lógica de sincronização para suportar essa nova estrutura, incluindo a migração de dados existentes.",
-  "updatedAt":  "2026-10-24T20:35:02.008184696Z",
-  "requestFeedback":  true,
-  "userFacing":  true
-}

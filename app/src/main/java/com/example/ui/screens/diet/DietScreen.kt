@@ -90,7 +90,7 @@ import com.example.data.model.FoodCategory
 import com.example.data.model.FoodItem
 import com.example.data.model.MealPlanItem
 import com.example.data.model.MealType
-import com.example.ui.VirtusViewModel
+import com.example.ui.DietViewModel
 import com.example.ui.components.GrowthHeader
 import com.example.util.MacroCalculator
 import com.example.ui.theme.CarbonBorder
@@ -109,7 +109,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DietScreen(
-    viewModel: VirtusViewModel,
+    viewModel: DietViewModel,
     onNavigateToShopping: () -> Unit
 ) {
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
@@ -314,7 +314,7 @@ fun DietScreen(
                         ) {
                             Box(modifier = Modifier.fillMaxSize()) {
                                 Image(
-                                    painter = painterResource(id = R.drawable.img_virtus_nutrition_banner_1793897887293),
+                                    painter = painterResource(id = R.drawable.img_virtus_nutrition_banner),
                                     contentDescription = "Banner de Nutrição Virtus",
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize()

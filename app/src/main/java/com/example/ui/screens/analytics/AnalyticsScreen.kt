@@ -73,7 +73,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
 import com.example.data.model.ProgressLog
-import com.example.ui.VirtusViewModel
+import com.example.ui.WorkoutViewModel
 import com.example.ui.components.GrowthHeader
 import com.example.ui.components.WeightProgressionChart
 import com.example.ui.theme.CarbonBorder
@@ -111,7 +111,7 @@ private data class ActivityHistoryBucket(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnalyticsScreen(
-    viewModel: VirtusViewModel,
+    viewModel: WorkoutViewModel,
     onNavigateToProgression: () -> Unit = {}
 ) {
     val context = LocalContext.current

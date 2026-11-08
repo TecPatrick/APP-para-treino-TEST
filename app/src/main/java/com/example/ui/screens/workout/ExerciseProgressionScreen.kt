@@ -2,45 +2,58 @@ package com.example.ui.screens.workout
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.TrendingUp
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -48,35 +61,20 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.WorkoutExercise
 import com.example.data.model.WorkoutLog
-import com.example.ui.VirtusViewModel
+import com.example.ui.WorkoutViewModel
 import com.example.ui.components.GrowthHeader
-import com.example.ui.theme.*
+import com.example.ui.theme.CarbonBorder
+import com.example.ui.theme.CarbonCard
+import com.example.ui.theme.GrowthCyan
+import com.example.ui.theme.GrowthGreen
+import com.example.ui.theme.GrowthOrange
+import com.example.ui.theme.GrowthOrangeLight
+import com.example.ui.theme.GrowthRed
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
-import kotlin.math.roundToInt
 
-/**
- * Ponto de dado consolidado por semana para plotar evolução de carga
- * dos exercícios compostos extraídos do Firestore.
- */
-data class WeeklyCompoundProgression(
-    val weekNumber: Int,
-    val weekLabel: String,
-    val dateRangeDisplay: String,
-    val peakWeightKg: Float,
-    val totalVolumeKg: Float,
-    val totalSets: Int,
-    val totalReps: Int,
-    val estimatedOneRepMaxKg: Float,
-    val deltaVsPreviousWeekKg: Float = 0f,
-    val notes: String = ""
-)
-
-/**
- * Principais exercícios compostos do treinamento de força
- */
 private val MAIN_COMPOUND_EXERCISES = listOf(
     "Supino Reto com Barra",
     "Agachamento Livre com Barra",
@@ -89,15 +87,10 @@ private val MAIN_COMPOUND_EXERCISES = listOf(
     "Paralelas / Dips"
 )
 
-private enum class ChartDisplayMode(val title: String) {
-    PEAK_WEIGHT("Carga Máxima (kg)"),
-    WEEKLY_VOLUME("Volume Semanal (Tonelagem)")
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExerciseProgressionScreen(
-    viewModel: VirtusViewModel,
+    viewModel: WorkoutViewModel,
     onNavigateBack: () -> Unit
 ) {
     BackHandler {
@@ -113,18 +106,16 @@ fun ExerciseProgressionScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExerciseProgressionContent(
-    viewModel: VirtusViewModel,
+    viewModel: WorkoutViewModel,
     onNavigateBack: (() -> Unit)? = null,
     showTopHeader: Boolean = true
 ) {
-
     val context = LocalContext.current
     val allExercises by viewModel.allExercises.collectAsStateWithLifecycle()
     val localWorkoutLogs by viewModel.workoutLogs.collectAsStateWithLifecycle()
     val cloudWorkoutLogs by viewModel.cloudWorkoutLogs.collectAsStateWithLifecycle()
     val isFirestoreSyncing by viewModel.isFirestoreSyncing.collectAsStateWithLifecycle()
 
-    // Dispara a extração/atualização dos dados históricos do Firestore ao abrir a tela
     LaunchedEffect(Unit) {
         viewModel.refreshWorkoutLogsFromFirestore()
     }
@@ -132,18 +123,15 @@ fun ExerciseProgressionContent(
     var selectedChartMode by remember { mutableStateOf(ChartDisplayMode.PEAK_WEIGHT) }
     var showRecordWeightDialog by remember { mutableStateOf(false) }
 
-    // Lista consolidada de exercícios compostos disponíveis no app
     val availableCompoundExercises = remember(allExercises) {
         val exerciseMap = allExercises.associateBy { it.exerciseName.trim().lowercase(Locale.ROOT) }
         val list = mutableListOf<WorkoutExercise>()
 
-        // 1. Prioriza os principais compostos
         MAIN_COMPOUND_EXERCISES.forEach { mainName ->
             val match = exerciseMap[mainName.trim().lowercase(Locale.ROOT)]
             if (match != null) {
                 list.add(match)
             } else {
-                // Cria instância de referência caso ainda não esteja na rotina
                 val defaultWeight = when {
                     mainName.contains("Terra", true) -> 100f
                     mainName.contains("Agachamento", true) -> 80f
@@ -167,7 +155,6 @@ fun ExerciseProgressionContent(
             }
         }
 
-        // 2. Adiciona outros exercícios compostos ou cadastrados pelo usuário
         allExercises.forEach { ex ->
             if (list.none { it.exerciseName.equals(ex.exerciseName, ignoreCase = true) }) {
                 list.add(ex)
@@ -184,21 +171,17 @@ fun ExerciseProgressionContent(
         availableCompoundExercises.firstOrNull { it.exerciseName.equals(selectedExerciseName, ignoreCase = true) }
     }
 
-    // Combina e deduplica os logs locais e os logs históricos extraídos do Firestore
     val combinedWorkoutLogs = remember(localWorkoutLogs, cloudWorkoutLogs) {
-        val merged = (cloudWorkoutLogs + localWorkoutLogs)
+        (cloudWorkoutLogs + localWorkoutLogs)
             .distinctBy { it.id.toString() + "_" + it.dateMillis }
             .sortedBy { it.dateMillis }
-        merged
     }
 
-    // Agrupa e calcula a progressão ao longo das semanas a partir dos dados do Firestore
     val weeklyProgressionList = remember(selectedExerciseName, combinedWorkoutLogs, activeExercise) {
         val baseWeight = activeExercise?.currentWeightKg ?: 60f
         val baseSets = activeExercise?.sets ?: 4
         val baseReps = activeExercise?.repsMin ?: 8
 
-        // Filtra os logs que contêm o exercício selecionado
         val relevantLogs = combinedWorkoutLogs.filter { log ->
             log.notes.contains(selectedExerciseName, ignoreCase = true) ||
             log.routineName.contains(selectedExerciseName, ignoreCase = true)
@@ -223,7 +206,7 @@ fun ExerciseProgressionContent(
             var weekCounter = 1
             var prevWeekWeight = baseWeight * 0.85f
 
-            weeksMap.toSortedMap().forEach { (key, logsInWeek) ->
+            weeksMap.toSortedMap().forEach { (_, logsInWeek) ->
                 val firstDate = logsInWeek.minOf { it.dateMillis }
                 val lastDate = logsInWeek.maxOf { it.dateMillis }
                 val startStr = SimpleDateFormat("dd/MM", Locale("pt", "BR")).format(Date(firstDate))
@@ -233,7 +216,6 @@ fun ExerciseProgressionContent(
                 val totalVolume = logsInWeek.sumOf { it.totalVolumeKg.toDouble() }.toFloat()
                 val totalSets = logsInWeek.sumOf { it.totalSetsCompleted }.coerceAtLeast(baseSets)
 
-                // Extrai peso das anotações ou calcula estimativa baseada no volume
                 val extractedWeights = logsInWeek.mapNotNull { log ->
                     val match = Regex("""(\d+(\.\d+)?)kg""").find(log.notes)
                     match?.groupValues?.get(1)?.toFloatOrNull()
@@ -269,7 +251,6 @@ fun ExerciseProgressionContent(
             }
         }
 
-        // Se o usuário ainda não tiver histórico no Firestore, constrói a linha de base semanal das últimas 6 semanas
         if (resultWeeks.isEmpty()) {
             val now = System.currentTimeMillis()
             val weekMillis = 7 * 24L * 60L * 60L * 1000L
@@ -308,7 +289,6 @@ fun ExerciseProgressionContent(
         resultWeeks
     }
 
-    // Métricas Consolidadas de Desempenho
     val currentPeakWeight = weeklyProgressionList.lastOrNull()?.peakWeightKg ?: (activeExercise?.currentWeightKg ?: 0f)
     val baselinePeakWeight = weeklyProgressionList.firstOrNull()?.peakWeightKg ?: currentPeakWeight
     val allTimePR = weeklyProgressionList.maxOfOrNull { it.peakWeightKg } ?: currentPeakWeight
@@ -317,7 +297,6 @@ fun ExerciseProgressionContent(
     val currentOneRepMax = weeklyProgressionList.lastOrNull()?.estimatedOneRepMaxKg ?: (currentPeakWeight * 1.25f)
     val totalTonnageSumKg = weeklyProgressionList.sumOf { it.totalVolumeKg.toDouble() }.toFloat()
 
-    // Controle interativo de seleção de ponto no gráfico
     var selectedPointIndex by remember { mutableStateOf<Int?>(null) }
 
     val mainBody: @Composable (PaddingValues) -> Unit = { innerPadding ->
@@ -329,7 +308,6 @@ fun ExerciseProgressionContent(
             contentPadding = PaddingValues(top = 8.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // 1. Banner de Status: App Check (Play Integrity) e Firestore Cloud Sync
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = CarbonCard),
@@ -400,7 +378,6 @@ fun ExerciseProgressionContent(
                 }
             }
 
-            // 2. Seletor dos Principais Exercícios Compostos
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -466,7 +443,6 @@ fun ExerciseProgressionContent(
                 }
             }
 
-            // 3. Alternador de Modo de Gráfico (Carga Máxima Semanal vs Volume Semanal)
             item {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -511,121 +487,17 @@ fun ExerciseProgressionContent(
                 }
             }
 
-            // 4. KPIs de Força e Evolução ao Longo das Semanas
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // PR Histórico
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = CarbonCard),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, GrowthGreen.copy(alpha = 0.35f)),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("RECORDE (PR)", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GrowthGreen)
-                                    Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = GrowthGreen, modifier = Modifier.size(16.dp))
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("${allTimePR.toInt()} kg", fontSize = 20.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground)
-                                Text("Pico registrado na nuvem", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-
-                        // 1RM Estimado Atual
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = CarbonCard),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, GrowthCyan.copy(alpha = 0.35f)),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("1RM ESTIMADO", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GrowthCyan)
-                                    Icon(Icons.Default.Bolt, contentDescription = null, tint = GrowthCyan, modifier = Modifier.size(16.dp))
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("${currentOneRepMax.toInt()} kg", fontSize = 20.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground)
-                                Text("Fórmula de Brzycki", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Ganho Total nas Semanas
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = CarbonCard),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.35f)),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("EVOLUÇÃO TOTAL", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = GrowthOrangeLight)
-                                    Icon(
-                                        imageVector = if (totalGainKg >= 0) Icons.AutoMirrored.Filled.TrendingUp else Icons.Default.TrendingDown,
-                                        contentDescription = null,
-                                        tint = if (totalGainKg >= 0) GrowthGreen else GrowthRed,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                val sign = if (totalGainKg >= 0) "+" else ""
-                                Text(
-                                    text = "$sign${totalGainKg.toInt()} kg (${String.format(Locale.US, "%.1f", totalGainPercent)}%)",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = if (totalGainKg >= 0) GrowthGreen else GrowthRed
-                                )
-                                Text("Ao longo das semanas", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-
-                        // Semanas Rastreadas no Firestore
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = CarbonCard),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, CarbonBorder),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("SEMANAS RASTREADAS", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Icon(Icons.Default.CalendarToday, contentDescription = null, tint = GrowthOrange, modifier = Modifier.size(16.dp))
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("${weeklyProgressionList.size} semanas", fontSize = 16.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground)
-                                Text("${totalTonnageSumKg.toInt()} kg de volume", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-                }
+                ProgressionKpiCardsSection(
+                    allTimePR = allTimePR,
+                    currentOneRepMax = currentOneRepMax,
+                    totalGainKg = totalGainKg,
+                    totalGainPercent = totalGainPercent,
+                    trackedWeeksCount = weeklyProgressionList.size,
+                    totalTonnageSumKg = totalTonnageSumKg
+                )
             }
 
-            // 4.1 Botão de Compartilhar PR e Evolução (Android Share Intent)
             item {
                 Button(
                     onClick = {
@@ -662,312 +534,18 @@ fun ExerciseProgressionContent(
                 }
             }
 
-            // 5. Gráfico Principal Dinâmico (Curva de Carga ou Barras de Volume)
             item {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = CarbonCard),
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, CarbonBorder),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("compound_progression_chart_card")
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    text = selectedExerciseName,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onBackground
-                                )
-                                Text(
-                                    text = if (selectedChartMode == ChartDisplayMode.PEAK_WEIGHT)
-                                        "Carga Máxima Semanal (kg) ao Longo das Semanas"
-                                    else
-                                        "Volume Total de Treino Semanal (kg)",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = GrowthOrange.copy(alpha = 0.20f),
-                                border = BorderStroke(1.dp, GrowthOrange)
-                            ) {
-                                Text(
-                                    text = "${currentPeakWeight.toInt()} kg atual",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = GrowthOrange,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Tooltip flutuante interativo quando uma semana é tocada
-                        selectedPointIndex?.let { idx ->
-                            val pt = weeklyProgressionList.getOrNull(idx)
-                            if (pt != null) {
-                                Surface(
-                                    color = CarbonCardElevated,
-                                    shape = RoundedCornerShape(8.dp),
-                                    border = BorderStroke(1.dp, GrowthOrange.copy(alpha = 0.5f)),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = 10.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Column {
-                                            Text(pt.weekLabel, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            Text("${pt.peakWeightKg.toInt()} kg", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = GrowthOrange)
-                                        }
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Text("Volume Semanal", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            Text("${pt.totalVolumeKg.toInt()} kg", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                                        }
-                                        Column(horizontalAlignment = Alignment.End) {
-                                            Text("1RM Estimado", fontSize = 10.sp, color = GrowthCyan)
-                                            Text("${pt.estimatedOneRepMaxKg.toInt()} kg", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = GrowthCyan)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Canvas de renderização do gráfico
-                        val weights = weeklyProgressionList.map { it.peakWeightKg }
-                        val minWeight = (weights.minOrNull() ?: 20f) - 5f
-                        val maxWeight = (weights.maxOrNull() ?: 100f) + 5f
-                        val weightRange = (maxWeight - minWeight).coerceAtLeast(1f)
-
-                        val volumes = weeklyProgressionList.map { it.totalVolumeKg }
-                        val maxVolume = (volumes.maxOrNull() ?: 1000f).coerceAtLeast(100f)
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp)
-                        ) {
-                            Canvas(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .pointerInput(weeklyProgressionList) {
-                                        detectTapGestures { offset ->
-                                            val w = size.width
-                                            val count = weeklyProgressionList.size
-                                            if (count > 0) {
-                                                val spacing = if (count > 1) w / (count - 1) else w / 2
-                                                val closestIndex = if (count == 1) 0 else {
-                                                    ((offset.x / spacing).roundToInt()).coerceIn(0, count - 1)
-                                                }
-                                                selectedPointIndex = closestIndex
-                                            }
-                                        }
-                                    }
-                                    .pointerInput(weeklyProgressionList) {
-                                        detectDragGestures { change, _ ->
-                                            val w = size.width
-                                            val count = weeklyProgressionList.size
-                                            if (count > 0) {
-                                                val spacing = if (count > 1) w / (count - 1) else w / 2
-                                                val closestIndex = if (count == 1) 0 else {
-                                                    ((change.position.x / spacing).roundToInt()).coerceIn(0, count - 1)
-                                                }
-                                                selectedPointIndex = closestIndex
-                                            }
-                                        }
-                                    }
-                            ) {
-                                val width = size.width
-                                val height = size.height
-                                val count = weeklyProgressionList.size
-
-                                if (width <= 0f || height <= 0f || count == 0) return@Canvas
-
-                                // 1. Linhas guias horizontais
-                                val gridLineSteps = 4
-                                val dashedEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
-                                for (i in 0..gridLineSteps) {
-                                    val y = height * (i.toFloat() / gridLineSteps)
-                                    drawLine(
-                                        color = CarbonBorder.copy(alpha = 0.5f),
-                                        start = Offset(0f, y),
-                                        end = Offset(width, y),
-                                        strokeWidth = 1.dp.toPx(),
-                                        pathEffect = dashedEffect
-                                    )
-                                }
-
-                                if (selectedChartMode == ChartDisplayMode.PEAK_WEIGHT) {
-                                    // 2. Linha de PR (Verde pontilhada)
-                                    val prNormalizedY = (allTimePR - minWeight) / weightRange
-                                    val prY = height - (prNormalizedY * height).coerceIn(10f, height - 10f)
-                                    drawLine(
-                                        color = GrowthGreen.copy(alpha = 0.6f),
-                                        start = Offset(0f, prY),
-                                        end = Offset(width, prY),
-                                        strokeWidth = 1.5.dp.toPx(),
-                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 8f), 0f)
-                                    )
-
-                                    val pointSpacing = if (count > 1) width / (count - 1) else width / 2
-                                    val points = weeklyProgressionList.mapIndexed { index, pt ->
-                                        val x = if (count > 1) index * pointSpacing else width / 2
-                                        val normalizedY = (pt.peakWeightKg - minWeight) / weightRange
-                                        val y = height - (normalizedY * height).coerceIn(16f, height - 16f)
-                                        Offset(x, y)
-                                    }
-
-                                    // Gradiente sob a curva
-                                    if (points.size > 1) {
-                                        val fillPath = Path().apply {
-                                            moveTo(points.first().x, height)
-                                            points.forEach { lineTo(it.x, it.y) }
-                                            lineTo(points.last().x, height)
-                                            close()
-                                        }
-                                        drawPath(
-                                            path = fillPath,
-                                            brush = Brush.verticalGradient(
-                                                colors = listOf(
-                                                    GrowthOrange.copy(alpha = 0.38f),
-                                                    GrowthOrange.copy(alpha = 0.08f),
-                                                    Color.Transparent
-                                                )
-                                            )
-                                        )
-
-                                        // Curva Suave (Cubic Bézier)
-                                        val linePath = Path().apply {
-                                            moveTo(points.first().x, points.first().y)
-                                            for (i in 0 until points.size - 1) {
-                                                val p0 = points[i]
-                                                val p1 = points[i + 1]
-                                                val controlX1 = p0.x + (p1.x - p0.x) / 2
-                                                val controlY1 = p0.y
-                                                val controlX2 = p0.x + (p1.x - p0.x) / 2
-                                                val controlY2 = p1.y
-                                                cubicTo(controlX1, controlY1, controlX2, controlY2, p1.x, p1.y)
-                                            }
-                                        }
-                                        drawPath(
-                                            path = linePath,
-                                            color = GrowthOrange,
-                                            style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round)
-                                        )
-                                    }
-
-                                    // Linha do cursor vertical de seleção
-                                    selectedPointIndex?.let { selIdx ->
-                                        if (selIdx in points.indices) {
-                                            val selPt = points[selIdx]
-                                            drawLine(
-                                                color = GrowthOrange.copy(alpha = 0.7f),
-                                                start = Offset(selPt.x, 0f),
-                                                end = Offset(selPt.x, height),
-                                                strokeWidth = 1.5.dp.toPx(),
-                                                pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 6f), 0f)
-                                            )
-                                            drawCircle(
-                                                color = GrowthOrange.copy(alpha = 0.25f),
-                                                radius = 12.dp.toPx(),
-                                                center = selPt
-                                            )
-                                        }
-                                    }
-
-                                    // Pontos de dados
-                                    points.forEachIndexed { idx, pt ->
-                                        val isSelected = selectedPointIndex == idx
-                                        val isPR = weeklyProgressionList[idx].peakWeightKg >= allTimePR
-                                        val dotColor = if (isPR) GrowthGreen else GrowthOrange
-
-                                        drawCircle(
-                                            color = dotColor,
-                                            radius = if (isSelected) 7.dp.toPx() else 5.dp.toPx(),
-                                            center = pt
-                                        )
-                                        drawCircle(
-                                            color = Color.White,
-                                            radius = if (isSelected) 3.5.dp.toPx() else 2.5.dp.toPx(),
-                                            center = pt
-                                        )
-                                    }
-                                } else {
-                                    // Modo 2: Gráfico de Barras de Volume Semanal
-                                    val barWidth = (width / count) * 0.55f
-                                    val slotWidth = width / count
-
-                                    weeklyProgressionList.forEachIndexed { index, pt ->
-                                        val isSelected = selectedPointIndex == index
-                                        val normVol = pt.totalVolumeKg / maxVolume
-                                        val barHeight = (normVol * height * 0.85f).coerceAtLeast(8f)
-                                        val x = (index * slotWidth) + (slotWidth - barWidth) / 2
-                                        val y = height - barHeight
-
-                                        drawRoundRect(
-                                            color = if (isSelected) GrowthOrange else GrowthOrange.copy(alpha = 0.6f),
-                                            topLeft = Offset(x, y),
-                                            size = Size(barWidth, barHeight),
-                                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(6.dp.toPx(), 6.dp.toPx())
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // Eixo X - Semanas do Calendário
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            weeklyProgressionList.forEachIndexed { index, pt ->
-                                val isSelected = selectedPointIndex == index
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clickable { selectedPointIndex = index }
-                                ) {
-                                    Text(
-                                        text = "${pt.peakWeightKg.toInt()}kg",
-                                        fontSize = 10.sp,
-                                        fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold,
-                                        color = if (isSelected) GrowthOrange else MaterialTheme.colorScheme.onBackground,
-                                        maxLines = 1,
-                                        textAlign = TextAlign.Center
-                                    )
-                                    Text(
-                                        text = pt.weekLabel,
-                                        fontSize = 9.sp,
-                                        color = if (isSelected) GrowthOrange else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                CompoundProgressionChartCard(
+                    selectedExerciseName = selectedExerciseName,
+                    selectedChartMode = selectedChartMode,
+                    currentPeakWeight = currentPeakWeight,
+                    allTimePR = allTimePR,
+                    weeklyProgressionList = weeklyProgressionList,
+                    selectedPointIndex = selectedPointIndex,
+                    onSelectPointIndex = { selectedPointIndex = it }
+                )
             }
 
-            // 6. Botões de Ação
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1006,7 +584,6 @@ fun ExerciseProgressionContent(
                 }
             }
 
-            // 7. Lista / Histórico Semanal de Carga Extraída do Firestore
             item {
                 Text(
                     text = "HISTÓRICO SEMANAL (DADOS DO FIRESTORE)",
@@ -1176,104 +753,20 @@ fun ExerciseProgressionContent(
         mainBody(PaddingValues(0.dp))
     }
 
-    // Modal para registrar nova carga semanal
     if (showRecordWeightDialog && activeExercise != null) {
-        var inputWeight by remember { mutableStateOf(activeExercise.currentWeightKg.toString()) }
-        var inputSets by remember { mutableStateOf(activeExercise.sets.toString()) }
-        var inputReps by remember { mutableStateOf(activeExercise.repsMin.toString()) }
-        var inputNotes by remember { mutableStateOf("") }
-
-        AlertDialog(
-            onDismissRequest = { showRecordWeightDialog = false },
-            title = {
-                Text(
-                    text = "Registrar Carga do Composto",
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
+        RecordCompoundWeightDialog(
+            activeExercise = activeExercise,
+            onDismiss = { showRecordWeightDialog = false },
+            onConfirm = { parsedWeight, parsedSets, parsedReps, inputNotes ->
+                viewModel.recordExerciseProgression(
+                    exercise = activeExercise,
+                    newWeightKg = parsedWeight,
+                    sets = parsedSets,
+                    reps = parsedReps,
+                    notes = inputNotes
                 )
-            },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = activeExercise.exerciseName,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GrowthOrange
-                    )
-
-                    OutlinedTextField(
-                        value = inputWeight,
-                        onValueChange = { inputWeight = it },
-                        label = { Text("Carga Máxima (kg)") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GrowthOrange,
-                            focusedLabelColor = GrowthOrange
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("input_new_compound_weight_kg")
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = inputSets,
-                            onValueChange = { inputSets = it },
-                            label = { Text("Séries") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = inputReps,
-                            onValueChange = { inputReps = it },
-                            label = { Text("Reps") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            singleLine = true,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-
-                    OutlinedTextField(
-                        value = inputNotes,
-                        onValueChange = { inputNotes = it },
-                        label = { Text("Observações (ex: RPE 9, com cinto)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val parsedWeight = inputWeight.toFloatOrNull() ?: activeExercise.currentWeightKg
-                        val parsedSets = inputSets.toIntOrNull() ?: activeExercise.sets
-                        val parsedReps = inputReps.toIntOrNull() ?: activeExercise.repsMin
-                        viewModel.recordExerciseProgression(
-                            exercise = activeExercise,
-                            newWeightKg = parsedWeight,
-                            sets = parsedSets,
-                            reps = parsedReps,
-                            notes = inputNotes
-                        )
-                        showRecordWeightDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
-                    modifier = Modifier.testTag("confirm_record_compound_weight_btn")
-                ) {
-                    Text("Salvar & Sincronizar", color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRecordWeightDialog = false }) {
-                    Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            },
-            containerColor = CarbonCard
+                showRecordWeightDialog = false
+            }
         )
     }
 }

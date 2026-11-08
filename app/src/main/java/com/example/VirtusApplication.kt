@@ -24,6 +24,9 @@ open class MainApplication : Application() {
     val repository by lazy {
         VirtusRepository(database.appDao(), database::clearAllTables)
     }
+    val sharedState by lazy {
+        com.example.ui.VirtusSharedState(this, applicationScope, repository)
+    }
 
     override fun onCreate() {
         super.onCreate()

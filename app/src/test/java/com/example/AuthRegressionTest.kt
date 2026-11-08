@@ -159,7 +159,8 @@ class AuthRegressionTest {
     }
 
     @Test
-    fun appCheckDeterministicSecretIsConfigured() {
-        assertTrue(AppCheckInitializer.DETERMINISTIC_DEBUG_SECRET.isNotBlank())
+    fun appCheckInitializerHasNoHardcodedDebugSecret() {
+        val fields = AppCheckInitializer::class.java.declaredFields.map { it.name }
+        assertFalse(fields.contains("DETERMINISTIC_DEBUG_SECRET"))
     }
 }

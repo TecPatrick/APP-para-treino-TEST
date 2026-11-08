@@ -89,7 +89,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.GpsRouteLog
-import com.example.ui.VirtusViewModel
+import com.example.ui.CardioViewModel
 import com.example.ui.components.GrowthHeader
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
@@ -111,7 +111,7 @@ import com.google.android.gms.tasks.CancellationTokenSource
 
 @Composable
 fun GpsTrackerScreen(
-    viewModel: VirtusViewModel,
+    viewModel: CardioViewModel,
     workoutTrackerViewModel: WorkoutTrackerViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     onNavigateBack: () -> Unit = {}
 ) {

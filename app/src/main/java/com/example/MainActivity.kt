@@ -73,7 +73,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.ui.VirtusViewModel
+import com.example.ui.AuthViewModel
+import com.example.ui.CardioViewModel
+import com.example.ui.DietViewModel
+import com.example.ui.ShoppingViewModel
+import com.example.ui.SyncViewModel
+import com.example.ui.WorkoutViewModel
 import com.example.ui.screens.analytics.AnalyticsScreen
 import com.example.ui.screens.auth.AuthAndOnboardingScreen
 import com.example.ui.screens.calculator.MacroCalculatorScreen
@@ -118,38 +123,61 @@ enum class AppNavigationScreen(
 
 class MainActivity : FragmentActivity() {
 
-    private val viewModel: VirtusViewModel by viewModels()
+    private val authViewModel: AuthViewModel by viewModels()
+    private val workoutViewModel: WorkoutViewModel by viewModels()
+    private val dietViewModel: DietViewModel by viewModels()
+    private val shoppingViewModel: ShoppingViewModel by viewModels()
+    private val cardioViewModel: CardioViewModel by viewModels()
+    private val syncViewModel: SyncViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme(darkTheme = true) {
-                MainAppScreen(viewModel = viewModel)
+                MainAppScreen(
+                    authViewModel = authViewModel,
+                    workoutViewModel = workoutViewModel,
+                    dietViewModel = dietViewModel,
+                    shoppingViewModel = shoppingViewModel,
+                    cardioViewModel = cardioViewModel,
+                    syncViewModel = syncViewModel
+                )
             }
         }
     }
 }
 
 @Composable
-fun MainAppScreen(viewModel: VirtusViewModel) {
+fun MainAppScreen(
+    authViewModel: AuthViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+    workoutViewModel: WorkoutViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+    dietViewModel: DietViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+    shoppingViewModel: ShoppingViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+    cardioViewModel: CardioViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+    syncViewModel: SyncViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+) {
     val context = LocalContext.current
-    val profile by viewModel.userProfile.collectAsStateWithLifecycle()
+    val profile by authViewModel.userProfile.collectAsStateWithLifecycle()
     var currentScreen by rememberSaveable { mutableStateOf(AppNavigationScreen.DASHBOARD) }
     var isWorkoutBiometricVerified by rememberSaveable { mutableStateOf(false) }
     var isDietBiometricVerified by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
-    val toastMessage by viewModel.toastMessage.collectAsStateWithLifecycle()
+    val toastMessage by authViewModel.toastMessage.collectAsStateWithLifecycle()
+    val isOnline by syncViewModel.isNetworkOnline.collectAsStateWithLifecycle()
+    val isSyncing by syncViewModel.isSyncing.collectAsStateWithLifecycle()
+    val pendingSyncItems by syncViewModel.pendingSyncItems.collectAsStateWithLifecycle()
+    val lastSyncBannerNotification by syncViewModel.lastSyncBannerNotification.collectAsStateWithLifecycle()
 
     // Auto-login Google + sincronização Delta ao iniciar caso sessão Firebase esteja ativa
     LaunchedEffect(Unit) {
-        viewModel.restoreActiveFirebaseSession()
+        authViewModel.restoreActiveFirebaseSession()
     }
 
     LaunchedEffect(toastMessage) {
         toastMessage?.let {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-            viewModel.clearToast()
+            authViewModel.clearToast()
         }
     }
 
@@ -158,7 +186,7 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
 
     if (!isUserAuthenticated) {
         AuthAndOnboardingScreen(
-            viewModel = viewModel,
+            viewModel = authViewModel,
             onAuthSuccess = {
                 currentScreen = AppNavigationScreen.DASHBOARD
             }
@@ -239,19 +267,32 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
             }
         }
     ) { innerPadding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            AnimatedContent(
-                targetState = currentScreen,
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = "ScreenTransition"
-            ) { target ->
+            com.example.ui.sync.OfflineSyncQueueBanner(
+                isOnline = isOnline,
+                isSyncing = isSyncing,
+                pendingItems = pendingSyncItems,
+                lastSyncNotification = lastSyncBannerNotification,
+                onSyncNow = { syncViewModel.syncAllDataToFirestore() },
+                onDismissNotification = { syncViewModel.dismissSyncBannerNotification() }
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                AnimatedContent(
+                    targetState = currentScreen,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = "ScreenTransition"
+                ) { target ->
                 when (target) {
                     AppNavigationScreen.DASHBOARD -> DashboardScreen(
-                        viewModel = viewModel,
+                        viewModel = dietViewModel,
                         onNavigateToDiet = { currentScreen = AppNavigationScreen.DIET },
                         onNavigateToWorkout = { currentScreen = AppNavigationScreen.WORKOUT },
                         onNavigateToShopping = { currentScreen = AppNavigationScreen.SHOPPING },
@@ -272,7 +313,7 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
                             )
                         } else {
                             DietScreen(
-                                viewModel = viewModel,
+                                viewModel = dietViewModel,
                                 onNavigateToShopping = { currentScreen = AppNavigationScreen.SHOPPING }
                             )
                         }
@@ -288,44 +329,47 @@ fun MainAppScreen(viewModel: VirtusViewModel) {
                             )
                         } else {
                             WorkoutScreen(
-                                viewModel = viewModel,
+                                viewModel = workoutViewModel,
                                 onNavigateToProgression = { currentScreen = AppNavigationScreen.EXERCISE_PROGRESSION }
                             )
                         }
                     }
                     AppNavigationScreen.GPS -> GpsTrackerScreen(
-                        viewModel = viewModel,
+                        viewModel = cardioViewModel,
                         onNavigateBack = { currentScreen = AppNavigationScreen.DASHBOARD }
                     )
                     AppNavigationScreen.SHOPPING -> ShoppingListScreen(
-                        viewModel = viewModel,
+                        viewModel = shoppingViewModel,
                         onNavigateToReceipts = { currentScreen = AppNavigationScreen.RECEIPTS }
                     )
                     AppNavigationScreen.RECEIPTS -> ReceiptsInflationScreen(
-                        viewModel = viewModel,
+                        viewModel = shoppingViewModel,
                         onNavigateBack = { currentScreen = AppNavigationScreen.DASHBOARD }
                     )
                     AppNavigationScreen.ANALYTICS -> AnalyticsScreen(
-                        viewModel = viewModel,
+                        viewModel = workoutViewModel,
                         onNavigateToProgression = { currentScreen = AppNavigationScreen.EXERCISE_PROGRESSION }
                     )
                     AppNavigationScreen.EXERCISE_PROGRESSION -> ExerciseProgressionScreen(
-                        viewModel = viewModel,
+                        viewModel = workoutViewModel,
                         onNavigateBack = { currentScreen = AppNavigationScreen.WORKOUT }
                     )
                     AppNavigationScreen.CALCULATOR -> MacroCalculatorScreen(
-                        viewModel = viewModel,
+                        viewModel = dietViewModel,
                         onNavigateBack = { currentScreen = AppNavigationScreen.DASHBOARD }
                     )
                     AppNavigationScreen.PROFILE -> UserProfileScreen(
-                        viewModel = viewModel,
+                        viewModel = authViewModel,
+                        workoutViewModel = workoutViewModel,
+                        syncViewModel = syncViewModel,
                         onNavigateBack = { currentScreen = AppNavigationScreen.DASHBOARD },
                         onNavigateToAccount = { currentScreen = AppNavigationScreen.AUTH }
                     )
                     AppNavigationScreen.AUTH -> AuthAndOnboardingScreen(
-                        viewModel = viewModel,
+                        viewModel = authViewModel,
                         onAuthSuccess = { currentScreen = AppNavigationScreen.DASHBOARD }
                     )
+                }
                 }
             }
         }

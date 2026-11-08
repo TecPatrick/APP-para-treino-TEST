@@ -27,6 +27,42 @@
       },
       "required": ["userId", "email", "createdAt"]
     },
+    "WorkoutRoutine": {
+      "title": "Workout Routine",
+      "description": "User workout routine split definition.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "splitType": { "type": "string" },
+        "letter": { "type": "string" },
+        "title": { "type": "string" },
+        "dayOfWeekLabel": { "type": "string" },
+        "targetMuscleGroups": { "type": "string" },
+        "estimatedDurationMinutes": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "letter", "title"]
+    },
+    "WorkoutExercise": {
+      "title": "Workout Exercise",
+      "description": "Individual exercise inside a workout routine or free session.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "workoutId": { "type": "string" },
+        "routineId": { "type": "integer" },
+        "exerciseName": { "type": "string" },
+        "muscleGroup": { "type": "string" },
+        "sets": { "type": "integer" },
+        "repsMin": { "type": "integer" },
+        "repsMax": { "type": "integer" },
+        "currentWeightKg": { "type": "number" },
+        "restSeconds": { "type": "integer" },
+        "orderIndex": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "workoutId", "exerciseName"]
+    },
     "WorkoutLog": {
       "title": "Workout Log",
       "description": "Record of a completed gym workout session.",
@@ -61,6 +97,26 @@
     "/users/{userId}": {
       "schema": "UserProfile",
       "description": "User profile document identified by UID."
+    },
+    "/users/{userId}/workoutRoutines/{routineId}": {
+      "schema": "WorkoutRoutine",
+      "description": "User workout routine definition."
+    },
+    "/users/{userId}/workoutRoutines/{routineId}/workoutExercises/{exerciseId}": {
+      "schema": "WorkoutExercise",
+      "description": "Nested workout exercises under a routine."
+    },
+    "/users/{userId}/workouts/{workoutId}/workoutExercises/{exerciseId}": {
+      "schema": "WorkoutExercise",
+      "description": "Nested workout exercises under a workout document."
+    },
+    "/users/{userId}/workouts/{workoutId}/exercises/{exerciseId}": {
+      "schema": "WorkoutExercise",
+      "description": "Compatible nested exercises subcollection under a workout document."
+    },
+    "/users/{userId}/workoutExercises/{exerciseId}": {
+      "schema": "WorkoutExercise",
+      "description": "Backward-compatible root-level user workout exercises collection."
     },
     "/users/{userId}/workout_logs/{logId}": {
       "schema": "WorkoutLog",

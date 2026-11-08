@@ -80,7 +80,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.data.model.MealPlanItem
 import com.example.data.model.MealType
-import com.example.ui.VirtusViewModel
+import com.example.ui.DietViewModel
 import com.example.ui.components.CircularCalorieGauge
 import com.example.ui.components.DailyHistoryHeader
 import com.example.ui.components.DailyHistorySummary
@@ -105,7 +105,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
-    viewModel: VirtusViewModel,
+    viewModel: DietViewModel,
     onNavigateToDiet: () -> Unit,
     onNavigateToWorkout: () -> Unit,
     onNavigateToShopping: () -> Unit,
@@ -204,7 +204,7 @@ fun DashboardScreen(
                         .aspectRatio(16f / 9f)
                 ) {
                     Image(
-                        painter = painterResource(id = R.drawable.img_virtus_top_banner_1793914003348),
+                        painter = painterResource(id = R.drawable.img_virtus_top_banner),
                         contentDescription = "Banner promocional Virtus Fitness Dark Premium",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize()

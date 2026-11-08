@@ -90,7 +90,9 @@ import com.example.data.model.ActivityLevel
 import com.example.data.model.BodyType
 import com.example.data.model.FitnessGoal
 import com.example.data.model.Gender
-import com.example.ui.VirtusViewModel
+import com.example.ui.AuthViewModel
+import com.example.ui.SyncViewModel
+import com.example.ui.WorkoutViewModel
 import com.example.ui.components.GrowthHeader
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
@@ -108,7 +110,9 @@ import kotlin.math.roundToInt
 
 @Composable
 fun UserProfileScreen(
-    viewModel: VirtusViewModel,
+    viewModel: AuthViewModel,
+    workoutViewModel: WorkoutViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
+    syncViewModel: SyncViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     onNavigateBack: () -> Unit = {},
     onNavigateToAccount: () -> Unit = {}
 ) {
@@ -189,7 +193,7 @@ fun UserProfileScreen(
     val workoutRoutines by viewModel.workoutRoutines.collectAsStateWithLifecycle()
     val allExercises by viewModel.allExercises.collectAsStateWithLifecycle()
     val muscleVolume = remember(heatmapDays, workoutLogs, workoutRoutines, allExercises) {
-        viewModel.getMuscleVolume(heatmapDays)
+        workoutViewModel.getMuscleVolume(heatmapDays)
     }
 
     LazyColumn(
@@ -1117,7 +1121,7 @@ fun UserProfileScreen(
 
                             OutlinedButton(
                                 onClick = {
-                                    viewModel.restoreDefaultRoutines()
+                                    workoutViewModel.restoreDefaultRoutines()
                                 },
                                 modifier = Modifier
                                     .weight(1f)
@@ -1339,7 +1343,7 @@ fun UserProfileScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             OutlinedButton(
-                                onClick = { viewModel.uploadProfileToCloud() },
+                                onClick = { syncViewModel.uploadProfileToCloud() },
                                 enabled = !isSyncBusy,
                                 modifier = Modifier
                                     .weight(1f)
@@ -1368,7 +1372,7 @@ fun UserProfileScreen(
                             }
 
                             OutlinedButton(
-                                onClick = { viewModel.downloadProfileFromCloud() },
+                                onClick = { syncViewModel.downloadProfileFromCloud() },
                                 enabled = !isSyncBusy,
                                 modifier = Modifier
                                     .weight(1f)
@@ -1398,7 +1402,7 @@ fun UserProfileScreen(
                         }
 
                         Button(
-                            onClick = { viewModel.syncAllDataToFirestore() },
+                            onClick = { syncViewModel.syncAllDataToFirestore() },
                             enabled = !isSyncBusy,
                             modifier = Modifier
                                 .fillMaxWidth()

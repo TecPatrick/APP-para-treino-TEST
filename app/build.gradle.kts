@@ -27,10 +27,12 @@ android {
 
   signingConfigs {
     create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
+      val storeFilePath = System.getenv("STORE_FILE") ?: System.getenv("KEYSTORE_PATH")
+      if (!storeFilePath.isNullOrBlank()) {
+        storeFile = file(storeFilePath)
+      }
       storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
+      keyAlias = System.getenv("KEY_ALIAS")
       keyPassword = System.getenv("KEY_PASSWORD")
     }
     create("debugConfig") {
@@ -48,7 +50,10 @@ android {
       isMinifyEnabled = true
       isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      val releaseSigning = signingConfigs.getByName("release")
+      if (releaseSigning.storeFile != null && !releaseSigning.storePassword.isNullOrBlank()) {
+        signingConfig = releaseSigning
+      }
       firebaseAppDistribution {
         appId = "1:204365877775:android:f77650214127790642497a"
         artifactType = "APK"

@@ -108,7 +108,7 @@ import com.example.data.model.WorkoutExercise
 import com.example.data.model.WorkoutLog
 import com.example.data.model.WorkoutRoutine
 import com.example.data.model.WorkoutSplitType
-import com.example.ui.VirtusViewModel
+import com.example.ui.WorkoutViewModel
 import com.example.ui.components.GrowthHeader
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
@@ -131,7 +131,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkoutScreen(
-    viewModel: VirtusViewModel,
+    viewModel: WorkoutViewModel,
     onNavigateToProgression: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -282,7 +282,7 @@ fun WorkoutScreen(
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         Image(
-                            painter = painterResource(id = R.drawable.img_virtus_workout_banner_1793897885821),
+                            painter = painterResource(id = R.drawable.img_virtus_workout_banner),
                             contentDescription = "Banner de Treinos Virtus",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()

@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/img_virtus_brand_emblem_1793897882182"
+        android:drawable="@drawable/img_virtus_brand_emblem"
         android:gravity="center" />
 </layer-list>

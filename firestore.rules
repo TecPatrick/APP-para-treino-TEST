@@ -126,6 +126,12 @@ service cloud.firestore {
         allow delete: if isOwner(userId);
       }
 
+      match /shoppingList/{itemId} {
+        allow list, get: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
+        allow delete: if isOwner(userId);
+      }
+
       match /progressLogs/{logId} {
         allow list, get: if isOwner(userId);
         allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
@@ -136,12 +142,36 @@ service cloud.firestore {
         allow list, get: if isOwner(userId);
         allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
         allow delete: if isOwner(userId);
+
+        match /workoutExercises/{exerciseId} {
+          allow list, get: if isOwner(userId);
+          allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
+          allow delete: if isOwner(userId);
+        }
+
+        match /exercises/{exerciseId} {
+          allow list, get: if isOwner(userId);
+          allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
+          allow delete: if isOwner(userId);
+        }
+      }
+
+      match /workoutExercises/{exerciseId} {
+        allow list, get: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
+        allow delete: if isOwner(userId);
       }
 
       match /workouts/{workoutId} {
         allow list, get: if isOwner(userId);
         allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
         allow delete: if isOwner(userId);
+
+        match /workoutExercises/{exerciseId} {
+          allow list, get: if isOwner(userId);
+          allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
+          allow delete: if isOwner(userId);
+        }
 
         match /exercises/{exerciseId} {
           allow list, get: if isOwner(userId);

@@ -74,17 +74,11 @@ open class FirestoreSyncManager(private val context: Context) {
     private val _lastSyncReport = MutableStateFlow<SyncReport?>(null)
     val lastSyncReport: StateFlow<SyncReport?> = _lastSyncReport.asStateFlow()
 
+    private val migratedUsersInSession = mutableSetOf<String>()
+
     private val firestore: FirebaseFirestore by lazy {
-        val databaseId = try {
-            context.getString(R.string.firestore_database_id)
-        } catch (_: Exception) {
-            "(default)"
-        }
-        val fs = if (databaseId.isNotBlank() && databaseId != "(default)") {
-            FirebaseFirestore.getInstance(databaseId)
-        } else {
-            FirebaseFirestore.getInstance()
-        }
+        val databaseId = context.applicationContext.getString(R.string.firestore_database_id)
+        val fs = FirebaseFirestore.getInstance(databaseId)
 
         try {
             // Habilita persistência offline permanente no disco
@@ -827,22 +821,24 @@ open class FirestoreSyncManager(private val context: Context) {
     // 4. ITENS ADICIONAIS EXISTENTES (MealPlan, Shopping, Progress, Routines)
     // =========================================================================
 
-    suspend fun syncMealPlanToCloud(mealPlan: MealPlanItem): Result<Unit> {
-        val uid = currentUserId ?: return Result.failure(Exception("Usuário não autenticado no Firebase"))
+    private fun mealPlanPayload(uid: String, mealPlan: MealPlanItem): Map<String, Any> = mapOf(
+        "userId" to uid,
+        "mealType" to mealPlan.mealType.name,
+        "name" to mealPlan.foodName,
+        "portionGrams" to mealPlan.amount.toDouble(),
+        "calories" to mealPlan.calories.toDouble(),
+        "protein" to mealPlan.protein.toDouble(),
+        "carbs" to mealPlan.carbs.toDouble(),
+        "fat" to mealPlan.fat.toDouble(),
+        "isCompletedToday" to mealPlan.isCompletedToday,
+        "isFixed" to mealPlan.isFixed
+    )
+
+    suspend fun syncMealPlanToCloud(mealPlan: MealPlanItem, customUid: String? = null): Result<Unit> {
+        val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado no Firebase"))
         return try {
             val docId = mealPlan.id.toString()
-            val baseData = mapOf(
-                "userId" to uid,
-                "mealType" to mealPlan.mealType.name,
-                "name" to mealPlan.foodName,
-                "portionGrams" to mealPlan.amount.toDouble(),
-                "calories" to mealPlan.calories.toDouble(),
-                "protein" to mealPlan.protein.toDouble(),
-                "carbs" to mealPlan.carbs.toDouble(),
-                "fat" to mealPlan.fat.toDouble(),
-                "isCompletedToday" to mealPlan.isCompletedToday,
-                "isFixed" to mealPlan.isFixed
-            )
+            val baseData = mealPlanPayload(uid, mealPlan)
             val hash = FirestoreDeltaEngine.computeRecordHash("mealPlans", baseData)
             if (!deltaLedger.hasEntityChanged(uid, "mealPlans", docId, hash)) {
                 return Result.success(Unit)
@@ -890,19 +886,21 @@ open class FirestoreSyncManager(private val context: Context) {
         } catch (e: Exception) { Result.failure(e) }
     }
 
-    suspend fun syncShoppingItemToCloud(item: ShoppingItem): Result<Unit> {
-        val uid = currentUserId ?: return Result.failure(Exception("Usuário não autenticado no Firebase"))
+    private fun shoppingItemPayload(uid: String, item: ShoppingItem): Map<String, Any> = mapOf(
+        "userId" to uid,
+        "name" to item.name,
+        "category" to item.category.name,
+        "totalQuantityGrams" to item.quantity.toDouble(),
+        "unit" to item.unit,
+        "estimatedPrice" to item.estimatedPrice.toDouble(),
+        "isBought" to item.isChecked
+    )
+
+    suspend fun syncShoppingItemToCloud(item: ShoppingItem, customUid: String? = null): Result<Unit> {
+        val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado no Firebase"))
         return try {
             val docId = item.id.toString()
-            val baseData = mapOf(
-                "userId" to uid,
-                "name" to item.name,
-                "category" to item.category.name,
-                "totalQuantityGrams" to item.quantity.toDouble(),
-                "unit" to item.unit,
-                "estimatedPrice" to item.estimatedPrice.toDouble(),
-                "isBought" to item.isChecked
-            )
+            val baseData = shoppingItemPayload(uid, item)
             val hash = FirestoreDeltaEngine.computeRecordHash("shoppingItems", baseData)
             if (!deltaLedger.hasEntityChanged(uid, "shoppingItems", docId, hash)) {
                 return Result.success(Unit)
@@ -962,19 +960,21 @@ open class FirestoreSyncManager(private val context: Context) {
         }
     }
 
+    private fun workoutRoutinePayload(uid: String, routine: WorkoutRoutine): Map<String, Any> = mapOf(
+        "userId" to uid,
+        "splitType" to routine.splitType.name,
+        "letter" to routine.letter,
+        "title" to routine.title,
+        "dayOfWeekLabel" to routine.dayOfWeekLabel,
+        "targetMuscleGroups" to routine.targetMuscleGroups,
+        "estimatedDurationMinutes" to routine.estimatedDurationMinutes
+    )
+
     suspend fun syncWorkoutRoutineToCloud(routine: WorkoutRoutine, customUid: String? = null): Result<Unit> {
         val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado"))
         return try {
             val docId = routine.id.toString()
-            val baseData = mapOf(
-                "userId" to uid,
-                "splitType" to routine.splitType.name,
-                "letter" to routine.letter,
-                "title" to routine.title,
-                "dayOfWeekLabel" to routine.dayOfWeekLabel,
-                "targetMuscleGroups" to routine.targetMuscleGroups,
-                "estimatedDurationMinutes" to routine.estimatedDurationMinutes
-            )
+            val baseData = workoutRoutinePayload(uid, routine)
             val hash = FirestoreDeltaEngine.computeRecordHash("workoutRoutines", baseData)
             if (!deltaLedger.hasEntityChanged(uid, "workoutRoutines", docId, hash)) {
                 return Result.success(Unit)
@@ -993,40 +993,71 @@ open class FirestoreSyncManager(private val context: Context) {
         } catch (e: Exception) { Result.failure(e) }
     }
 
+    private fun workoutExercisePayload(uid: String, wid: String, exercise: WorkoutExercise): Map<String, Any> = mapOf(
+        "userId" to uid,
+        "workoutId" to wid,
+        "routineId" to exercise.routineId,
+        "exerciseName" to exercise.exerciseName,
+        "muscleGroup" to exercise.muscleGroup,
+        "sets" to exercise.sets,
+        "repsMin" to exercise.repsMin,
+        "repsMax" to exercise.repsMax,
+        "currentWeightKg" to exercise.currentWeightKg.toDouble(),
+        "restSeconds" to exercise.restSeconds,
+        "orderIndex" to exercise.orderIndex
+    )
+
     suspend fun syncWorkoutExerciseToCloud(exercise: WorkoutExercise, workoutId: String? = null, customUid: String? = null): Result<Unit> {
         val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado"))
         val wid = workoutId ?: if (exercise.routineId > 0) exercise.routineId.toString() else "free"
-        val docId = "${wid}_${exercise.id}"
-        val path = "users/$uid/workouts/$wid/exercises/${exercise.id}"
+        val exerciseIdStr = exercise.id.toString()
+        val docId = "${wid}_$exerciseIdStr"
+        val path = "users/$uid/workoutRoutines/$wid/workoutExercises/$exerciseIdStr"
         FirestoreLogger.logWriteAttempt("syncWorkoutExerciseToCloud", uid, path, exercise)
         return try {
-            val baseData = mapOf(
-                "userId" to uid,
-                "workoutId" to wid,
-                "routineId" to exercise.routineId,
-                "exerciseName" to exercise.exerciseName,
-                "muscleGroup" to exercise.muscleGroup,
-                "sets" to exercise.sets,
-                "repsMin" to exercise.repsMin,
-                "repsMax" to exercise.repsMax,
-                "currentWeightKg" to exercise.currentWeightKg.toDouble(),
-                "restSeconds" to exercise.restSeconds,
-                "orderIndex" to exercise.orderIndex
-            )
+            val baseData = workoutExercisePayload(uid, wid, exercise)
             val hash = FirestoreDeltaEngine.computeRecordHash("workoutExercises", baseData)
             if (!deltaLedger.hasEntityChanged(uid, "workoutExercises", docId, hash)) {
                 return Result.success(Unit)
             }
 
             val nowMillis = System.currentTimeMillis()
-            val docRef = firestore.collection("users").document(uid)
-                .collection("workouts").document(wid)
-                .collection("exercises").document(exercise.id.toString())
+            val userDocRef = firestore.collection("users").document(uid)
             val data = baseData + mapOf(
                 "updatedAtMillis" to nowMillis,
                 "updatedAt" to FieldValue.serverTimestamp()
             )
-            awaitCloudWrite(docRef.set(data, SetOptions.merge()))
+
+            val batch = firestore.batch()
+            // 1. Subcoleção aninhada em workoutRoutines/{wid}/workoutExercises/{exerciseId}
+            batch.set(
+                userDocRef.collection("workoutRoutines").document(wid)
+                    .collection("workoutExercises").document(exerciseIdStr),
+                data,
+                SetOptions.merge()
+            )
+            // 2. Subcoleção aninhada em workouts/{wid}/workoutExercises/{exerciseId}
+            batch.set(
+                userDocRef.collection("workouts").document(wid)
+                    .collection("workoutExercises").document(exerciseIdStr),
+                data,
+                SetOptions.merge()
+            )
+            // 3. Subcoleção aninhada em workouts/{wid}/exercises/{exerciseId}
+            batch.set(
+                userDocRef.collection("workouts").document(wid)
+                    .collection("exercises").document(exerciseIdStr),
+                data,
+                SetOptions.merge()
+            )
+            // 4. Estrutura atual preservada em workoutExercises/{docId} para retrocompatibilidade
+            batch.set(
+                userDocRef.collection("workoutExercises").document(docId),
+                data,
+                SetOptions.merge()
+            )
+
+            awaitCloudWrite(batch.commit())
             deltaLedger.markEntitySynced(uid, "workoutExercises", docId, hash, nowMillis)
             FirestoreLogger.logSuccess("syncWorkoutExerciseToCloud", path)
             Result.success(Unit)
@@ -1121,10 +1152,25 @@ open class FirestoreSyncManager(private val context: Context) {
         foodRecords: List<FoodRecord> = emptyList(),
         cardioLogs: List<CardioLog> = emptyList(),
         dailyIntakes: List<DailyIntakeHistory> = emptyList(),
-        favoriteFoods: List<com.example.data.model.FoodItem> = emptyList()
+        favoriteFoods: List<com.example.data.model.FoodItem> = emptyList(),
+        workoutRoutines: List<WorkoutRoutine> = emptyList(),
+        workoutExercises: List<WorkoutExercise> = emptyList(),
+        mealPlanItems: List<MealPlanItem> = emptyList(),
+        shoppingItems: List<ShoppingItem> = emptyList()
     ): Result<SyncReport> {
         val uid = resolveUserId(profile?.firebaseUid)
             ?: return Result.failure(IllegalStateException("Entre na sua conta para sincronizar. Os dados locais continuam no aparelho."))
+
+        // Executa automaticamente a migração não-destrutiva de exercícios para workoutRoutines/{id}/workoutExercises e workouts/{id}/exercises
+        if (migratedUsersInSession.add(uid)) {
+            runCatching {
+                val migrationService = WorkoutMigrationService(context, firestore, auth)
+                migrationService.migrateUserWorkoutsAndExercises(uid, preserveLegacyDocuments = true)
+                if (workoutExercises.isNotEmpty()) {
+                    migrationService.migrateLocalExercisesToSubcollections(workoutExercises, uid)
+                }
+            }
+        }
 
         val operations = mutableListOf<suspend () -> Result<Unit>>()
         var skippedCount = 0
@@ -1162,6 +1208,55 @@ open class FirestoreSyncManager(private val context: Context) {
                 }
             } else {
                 skippedCount++
+            }
+        }
+
+        workoutRoutines.forEach { routine ->
+            if (routine.id > 0L) {
+                val docId = routine.id.toString()
+                val hash = FirestoreDeltaEngine.computeRecordHash("workoutRoutines", workoutRoutinePayload(uid, routine))
+                if (deltaLedger.hasEntityChanged(uid, "workoutRoutines", docId, hash)) {
+                    operations.add { syncWorkoutRoutineToCloud(routine, uid) }
+                } else {
+                    skippedCount++
+                }
+            }
+        }
+
+        workoutExercises.forEach { exercise ->
+            if (exercise.id > 0L) {
+                val wid = if (exercise.routineId > 0L) exercise.routineId.toString() else "free"
+                val docId = "${wid}_${exercise.id}"
+                val hash = FirestoreDeltaEngine.computeRecordHash("workoutExercises", workoutExercisePayload(uid, wid, exercise))
+                if (deltaLedger.hasEntityChanged(uid, "workoutExercises", docId, hash)) {
+                    operations.add { syncWorkoutExerciseToCloud(exercise, wid, uid) }
+                } else {
+                    skippedCount++
+                }
+            }
+        }
+
+        mealPlanItems.forEach { item ->
+            if (item.id > 0L) {
+                val docId = item.id.toString()
+                val hash = FirestoreDeltaEngine.computeRecordHash("mealPlans", mealPlanPayload(uid, item))
+                if (deltaLedger.hasEntityChanged(uid, "mealPlans", docId, hash)) {
+                    operations.add { syncMealPlanToCloud(item, uid) }
+                } else {
+                    skippedCount++
+                }
+            }
+        }
+
+        shoppingItems.forEach { item ->
+            if (item.id > 0L) {
+                val docId = item.id.toString()
+                val hash = FirestoreDeltaEngine.computeRecordHash("shoppingItems", shoppingItemPayload(uid, item))
+                if (deltaLedger.hasEntityChanged(uid, "shoppingItems", docId, hash)) {
+                    operations.add { syncShoppingItemToCloud(item, uid) }
+                } else {
+                    skippedCount++
+                }
             }
         }
 

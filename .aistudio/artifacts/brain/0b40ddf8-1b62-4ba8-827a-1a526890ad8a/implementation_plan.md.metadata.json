@@ -1,6 +1,0 @@
-{
-  "summary": "Plano de implementação para remover o bloco de heatmap/resumo muscular da tela de Treino, manter o Heatmap Anatômico exclusivamente na tela de Perfil com alternância entre vista Frontal, Posterior e Lado a Lado, e preparar/subir a versão Alpha.",
-  "updatedAt": "2026-11-06T00:45:58.615806833Z",
-  "requestFeedback": true,
-  "userFacing": true
-}

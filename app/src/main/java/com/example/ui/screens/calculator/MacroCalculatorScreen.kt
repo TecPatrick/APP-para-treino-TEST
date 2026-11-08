@@ -61,7 +61,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.ActivityLevel
 import com.example.data.model.FitnessGoal
 import com.example.data.model.Gender
-import com.example.ui.VirtusViewModel
+import com.example.ui.DietViewModel
 import com.example.ui.components.GrowthHeader
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
@@ -77,7 +77,7 @@ import com.example.util.MacroCalculator
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MacroCalculatorScreen(
-    viewModel: VirtusViewModel,
+    viewModel: DietViewModel,
     onNavigateBack: () -> Unit
 ) {
     val currentProfile by viewModel.userProfile.collectAsStateWithLifecycle()

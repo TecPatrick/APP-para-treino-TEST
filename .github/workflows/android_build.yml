@@ -1,0 +1,190 @@
+name: Android Build & Firebase Alpha Distribution
+
+on:
+  push:
+    branches: [ main, master, alpha ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: 'Notas da versão para o grupo Alpha no Firebase App Distribution'
+        required: false
+        default: 'Virtus v0.9.1-alpha: Migração automática retrocompatível de workoutExercises, Fila de Sincronização Offline e Heatmap Anatômico no Perfil.'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAVA_VERSION: '17'
+  GRADLE_VERSION: '9.3.1'
+  FIREBASE_APP_ID: '1:204365877775:android:f77650214127790642497a'
+  FIREBASE_TESTER_GROUPS: 'alpha'
+  FIREBASE_RELEASE_NOTES: ${{ inputs.release_notes || 'Virtus v0.9.1-alpha: Migração automática retrocompatível de workoutExercises, Fila de Sincronização Offline e Heatmap Anatômico no Perfil.' }}
+
+jobs:
+  build-apk:
+    name: Build, Sign & Distribute Alpha APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    env:
+      STORE_FILE: ${{ runner.temp }}/custom-signing.jks
+      STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 17 with Gradle cache
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: 'gradle'
+
+      - name: Set up Gradle with build cache
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: ${{ env.GRADLE_VERSION }}
+
+      - name: Prepare environment variables (.env & google-services.json)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ ! -f ".env" ]; then
+            if [ -f ".env.example" ]; then
+              cp .env.example .env
+            else
+              touch .env
+            fi
+          fi
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          fi
+
+      - name: Configure APK signing from GitHub Secrets (KEYSTORE_BASE64, STORE_PASSWORD, KEY_PASSWORD, KEY_ALIAS)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$DEBUG_KEYSTORE_BASE64" ]; then
+            printf '%s' "$DEBUG_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > debug.keystore
+          elif [ -s "debug.keystore.base64" ]; then
+            tr -d '[:space:]' < debug.keystore.base64 | base64 --decode > debug.keystore
+          elif [ ! -f "debug.keystore" ]; then
+            keytool -genkeypair -v \
+              -keystore debug.keystore \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "KEYSTORE_BASE64 detectado nos GitHub Secrets. Preparando keystore de assinatura..."
+            printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > "$RUNNER_TEMP/custom-signing.jks"
+          fi
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Run unit, migration, and regression tests
+        run: ./gradlew --no-daemon testDebugUnitTest
+
+      - name: Build APK
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Sign APK with GitHub Secrets (KEYSTORE_BASE64, STORE_PASSWORD, KEY_PASSWORD, KEY_ALIAS)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          SECRET_STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          SECRET_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          SECRET_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
+          if [ -n "$KEYSTORE_BASE64" ] && [ -s "$RUNNER_TEMP/custom-signing.jks" ] && [ -n "$SECRET_STORE_PASSWORD" ] && [ -n "$SECRET_KEY_ALIAS" ]; then
+            APKSIGNER_BIN=$(find "$ANDROID_HOME/build-tools" -name "apksigner" | sort -V | tail -n 1)
+            if [ -n "$APKSIGNER_BIN" ]; then
+              echo "Assinando APK com KEYSTORE_BASE64 e KEY_ALIAS dos GitHub Secrets..."
+              "$APKSIGNER_BIN" sign \
+                --ks "$RUNNER_TEMP/custom-signing.jks" \
+                --ks-pass "pass:$SECRET_STORE_PASSWORD" \
+                --ks-key-alias "$SECRET_KEY_ALIAS" \
+                --key-pass "pass:${SECRET_KEY_PASSWORD:-$SECRET_STORE_PASSWORD}" \
+                "$APK_PATH"
+              "$APKSIGNER_BIN" verify --verbose "$APK_PATH"
+            fi
+          else
+            echo "APK mantido com a assinatura padrão de debug (fallback seguro ativo)."
+          fi
+          ls -lh "$APK_PATH"
+
+      - name: Upload Signed APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: virtus-alpha-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Set up Node.js for Firebase CLI
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Conditional Upload to Firebase App Distribution (Alpha)
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        env:
+          FIREBASE_APP_DISTRIBUTION_CREDENTIALS: ${{ secrets.FIREBASE_APP_DISTRIBUTION_CREDENTIALS || secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
+
+          if [ -n "$FIREBASE_APP_DISTRIBUTION_CREDENTIALS" ]; then
+            echo "Credencial de Service Account do Firebase encontrada. Enviando APK ao grupo Alpha..."
+            CREDENTIAL_FILE="$RUNNER_TEMP/firebase-service-account.json"
+            printf '%s' "$FIREBASE_APP_DISTRIBUTION_CREDENTIALS" > "$CREDENTIAL_FILE"
+            chmod 600 "$CREDENTIAL_FILE"
+            export GOOGLE_APPLICATION_CREDENTIALS="$CREDENTIAL_FILE"
+            export FIREBASE_APP_DISTRIBUTION_CREDENTIALS="$CREDENTIAL_FILE"
+            npx -y firebase-tools@15.34.0 appdistribution:distribute \
+              "$APK_PATH" \
+              --app "$FIREBASE_APP_ID" \
+              --groups "$FIREBASE_TESTER_GROUPS" \
+              --release-notes "$FIREBASE_RELEASE_NOTES (commit ${GITHUB_SHA::7})"
+          else
+            echo "Aviso: Credenciais FIREBASE_APP_DISTRIBUTION_CREDENTIALS ausentes nos Secrets. Upload ao Firebase Alpha ignorado com segurança; APK assinado disponível nos Artifacts."
+            exit 0
+          fi
+
+      - name: Clean up temporary credentials and keystores
+        if: always()
+        run: |
+          rm -f "$RUNNER_TEMP/firebase-service-account.json"
+          rm -f "$RUNNER_TEMP/custom-signing.jks"
+
+      - name: Upload Test Reports and Room Schemas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-and-schemas
+          path: |
+            app/build/reports/tests/
+            app/build/test-results/
+            app/schemas/
+          if-no-files-found: ignore
+          retention-days: 7

@@ -2,11 +2,11 @@ package com.example.data.firestore
 
 import android.content.Context
 import android.util.Log
-import com.example.BuildConfig
 import com.example.R
 import com.example.data.model.WorkoutExercise
 import com.example.util.FirestoreLogger
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
@@ -26,29 +26,66 @@ data class WorkoutMigrationReport(
 )
 
 /**
- * Serviço responsável por percorrer os documentos de treino do usuário no Firestore,
- * mover os exercícios existentes para a nova estrutura de subcoleção:
- *   /users/{userId}/workouts/{workoutId}/exercises/{exerciseId}
- * Tratando treinos sem ID válido usando o identificador padrão 'free'.
+ * Caminhos de destino e compatibilidade retroativa para um exercício no Firestore.
+ */
+data class ExerciseFirestorePaths(
+    val normalizedWorkoutId: String,
+    val routineWorkoutExercisesPath: String,
+    val workoutsWorkoutExercisesPath: String,
+    val workoutsExercisesPath: String,
+    val legacyRootWorkoutExercisesPath: String
+)
+
+/**
+ * Serviço responsável por percorrer os documentos de treino e exercícios do usuário no Firestore e
+ * migrar/copiar de forma não-destrutiva para as subcoleções aninhadas compatíveis:
+ *   - /users/{userId}/workoutRoutines/{workoutId}/workoutExercises/{exerciseId}
+ *   - /users/{userId}/workouts/{workoutId}/workoutExercises/{exerciseId}
+ *   - /users/{userId}/workouts/{workoutId}/exercises/{exerciseId}
+ * preservando a estrutura atual (/users/{userId}/workoutExercises/{exerciseId}) para retrocompatibilidade.
  */
 class WorkoutMigrationService(
     private val context: Context,
-    private val firestore: FirebaseFirestore = try {
-        val dbId = context.getString(R.string.firestore_database_id)
-        if (dbId.isNotBlank() && dbId != "(default)") {
-            FirebaseFirestore.getInstance(dbId)
-        } else {
-            FirebaseFirestore.getInstance()
-        }
-    } catch (_: Exception) {
-        FirebaseFirestore.getInstance()
-    },
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(
+        context.applicationContext.getString(R.string.firestore_database_id)
+    ),
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
 ) {
 
     companion object {
         private const val TAG = "WorkoutMigration"
         const val DEFAULT_WORKOUT_ID = "free"
+
+        /**
+         * Normaliza o identificador do treino/rotina para uso seguro em subcoleções do Firestore.
+         */
+        fun normalizeWorkoutId(rawWorkoutId: String?): String {
+            val trimmed = rawWorkoutId?.trim().orEmpty()
+            return if (trimmed.isNotBlank() && trimmed != "null" && trimmed != "0") {
+                trimmed
+            } else {
+                DEFAULT_WORKOUT_ID
+            }
+        }
+
+        /**
+         * Calcula todos os caminhos compatíveis (novas subcoleções aninhadas + caminho legado preservado).
+         */
+        fun resolveCompatiblePaths(
+            userId: String,
+            rawWorkoutId: String?,
+            exerciseId: String
+        ): ExerciseFirestorePaths {
+            val wid = normalizeWorkoutId(rawWorkoutId)
+            val exId = exerciseId.trim().ifBlank { UUID.randomUUID().toString() }
+            return ExerciseFirestorePaths(
+                normalizedWorkoutId = wid,
+                routineWorkoutExercisesPath = "users/$userId/workoutRoutines/$wid/workoutExercises/$exId",
+                workoutsWorkoutExercisesPath = "users/$userId/workouts/$wid/workoutExercises/$exId",
+                workoutsExercisesPath = "users/$userId/workouts/$wid/exercises/$exId",
+                legacyRootWorkoutExercisesPath = "users/$userId/workoutExercises/${wid}_$exId"
+            )
+        }
     }
 
     /**
@@ -59,138 +96,181 @@ class WorkoutMigrationService(
         return uid?.takeIf { it.isNotBlank() && !it.startsWith("guest_") }
     }
 
+    private suspend fun writeToCompatibleNestedPaths(
+        userDocRef: DocumentReference,
+        workoutId: String,
+        exerciseId: String,
+        payload: Map<String, Any?>,
+        alsoMirrorLegacyRoot: Boolean = true
+    ) {
+        val routineWorkoutExercisesRef = userDocRef
+            .collection("workoutRoutines")
+            .document(workoutId)
+            .collection("workoutExercises")
+            .document(exerciseId)
+
+        val workoutsWorkoutExercisesRef = userDocRef
+            .collection("workouts")
+            .document(workoutId)
+            .collection("workoutExercises")
+            .document(exerciseId)
+
+        val workoutsExercisesRef = userDocRef
+            .collection("workouts")
+            .document(workoutId)
+            .collection("exercises")
+            .document(exerciseId)
+
+        val batch = firestore.batch()
+        batch.set(routineWorkoutExercisesRef, payload, SetOptions.merge())
+        batch.set(workoutsWorkoutExercisesRef, payload, SetOptions.merge())
+        batch.set(workoutsExercisesRef, payload, SetOptions.merge())
+        if (alsoMirrorLegacyRoot) {
+            val legacyRef = userDocRef
+                .collection("workoutExercises")
+                .document("${workoutId}_$exerciseId")
+            batch.set(legacyRef, payload, SetOptions.merge())
+        }
+        batch.commit().await()
+    }
+
     /**
      * Executa a migração completa dos treinos e exercícios do usuário no Firestore.
      *
-     * 1. Percorre /users/{userId}/workouts e migra exercícios embutidos no documento
-     *    para /users/{userId}/workouts/{workoutId}/exercises/{exerciseId}.
-     * 2. Percorre a coleção legada /users/{userId}/workoutExercises e move cada documento
-     *    para a nova subcoleção do treino correspondente (ou 'free').
+     * Por padrão ([preserveLegacyDocuments] = true), preserva os documentos existentes na coleção
+     * atual `/users/{userId}/workoutExercises` enquanto copia todos os registros para as
+     * subcoleções aninhadas `workoutRoutines/{id}/workoutExercises` e `workouts/{id}/exercises`.
      */
-    suspend fun migrateUserWorkoutsAndExercises(customUid: String? = null): Result<WorkoutMigrationReport> {
+    suspend fun migrateUserWorkoutsAndExercises(
+        customUid: String? = null,
+        preserveLegacyDocuments: Boolean = true
+    ): Result<WorkoutMigrationReport> {
         val uid = resolveUserId(customUid)
             ?: return Result.failure(IllegalStateException("Usuário não autenticado no Firebase para migração."))
 
-        Log.i(TAG, "Iniciando migração de exercícios para o usuário: $uid")
+        Log.i(TAG, "Iniciando migração não-destrutiva de exercícios para o usuário: $uid")
         val errors = mutableListOf<String>()
         var workoutsProcessed = 0
         var exercisesMigrated = 0
-        var legacyExercisesMoved = 0
+        var legacyExercisesCopied = 0
         var failedCount = 0
 
         val userDocRef = firestore.collection("users").document(uid)
 
         // =========================================================================
-        // 1. Percorrer documentos na coleção /users/{userId}/workouts
+        // 1. Percorrer documentos na coleção /users/{userId}/workouts e /workoutRoutines
         // =========================================================================
-        try {
-            val workoutsSnapshot = userDocRef.collection("workouts").get().await()
-            for (workoutDoc in workoutsSnapshot.documents) {
-                workoutsProcessed++
-                val rawId = workoutDoc.id.trim()
-                val workoutId = if (rawId.isBlank() || rawId == "null") {
-                    val fieldId = workoutDoc.getString("workoutId") ?: workoutDoc.getString("id")
-                    if (!fieldId.isNullOrBlank() && fieldId != "null") fieldId.trim() else DEFAULT_WORKOUT_ID
-                } else {
-                    rawId
-                }
+        for (parentCollection in listOf("workouts", "workoutRoutines")) {
+            try {
+                val workoutsSnapshot = userDocRef.collection(parentCollection).get().await()
+                for (workoutDoc in workoutsSnapshot.documents) {
+                    workoutsProcessed++
+                    val rawId = workoutDoc.id.trim()
+                    val candidateId = if (rawId.isBlank() || rawId == "null") {
+                        workoutDoc.getString("workoutId") ?: workoutDoc.getString("id")
+                    } else {
+                        rawId
+                    }
+                    val workoutId = normalizeWorkoutId(candidateId)
 
-                // Verifica se há lista de exercícios embutidos no documento do treino
-                @Suppress("UNCHECKED_CAST")
-                val embeddedExercises = workoutDoc.get("exercises") as? List<Map<String, Any?>>
-                if (!embeddedExercises.isNullOrEmpty()) {
-                    for (exMap in embeddedExercises) {
-                        try {
-                            val rawExId = (exMap["id"] ?: exMap["exerciseId"])?.toString()?.trim()
-                            val exerciseId = if (!rawExId.isNullOrBlank() && rawExId != "null") {
-                                rawExId
-                            } else {
-                                UUID.randomUUID().toString()
+                    @Suppress("UNCHECKED_CAST")
+                    val embeddedExercises = workoutDoc.get("exercises") as? List<Map<String, Any?>>
+                    if (!embeddedExercises.isNullOrEmpty()) {
+                        for (exMap in embeddedExercises) {
+                            try {
+                                val rawExId = (exMap["id"] ?: exMap["exerciseId"])?.toString()?.trim()
+                                val exerciseId = if (!rawExId.isNullOrBlank() && rawExId != "null") {
+                                    rawExId
+                                } else {
+                                    UUID.randomUUID().toString()
+                                }
+
+                                val paths = resolveCompatiblePaths(uid, workoutId, exerciseId)
+                                FirestoreLogger.logWriteAttempt("migrateEmbeddedExercise", uid, paths.routineWorkoutExercisesPath, exMap)
+
+                                val payload = HashMap<String, Any?>(exMap).apply {
+                                    put("userId", uid)
+                                    put("workoutId", paths.normalizedWorkoutId)
+                                    put("id", exerciseId)
+                                    put("updatedAt", FieldValue.serverTimestamp())
+                                }
+
+                                writeToCompatibleNestedPaths(
+                                    userDocRef = userDocRef,
+                                    workoutId = paths.normalizedWorkoutId,
+                                    exerciseId = exerciseId,
+                                    payload = payload,
+                                    alsoMirrorLegacyRoot = true
+                                )
+                                FirestoreLogger.logSuccess("migrateEmbeddedExercise", paths.routineWorkoutExercisesPath)
+                                exercisesMigrated++
+                            } catch (e: Exception) {
+                                failedCount++
+                                val msg = "Erro ao migrar exercício embutido no treino $workoutId: ${e.message}"
+                                Log.e(TAG, msg, e)
+                                errors.add(msg)
                             }
-
-                            val targetPath = "users/$uid/workouts/$workoutId/exercises/$exerciseId"
-                            FirestoreLogger.logWriteAttempt("migrateEmbeddedExercise", uid, targetPath, exMap)
-
-                            val exerciseDocRef = userDocRef
-                                .collection("workouts")
-                                .document(workoutId)
-                                .collection("exercises")
-                                .document(exerciseId)
-
-                            val payload = HashMap<String, Any?>(exMap).apply {
-                                put("userId", uid)
-                                put("workoutId", workoutId)
-                                put("id", exerciseId)
-                                put("updatedAt", FieldValue.serverTimestamp())
-                            }
-
-                            exerciseDocRef.set(payload, SetOptions.merge()).await()
-                            FirestoreLogger.logSuccess("migrateEmbeddedExercise", targetPath)
-                            exercisesMigrated++
-                        } catch (e: Exception) {
-                            failedCount++
-                            val msg = "Erro ao migrar exercício embutido no treino $workoutId: ${e.message}"
-                            Log.e(TAG, msg, e)
-                            errors.add(msg)
                         }
                     }
                 }
+            } catch (e: Exception) {
+                val msg = "Falha ao ler coleção /users/$uid/$parentCollection: ${e.message}"
+                Log.e(TAG, msg, e)
+                errors.add(msg)
             }
-        } catch (e: Exception) {
-            val msg = "Falha ao ler coleção /users/$uid/workouts: ${e.message}"
-            Log.e(TAG, msg, e)
-            errors.add(msg)
         }
 
         // =========================================================================
-        // 2. Percorrer e mover coleção legada /users/{userId}/workoutExercises
+        // 2. Percorrer coleção /users/{userId}/workoutExercises e copiar para as subcoleções aninhadas
+        //    (workoutRoutines/{id}/workoutExercises e workouts/{id}/exercises)
+        //    preservando os documentos originais para retrocompatibilidade
         // =========================================================================
         try {
             val legacySnapshot = userDocRef.collection("workoutExercises").get().await()
             for (legacyDoc in legacySnapshot.documents) {
                 try {
-                    val exerciseId = legacyDoc.id
+                    val rawDocId = legacyDoc.id
                     val data = legacyDoc.data ?: continue
 
-                    // Identificar workoutId ou usar DEFAULT_WORKOUT_ID ("free")
                     val rawWorkoutId = (data["workoutId"] ?: data["routineId"])?.toString()?.trim()
-                    val workoutId = if (!rawWorkoutId.isNullOrBlank() && rawWorkoutId != "null" && rawWorkoutId != "0") {
-                        rawWorkoutId
+                    val workoutId = normalizeWorkoutId(rawWorkoutId)
+                    val exerciseId = if (rawDocId.startsWith("${workoutId}_")) {
+                        rawDocId.removePrefix("${workoutId}_").ifBlank { rawDocId }
                     } else {
-                        DEFAULT_WORKOUT_ID
+                        rawDocId
                     }
 
-                    val targetPath = "users/$uid/workouts/$workoutId/exercises/$exerciseId"
-                    FirestoreLogger.logWriteAttempt("moveLegacyWorkoutExercise", uid, targetPath, data)
-
-                    val targetDocRef = userDocRef
-                        .collection("workouts")
-                        .document(workoutId)
-                        .collection("exercises")
-                        .document(exerciseId)
+                    val paths = resolveCompatiblePaths(uid, workoutId, exerciseId)
+                    FirestoreLogger.logWriteAttempt("copyLegacyWorkoutExercise", uid, paths.routineWorkoutExercisesPath, data)
 
                     val updatedData = HashMap<String, Any?>(data).apply {
                         put("userId", uid)
-                        put("workoutId", workoutId)
+                        put("workoutId", paths.normalizedWorkoutId)
                         put("updatedAt", FieldValue.serverTimestamp())
                     }
 
-                    // Escreve na nova subcoleção
-                    targetDocRef.set(updatedData, SetOptions.merge()).await()
-                    FirestoreLogger.logSuccess("moveLegacyWorkoutExercise", targetPath)
+                    writeToCompatibleNestedPaths(
+                        userDocRef = userDocRef,
+                        workoutId = paths.normalizedWorkoutId,
+                        exerciseId = exerciseId,
+                        payload = updatedData,
+                        alsoMirrorLegacyRoot = false
+                    )
+                    FirestoreLogger.logSuccess("copyLegacyWorkoutExercise", paths.routineWorkoutExercisesPath)
 
-                    // Remove do local legado
-                    legacyDoc.reference.delete().await()
-                    legacyExercisesMoved++
+                    if (!preserveLegacyDocuments) {
+                        legacyDoc.reference.delete().await()
+                    }
+                    legacyExercisesCopied++
                 } catch (e: Exception) {
                     failedCount++
-                    val msg = "Erro ao mover exercício legado ${legacyDoc.id}: ${e.message}"
+                    val msg = "Erro ao copiar exercício legado ${legacyDoc.id}: ${e.message}"
                     Log.e(TAG, msg, e)
                     errors.add(msg)
                 }
             }
         } catch (e: Exception) {
-            val msg = "Falha ao ler coleção legada workoutExercises: ${e.message}"
+            val msg = "Falha ao ler coleção workoutExercises: ${e.message}"
             Log.e(TAG, msg, e)
             errors.add(msg)
         }
@@ -199,17 +279,19 @@ class WorkoutMigrationService(
             userId = uid,
             workoutsProcessed = workoutsProcessed,
             exercisesMigrated = exercisesMigrated,
-            legacyExercisesMoved = legacyExercisesMoved,
+            legacyExercisesMoved = legacyExercisesCopied,
             failedCount = failedCount,
             errors = errors
         )
 
-        Log.i(TAG, "Migração concluída: $workoutsProcessed treinos processados, $exercisesMigrated exercícios migrados, $legacyExercisesMoved legados movidos, $failedCount falhas.")
+        Log.i(TAG, "Migração concluída: $workoutsProcessed treinos processados, $exercisesMigrated embutidos migrados, $legacyExercisesCopied exercícios copiados para subcoleções aninhadas, $failedCount falhas.")
         return Result.success(report)
     }
 
     /**
-     * Migra uma lista de entidades locais de exercício para a subcoleção do Firestore.
+     * Migra uma lista de entidades locais de exercício para as subcoleções aninhadas compatíveis do Firestore
+     * (`workoutRoutines/{id}/workoutExercises` e `workouts/{id}/exercises`),
+     * preservando também o espelho em `/users/{uid}/workoutExercises/{wid}_{exerciseId}`.
      */
     suspend fun migrateLocalExercisesToSubcollections(
         exercises: List<WorkoutExercise>,
@@ -222,21 +304,17 @@ class WorkoutMigrationService(
         val userDocRef = firestore.collection("users").document(uid)
 
         for (ex in exercises) {
-            val workoutId = if (ex.routineId > 0) ex.routineId.toString() else DEFAULT_WORKOUT_ID
+            if (ex.id <= 0L) continue
+            val rawWorkoutId = if (ex.routineId > 0L) ex.routineId.toString() else DEFAULT_WORKOUT_ID
             val exerciseId = ex.id.toString()
-            val path = "users/$uid/workouts/$workoutId/exercises/$exerciseId"
+            val paths = resolveCompatiblePaths(uid, rawWorkoutId, exerciseId)
 
             try {
-                FirestoreLogger.logWriteAttempt("migrateLocalExercise", uid, path, ex)
-                val docRef = userDocRef
-                    .collection("workouts")
-                    .document(workoutId)
-                    .collection("exercises")
-                    .document(exerciseId)
+                FirestoreLogger.logWriteAttempt("migrateLocalExercise", uid, paths.routineWorkoutExercisesPath, ex)
 
                 val data = mapOf(
                     "userId" to uid,
-                    "workoutId" to workoutId,
+                    "workoutId" to paths.normalizedWorkoutId,
                     "routineId" to ex.routineId,
                     "exerciseName" to ex.exerciseName,
                     "muscleGroup" to ex.muscleGroup,
@@ -251,11 +329,18 @@ class WorkoutMigrationService(
                     "updatedAt" to FieldValue.serverTimestamp()
                 )
 
-                docRef.set(data, SetOptions.merge()).await()
-                FirestoreLogger.logSuccess("migrateLocalExercise", path)
+                writeToCompatibleNestedPaths(
+                    userDocRef = userDocRef,
+                    workoutId = paths.normalizedWorkoutId,
+                    exerciseId = exerciseId,
+                    payload = data,
+                    alsoMirrorLegacyRoot = true
+                )
+
+                FirestoreLogger.logSuccess("migrateLocalExercise", paths.routineWorkoutExercisesPath)
                 count++
             } catch (e: Exception) {
-                FirestoreLogger.logError("migrateLocalExercise", path, e)
+                FirestoreLogger.logError("migrateLocalExercise", paths.routineWorkoutExercisesPath, e)
                 Log.e(TAG, "Erro ao migrar exercício local $exerciseId: ${e.message}", e)
             }
         }

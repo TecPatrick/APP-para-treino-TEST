@@ -9,11 +9,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.data.model.CardioLog
 import com.example.data.model.CardioType
-import com.example.ui.VirtusViewModel
+import com.example.ui.CardioViewModel
 
 @Composable
 fun CardioLogScreen(
-    viewModel: VirtusViewModel,
+    viewModel: CardioViewModel,
     onNavigateBack: () -> Unit
 ) {
     var selectedType by remember { mutableStateOf(CardioType.TREADMILL) }
