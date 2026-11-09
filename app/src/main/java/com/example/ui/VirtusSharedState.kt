@@ -10,6 +10,7 @@ import com.example.data.firestore.FirestoreSyncManager
 import com.example.data.firestore.SyncReport
 import com.example.data.firestore.WorkoutMigrationService
 import com.example.data.local.PrepopulatedData
+import com.example.data.model.AchievementsSummaryState
 import com.example.data.model.CardioLog
 import com.example.data.model.DailyIntakeHistory
 import com.example.data.model.DietPlan
@@ -34,6 +35,7 @@ import com.example.service.RunningForegroundService
 import com.example.ui.auth.AuthController
 import com.example.ui.sync.PendingSyncItem
 import com.example.ui.sync.SyncController
+import com.example.util.AchievementCatalogAndEngine
 import com.example.util.AppLog
 import com.example.util.MacroCalculator
 import com.example.util.PdfExporter
@@ -326,6 +328,52 @@ class VirtusSharedState(
     val allWorkoutSchedules: StateFlow<List<WorkoutSchedule>> = repository.allWorkoutSchedules
         .stateIn(scope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private val achievementsPrefs by lazy {
+        application.getSharedPreferences("virtus_achievements_prefs", Context.MODE_PRIVATE)
+    }
+
+    private val _equippedTitleId = MutableStateFlow<String?>(null)
+    val equippedTitleId: StateFlow<String?> = _equippedTitleId.asStateFlow()
+
+    fun equipAnimeTitle(achievementId: String) {
+        _equippedTitleId.value = achievementId
+        scope.launch(Dispatchers.IO) {
+            achievementsPrefs.edit().putString("equipped_title_id", achievementId).apply()
+        }
+        val titleName = AchievementCatalogAndEngine.catalog
+            .find { it.id == achievementId }?.animeTitleReward
+            ?: AchievementCatalogAndEngine.STARTER_TITLE_TEXT
+        showToast("Patente equipada: $titleName ⚡")
+    }
+
+    val achievementsState: StateFlow<AchievementsSummaryState> = combine(
+        combine(userProfile, allFoodRecords, recentIntakeHistory) { prof, foods, intake ->
+            Triple(prof, foods, intake)
+        },
+        combine(workoutLogs, workoutRoutines, allExercises) { logs, routines, exercises ->
+            Triple(logs, routines, exercises)
+        },
+        combine(allCardioLogs, allGpsRouteLogs, _equippedTitleId) { cardio, gps, equippedId ->
+            Triple(cardio, gps, equippedId)
+        }
+    ) { dietTriple, workoutTriple, cardioTriple ->
+        AchievementCatalogAndEngine.evaluateAchievements(
+            profile = dietTriple.first,
+            foodRecords = dietTriple.second,
+            intakeHistory = dietTriple.third,
+            workoutLogs = workoutTriple.first,
+            workoutRoutines = workoutTriple.second,
+            allExercises = workoutTriple.third,
+            cardioLogs = cardioTriple.first,
+            gpsRouteLogs = cardioTriple.second,
+            equippedTitleId = cardioTriple.third
+        )
+    }.stateIn(
+        scope = scope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = AchievementsSummaryState()
+    )
+
     val dailyEnergyExpenditure: StateFlow<DailyEnergyExpenditure> = combine(
         userProfile,
         workoutLogs,
@@ -443,6 +491,7 @@ class VirtusSharedState(
         }
 
         scope.launch(Dispatchers.IO) {
+            _equippedTitleId.value = achievementsPrefs.getString("equipped_title_id", null)
             val preferences = application.getSharedPreferences("daily_tracking", Context.MODE_PRIVATE)
             val today = currentDateKey()
             if (preferences.getString("meal_completion_date", null) != today) {
@@ -669,6 +718,7 @@ abstract class BaseVirtusDomainViewModel(application: Application) : AndroidView
     val totalGpsDistanceMeters: StateFlow<Float> get() = shared.totalGpsDistanceMeters
     val roomDietaryProfile: StateFlow<DietaryProfile?> get() = shared.roomDietaryProfile
     val allWorkoutSchedules: StateFlow<List<WorkoutSchedule>> get() = shared.allWorkoutSchedules
+    val achievementsState: StateFlow<AchievementsSummaryState> get() = shared.achievementsState
 
     val isFirestoreSyncing: StateFlow<Boolean> get() = shared.isFirestoreSyncing
     val cloudWorkoutLogs: StateFlow<List<WorkoutLog>> get() = shared.cloudWorkoutLogs
@@ -687,6 +737,7 @@ abstract class BaseVirtusDomainViewModel(application: Application) : AndroidView
     fun setDarkMode(isDark: Boolean) = shared.setDarkMode(isDark)
     fun toggleDarkMode() = shared.toggleDarkMode()
     fun exportPdfProgressReport(context: Context) = shared.exportPdfProgressReport(context)
+    fun equipAnimeTitle(achievementId: String) = shared.equipAnimeTitle(achievementId)
 
     override fun onCleared() {
         viewModelListenerJobs.forEach { it.cancel() }

@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Person
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.outlined.EmojiEvents
 import androidx.compose.material.icons.outlined.FitnessCenter
 import androidx.compose.material.icons.outlined.LocalFireDepartment
 import androidx.compose.material.icons.outlined.Person
@@ -79,6 +81,7 @@ import com.example.ui.DietViewModel
 import com.example.ui.ShoppingViewModel
 import com.example.ui.SyncViewModel
 import com.example.ui.WorkoutViewModel
+import com.example.ui.screens.achievements.AchievementsScreen
 import com.example.ui.screens.analytics.AnalyticsScreen
 import com.example.ui.screens.auth.AuthAndOnboardingScreen
 import com.example.ui.screens.calculator.MacroCalculatorScreen
@@ -115,6 +118,7 @@ enum class AppNavigationScreen(
     SHOPPING("Mercado", Icons.Filled.ShoppingCart, Icons.Outlined.ShoppingCart, "nav_shopping"),
     RECEIPTS("Preços/NF", Icons.AutoMirrored.Filled.ReceiptLong, Icons.AutoMirrored.Outlined.ReceiptLong, "nav_receipts"),
     ANALYTICS("Evolução", Icons.AutoMirrored.Filled.TrendingUp, Icons.AutoMirrored.Outlined.TrendingUp, "nav_analytics"),
+    ACHIEVEMENTS("Conquistas", Icons.Filled.EmojiEvents, Icons.Outlined.EmojiEvents, "nav_achievements"),
     EXERCISE_PROGRESSION("Cargas", Icons.AutoMirrored.Filled.TrendingUp, Icons.AutoMirrored.Outlined.TrendingUp, "nav_exercise_progression"),
     CALCULATOR("Macros", Icons.Filled.Calculate, Icons.Filled.Calculate, "nav_calculator"),
     PROFILE("Perfil", Icons.Filled.Person, Icons.Outlined.Person, "nav_profile"),
@@ -207,6 +211,7 @@ fun MainAppScreen(
     val showBottomBar = currentScreen != AppNavigationScreen.CALCULATOR &&
             currentScreen != AppNavigationScreen.AUTH &&
             currentScreen != AppNavigationScreen.PROFILE &&
+            currentScreen != AppNavigationScreen.ACHIEVEMENTS &&
             currentScreen != AppNavigationScreen.EXERCISE_PROGRESSION
 
     Scaffold(
@@ -303,7 +308,8 @@ fun MainAppScreen(
                         onNavigateToAnalytics = { currentScreen = AppNavigationScreen.ANALYTICS },
                         onNavigateToProfile = { currentScreen = AppNavigationScreen.PROFILE },
                         onNavigateToReceipts = { currentScreen = AppNavigationScreen.RECEIPTS },
-                        onNavigateToGps = { currentScreen = AppNavigationScreen.GPS }
+                        onNavigateToGps = { currentScreen = AppNavigationScreen.GPS },
+                        onNavigateToAchievements = { currentScreen = AppNavigationScreen.ACHIEVEMENTS }
                     )
                     AppNavigationScreen.DIET -> {
                         val requiresLock = profile.isBiometricLockEnabled && !isDietBiometricVerified
@@ -366,7 +372,12 @@ fun MainAppScreen(
                         workoutViewModel = workoutViewModel,
                         syncViewModel = syncViewModel,
                         onNavigateBack = { currentScreen = AppNavigationScreen.DASHBOARD },
-                        onNavigateToAccount = { currentScreen = AppNavigationScreen.AUTH }
+                        onNavigateToAccount = { currentScreen = AppNavigationScreen.AUTH },
+                        onNavigateToAchievements = { currentScreen = AppNavigationScreen.ACHIEVEMENTS }
+                    )
+                    AppNavigationScreen.ACHIEVEMENTS -> AchievementsScreen(
+                        viewModel = workoutViewModel,
+                        onNavigateBack = { currentScreen = AppNavigationScreen.DASHBOARD }
                     )
                     AppNavigationScreen.AUTH -> AuthAndOnboardingScreen(
                         viewModel = authViewModel,

@@ -52,10 +52,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.data.model.AchievementsSummaryState
 import com.example.data.model.ActivityLevel
 import com.example.data.model.FitnessGoal
 import com.example.data.model.Gender
 import com.example.data.model.UserProfile
+import com.example.ui.screens.achievements.components.EquippedAnimeTitlePill
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
 import com.example.ui.theme.CarbonCardElevated
@@ -149,7 +151,9 @@ fun BiometricsOverviewCard(
     liveBmr: Int,
     idealMinWeight: Float,
     idealMaxWeight: Float,
-    liveWaterGoal: Int
+    liveWaterGoal: Int,
+    achievementsSummary: AchievementsSummaryState = AchievementsSummaryState(),
+    onOpenAchievements: () -> Unit = {}
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = CarbonCard),
@@ -175,7 +179,10 @@ fun BiometricsOverviewCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
                         Box(
                             modifier = Modifier
                                 .size(48.dp)
@@ -197,6 +204,12 @@ fun BiometricsOverviewCard(
                                 fontWeight = FontWeight.Black,
                                 color = MaterialTheme.colorScheme.onBackground
                             )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            EquippedAnimeTitlePill(
+                                summary = achievementsSummary,
+                                onClick = onOpenAchievements
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
                             val genderLabel = if (selectedGender == Gender.MASCULINO) "Masculino" else "Feminino"
                             Text(
                                 text = "$genderLabel • $parsedAge anos • ${parsedHeight.toInt()} cm",

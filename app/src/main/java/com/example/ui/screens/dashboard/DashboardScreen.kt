@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.LocalDrink
 import androidx.compose.material.icons.filled.Person
@@ -87,6 +88,7 @@ import com.example.ui.components.DailyHistorySummary
 import com.example.ui.components.GrowthHeader
 import com.example.ui.components.MacroProgressBar
 import com.example.ui.components.WeightProgressionChart
+import com.example.ui.screens.achievements.components.AchievementsSummaryBannerCard
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
 import com.example.ui.theme.CarbonCardElevated
@@ -113,10 +115,12 @@ fun DashboardScreen(
     onNavigateToAnalytics: () -> Unit,
     onNavigateToProfile: () -> Unit = {},
     onNavigateToReceipts: () -> Unit = {},
-    onNavigateToGps: () -> Unit = {}
+    onNavigateToGps: () -> Unit = {},
+    onNavigateToAchievements: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
+    val achievementsSummary by viewModel.achievementsState.collectAsStateWithLifecycle()
     val mealPlans by viewModel.mealPlanItems.collectAsStateWithLifecycle()
     val foodRecords by viewModel.allFoodRecords.collectAsStateWithLifecycle()
     val workoutRoutines by viewModel.workoutRoutines.collectAsStateWithLifecycle()
@@ -146,14 +150,24 @@ fun DashboardScreen(
         contentPadding = PaddingValues(bottom = 96.dp)
     ) {
         // Header
-        item {
+        item(key = "dashboard_header", contentType = "header") {
             val dateStr = SimpleDateFormat("EEEE, d 'de' MMMM", Locale("pt", "BR")).format(Date(selectedDateMillis))
             GrowthHeader(
                 title = "Olá, ${profile.name}",
                 subtitle = dateStr.replaceFirstChar { it.uppercase() },
-                badgeText = "VIRTUS PERFORMANCE",
+                badgeText = "⚡ ${achievementsSummary.activeTitleText.uppercase()}",
                 trailingContent = {
                     Row {
+                        IconButton(
+                            onClick = onNavigateToAchievements,
+                            modifier = Modifier.size(44.dp).testTag("achievements_header_btn")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.EmojiEvents,
+                                contentDescription = "Conquistas e Títulos Anime",
+                                tint = GrowthYellow
+                            )
+                        }
                         IconButton(
                             onClick = { showMoreDialog = true },
                             modifier = Modifier.size(44.dp).testTag("more_btn")
@@ -322,6 +336,15 @@ fun DashboardScreen(
                     }
                 }
             }
+        }
+
+        // --- Resumo de Conquistas & Patente Anime ---
+        item(key = "dashboard_achievements_summary", contentType = "achievements_banner") {
+            AchievementsSummaryBannerCard(
+                summary = achievementsSummary,
+                onOpenGallery = onNavigateToAchievements,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+            )
         }
 
         // --- Diário & Calendário ---
@@ -605,6 +628,9 @@ fun DashboardScreen(
             title = { Text("Mais Opções", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground) },
             text = {
                 Column {
+                    TextButton(onClick = { onNavigateToAchievements(); showMoreDialog = false }) {
+                        Text("Medalhas & Títulos de Anime", color = GrowthYellow, fontWeight = FontWeight.Bold)
+                    }
                     TextButton(onClick = { onNavigateToShopping(); showMoreDialog = false }) {
                         Text("Lista de Compras", color = MaterialTheme.colorScheme.onBackground)
                     }

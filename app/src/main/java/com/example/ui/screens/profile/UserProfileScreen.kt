@@ -42,6 +42,7 @@ import com.example.ui.SyncViewModel
 import com.example.ui.WorkoutViewModel
 import com.example.ui.components.GrowthHeader
 import com.example.ui.components.MuscleHeatmapView
+import com.example.ui.screens.achievements.components.AchievementsSummaryBannerCard
 import com.example.ui.screens.profile.components.BiometricSecurityCard
 import com.example.ui.screens.profile.components.BiometricsOverviewCard
 import com.example.ui.screens.profile.components.FirestoreSyncCard
@@ -61,9 +62,11 @@ fun UserProfileScreen(
     workoutViewModel: WorkoutViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     syncViewModel: SyncViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     onNavigateBack: () -> Unit = {},
-    onNavigateToAccount: () -> Unit = {}
+    onNavigateToAccount: () -> Unit = {},
+    onNavigateToAchievements: () -> Unit = {}
 ) {
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
+    val achievementsSummary by viewModel.achievementsState.collectAsStateWithLifecycle()
 
     var nameInput by remember { mutableStateOf(profile.name) }
     var weightInputText by remember { mutableStateOf(profile.weightKg.toString()) }
@@ -164,6 +167,13 @@ fun UserProfileScreen(
                 )
             }
 
+            item(key = "profile_achievements_summary", contentType = "achievements_card") {
+                AchievementsSummaryBannerCard(
+                    summary = achievementsSummary,
+                    onOpenGallery = onNavigateToAchievements
+                )
+            }
+
             item(key = "profile_biometrics_overview", contentType = "overview_card") {
                 BiometricsOverviewCard(
                     profile = profile,
@@ -178,7 +188,9 @@ fun UserProfileScreen(
                     liveBmr = liveBmr,
                     idealMinWeight = idealMinWeight,
                     idealMaxWeight = idealMaxWeight,
-                    liveWaterGoal = liveWaterGoal
+                    liveWaterGoal = liveWaterGoal,
+                    achievementsSummary = achievementsSummary,
+                    onOpenAchievements = onNavigateToAchievements
                 )
             }
 
