@@ -123,7 +123,7 @@ fun ExerciseProgressionModal(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        items(uniqueExerciseNames) { name ->
+                        items(items = uniqueExerciseNames, key = { it }, contentType = { "exercise_chip" }) { name ->
                             val isSelected = name.equals(selectedExerciseName, ignoreCase = true)
                             FilterChip(
                                 selected = isSelected,

@@ -261,7 +261,7 @@ fun AddExerciseDialog(
                     Spacer(modifier = Modifier.height(6.dp))
 
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-                        items(muscleFilters) { muscle ->
+                        items(items = muscleFilters, key = { it }, contentType = { "muscle_filter" }) { muscle ->
                             val isSel = selectedMuscleFilter == muscle
                             FilterChip(
                                 selected = isSel,
@@ -285,7 +285,7 @@ fun AddExerciseDialog(
                             .height(250.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        items(filteredCatalog) { guide ->
+                        items(items = filteredCatalog, key = { it.exerciseName }, contentType = { "exercise_guide" }) { guide ->
                             Surface(
                                 color = CarbonCardElevated,
                                 shape = RoundedCornerShape(10.dp),
@@ -479,9 +479,11 @@ fun SubstituteExerciseDialog(
         }.ifEmpty { allGuides }
     }
 
-    val filteredList = matchingMuscleGuides.filter {
-        it.exerciseName != currentExercise.exerciseName &&
-        (it.exerciseName.contains(searchQuery, ignoreCase = true) || it.muscleGroup.contains(searchQuery, ignoreCase = true))
+    val filteredList = remember(matchingMuscleGuides, currentExercise.exerciseName, searchQuery) {
+        matchingMuscleGuides.filter {
+            it.exerciseName != currentExercise.exerciseName &&
+                (it.exerciseName.contains(searchQuery, ignoreCase = true) || it.muscleGroup.contains(searchQuery, ignoreCase = true))
+        }
     }
 
     AlertDialog(
@@ -587,7 +589,7 @@ fun SubstituteExerciseDialog(
                         .height(260.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    items(filteredList) { guide ->
+                    items(items = filteredList, key = { it.exerciseName }, contentType = { "substitute_guide" }) { guide ->
                         Surface(
                             color = CarbonCardElevated,
                             shape = RoundedCornerShape(10.dp),

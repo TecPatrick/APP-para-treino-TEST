@@ -143,6 +143,9 @@ class MainActivity : FragmentActivity() {
                     cardioViewModel = cardioViewModel,
                     syncViewModel = syncViewModel
                 )
+                LaunchedEffect(Unit) {
+                    runCatching { reportFullyDrawn() }
+                }
             }
         }
     }

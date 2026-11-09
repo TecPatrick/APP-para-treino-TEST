@@ -9,6 +9,7 @@ import com.example.data.model.FitnessGoal
 import com.example.data.model.Gender
 import com.example.data.model.ProgressLog
 import com.example.data.model.UserProfile
+import com.example.util.AppLog
 import com.example.util.MacroCalculator
 import com.google.firebase.auth.AuthCredential
 import kotlinx.coroutines.flow.StateFlow
@@ -55,7 +56,7 @@ class AuthViewModel(application: Application) : BaseVirtusDomainViewModel(applic
                     else "Bloqueio por biometria desativado"
                 )
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLog.e("AuthViewModel", "Não foi possível atualizar a biometria", e)
                 showToast("Não foi possível atualizar a biometria: ${e.message}")
             }
         }
@@ -214,6 +215,7 @@ class AuthViewModel(application: Application) : BaseVirtusDomainViewModel(applic
 
     fun logout() {
         viewModelScope.launch {
+            shared.stopCloudObservers()
             runCatching {
                 repository.clearAllLocalData()
             }.onSuccess {
@@ -234,6 +236,7 @@ class AuthViewModel(application: Application) : BaseVirtusDomainViewModel(applic
 
     fun clearAllUsersAndResetDatabase(onComplete: () -> Unit = {}) {
         viewModelScope.launch {
+            shared.stopCloudObservers()
             runCatching { repository.clearAllLocalData() }
                 .onSuccess {
                     authService.signOut()
@@ -248,6 +251,7 @@ class AuthViewModel(application: Application) : BaseVirtusDomainViewModel(applic
 
     fun deleteAccountLgpd(onSuccess: () -> Unit) {
         viewModelScope.launch {
+            shared.stopCloudObservers()
             val cloudResult = firestoreSync.deleteAllUserData()
             if (cloudResult.isFailure) {
                 showToast(

@@ -7,7 +7,7 @@ import org.junit.Test
 class WorkoutMigrationPathTest {
 
     @Test
-    fun `resolveCompatiblePaths generates nested workoutExercises and workouts exercises paths while preserving legacy path`() {
+    fun `resolveCompatiblePaths generates canonical workoutRoutines exercises path and maps legacy paths`() {
         val paths = WorkoutMigrationService.resolveCompatiblePaths(
             userId = "user_123",
             rawWorkoutId = "42",
@@ -16,7 +16,11 @@ class WorkoutMigrationPathTest {
 
         assertEquals("42", paths.normalizedWorkoutId)
         assertEquals(
-            "users/user_123/workoutRoutines/42/workoutExercises/101",
+            "users/user_123/workoutRoutines/42/exercises/101",
+            paths.canonicalRoutineExercisesPath
+        )
+        assertEquals(
+            "users/user_123/workoutRoutines/42/exercises/101",
             paths.routineWorkoutExercisesPath
         )
         assertEquals(
@@ -42,8 +46,8 @@ class WorkoutMigrationPathTest {
         )
         assertEquals("free", zeroPaths.normalizedWorkoutId)
         assertEquals(
-            "users/user_abc/workoutRoutines/free/workoutExercises/7",
-            zeroPaths.routineWorkoutExercisesPath
+            "users/user_abc/workoutRoutines/free/exercises/7",
+            zeroPaths.canonicalRoutineExercisesPath
         )
         assertEquals(
             "users/user_abc/workouts/free/exercises/7",

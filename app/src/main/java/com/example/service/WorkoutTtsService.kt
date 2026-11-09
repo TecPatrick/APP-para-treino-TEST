@@ -4,7 +4,7 @@ import android.content.Context
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
-import android.util.Log
+import com.example.util.AppLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,7 +33,7 @@ class WorkoutTtsService(private val context: Context) : TextToSpeech.OnInitListe
         if (status == TextToSpeech.SUCCESS) {
             val result = tts?.setLanguage(Locale("pt", "BR"))
             if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                Log.w(tag, "Portuguese (Brazil) language missing/not supported, falling back to default locale.")
+                AppLog.w(tag, "Portuguese (Brazil) language missing/not supported, falling back to default locale.")
                 tts?.language = Locale.getDefault()
             }
             tts?.setPitch(1.0f)
@@ -59,9 +59,9 @@ class WorkoutTtsService(private val context: Context) : TextToSpeech.OnInitListe
             })
 
             isInitialized = true
-            Log.d(tag, "Workout TTS initialized successfully.")
+            AppLog.d(tag, "Workout TTS initialized successfully.")
         } else {
-            Log.e(tag, "TTS initialization failed with status: $status")
+            AppLog.e(tag, "TTS initialization failed with status: $status")
             isInitialized = false
         }
     }
@@ -72,7 +72,7 @@ class WorkoutTtsService(private val context: Context) : TextToSpeech.OnInitListe
     override fun speak(text: String, flush: Boolean) {
         _lastNarratedText.value = text
         if (!isInitialized || tts == null) {
-            Log.w(tag, "TTS not initialized yet. Skipping phrase: $text")
+            AppLog.w(tag, "TTS not initialized yet. Skipping phrase: $text")
             return
         }
 
@@ -128,7 +128,7 @@ class WorkoutTtsService(private val context: Context) : TextToSpeech.OnInitListe
             isInitialized = false
             _isSpeaking.value = false
         } catch (e: Exception) {
-            Log.e(tag, "Error shutting down TTS", e)
+            AppLog.e(tag, "Error shutting down TTS", e)
         }
     }
 

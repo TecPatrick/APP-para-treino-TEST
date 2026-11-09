@@ -622,7 +622,7 @@ fun MultiExerciseLibraryPickerModal(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    items(muscleFilters) { muscle ->
+                    items(items = muscleFilters, key = { it }, contentType = { "muscle_filter" }) { muscle ->
                         val isSel = selectedMuscleFilter == muscle
                         FilterChip(
                             selected = isSel,
@@ -652,7 +652,7 @@ fun MultiExerciseLibraryPickerModal(
                         .weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filteredCatalog) { guide ->
+                    items(items = filteredCatalog, key = { it.exerciseName }, contentType = { "exercise_guide" }) { guide ->
                         val isChecked = selectedItems.contains(guide.exerciseName)
 
                         Surface(

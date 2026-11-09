@@ -2,7 +2,7 @@
   "entities": {
     "UserProfile": {
       "title": "User Profile",
-      "description": "Public and private user data including physical metrics and goals.",
+      "description": "User profile document including physical metrics, nutrition goals, and app preferences.",
       "type": "object",
       "properties": {
         "userId": { "type": "string", "description": "The Firebase UID of the user." },
@@ -16,16 +16,40 @@
         "trainingDaysPerWeek": { "type": "integer" },
         "activityLevel": { "type": "string" },
         "goal": { "type": "string" },
+        "dietCycleType": { "type": "string" },
+        "isAthleteOrWarmClimate": { "type": "boolean" },
         "targetCalories": { "type": "integer" },
         "targetProteinGrams": { "type": "integer" },
         "targetCarbsGrams": { "type": "integer" },
         "targetFatGrams": { "type": "integer" },
         "targetWaterMl": { "type": "integer" },
+        "monthlyTargetWeightKg": { "type": "number" },
+        "monthlyTargetDurationWeeks": { "type": "integer" },
+        "monthlyNotes": { "type": "string" },
+        "isDarkMode": { "type": "boolean" },
+        "isBiometricLockEnabled": { "type": "boolean" },
         "hasCompletedOnboarding": { "type": "boolean" },
+        "updatedAtMillis": { "type": "integer" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["userId", "email", "createdAt"]
+      "required": ["userId"]
+    },
+    "CalorieGoal": {
+      "title": "Calorie Goal",
+      "description": "Consolidated macro and hydration targets for the user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "targetCalories": { "type": "integer" },
+        "targetProteinGrams": { "type": "integer" },
+        "targetCarbsGrams": { "type": "integer" },
+        "targetFatGrams": { "type": "integer" },
+        "targetWaterMl": { "type": "integer" },
+        "updatedAtMillis": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId"]
     },
     "WorkoutRoutine": {
       "title": "Workout Routine",
@@ -39,13 +63,15 @@
         "dayOfWeekLabel": { "type": "string" },
         "targetMuscleGroups": { "type": "string" },
         "estimatedDurationMinutes": { "type": "integer" },
+        "orderIndex": { "type": "integer" },
+        "updatedAtMillis": { "type": "integer" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "letter", "title"]
     },
     "WorkoutExercise": {
       "title": "Workout Exercise",
-      "description": "Individual exercise inside a workout routine or free session.",
+      "description": "Individual exercise inside a workout routine.",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
@@ -59,6 +85,10 @@
         "currentWeightKg": { "type": "number" },
         "restSeconds": { "type": "integer" },
         "orderIndex": { "type": "integer" },
+        "notes": { "type": "string" },
+        "biomechanicsGuide": { "type": "string" },
+        "gifDemonstrationUrl": { "type": "string" },
+        "updatedAtMillis": { "type": "integer" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "workoutId", "exerciseName"]
@@ -69,14 +99,18 @@
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
+        "routineId": { "type": "integer" },
         "routineName": { "type": "string" },
         "dateMillis": { "type": "integer" },
         "durationMinutes": { "type": "integer" },
-        "totalVolume": { "type": "number" },
-        "exercisesCount": { "type": "integer" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "totalVolumeKg": { "type": "number" },
+        "totalSetsCompleted": { "type": "integer" },
+        "perceivedExertion": { "type": "integer" },
+        "notes": { "type": "string" },
+        "updatedAtMillis": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["userId", "dateMillis", "createdAt"]
+      "required": ["userId", "dateMillis"]
     },
     "CardioLog": {
       "title": "Cardio Log",
@@ -86,11 +120,148 @@
         "userId": { "type": "string" },
         "type": { "type": "string" },
         "durationMinutes": { "type": "integer" },
-        "caloriesBurned": { "type": "integer" },
+        "caloriesBurned": { "type": "number" },
+        "distanceKm": { "type": "number" },
         "dateMillis": { "type": "integer" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "notes": { "type": "string" },
+        "updatedAtMillis": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["userId", "type", "dateMillis", "createdAt"]
+      "required": ["userId", "type", "dateMillis"]
+    },
+    "GpsRouteLog": {
+      "title": "GPS Route Log",
+      "description": "Outdoor running or cycling route tracked via GPS.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "routeName": { "type": "string" },
+        "activityType": { "type": "string" },
+        "dateMillis": { "type": "integer" },
+        "dateDisplay": { "type": "string" },
+        "durationSeconds": { "type": "integer" },
+        "distanceMeters": { "type": "number" },
+        "stepsCount": { "type": "integer" },
+        "caloriesBurned": { "type": "number" },
+        "averagePaceMinPerKm": { "type": "number" },
+        "routePointsJson": { "type": "string" },
+        "routePoints": { "type": "string" },
+        "notes": { "type": "string" },
+        "updatedAtMillis": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "dateMillis"]
+    },
+    "FoodRecord": {
+      "title": "Food Record",
+      "description": "Logged food consumption entry for a specific date and meal.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "dateString": { "type": "string" },
+        "dateMillis": { "type": "integer" },
+        "mealType": { "type": "string" },
+        "foodItemId": { "type": "integer" },
+        "foodName": { "type": "string" },
+        "amount": { "type": "number" },
+        "unit": { "type": "string" },
+        "calories": { "type": "number" },
+        "protein": { "type": "number" },
+        "carbs": { "type": "number" },
+        "fat": { "type": "number" },
+        "fiber": { "type": "number" },
+        "notes": { "type": "string" },
+        "updatedAtMillis": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "dateString", "dateMillis", "mealType", "foodName"]
+    },
+    "DailyIntake": {
+      "title": "Daily Intake Summary",
+      "description": "Consolidated daily caloric, macro, and hydration summary.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "dateString": { "type": "string" },
+        "dateMillis": { "type": "integer" },
+        "totalCalories": { "type": "number" },
+        "totalProtein": { "type": "number" },
+        "totalCarbs": { "type": "number" },
+        "totalFat": { "type": "number" },
+        "targetCalories": { "type": "integer" },
+        "isAdhered": { "type": "boolean" },
+        "waterDrankMl": { "type": "integer" },
+        "updatedAtMillis": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "dateString", "dateMillis"]
+    },
+    "FavoriteFood": {
+      "title": "Favorite Food",
+      "description": "User favorite food reference.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "foodId": { "type": "integer" },
+        "foodName": { "type": "string" },
+        "category": { "type": "string" },
+        "isFavorite": { "type": "boolean" },
+        "updatedAtMillis": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "foodId", "foodName"]
+    },
+    "MealPlan": {
+      "title": "Meal Plan Item",
+      "description": "Planned meal item in the user's daily diet protocol.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "mealType": { "type": "string" },
+        "name": { "type": "string" },
+        "portionGrams": { "type": "number" },
+        "calories": { "type": "number" },
+        "protein": { "type": "number" },
+        "carbs": { "type": "number" },
+        "fat": { "type": "number" },
+        "isCompletedToday": { "type": "boolean" },
+        "isFixed": { "type": "boolean" },
+        "updatedAtMillis": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "mealType"]
+    },
+    "ShoppingItem": {
+      "title": "Shopping Item",
+      "description": "Item in the user's monthly or weekly grocery list.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "totalQuantityGrams": { "type": "number" },
+        "unit": { "type": "string" },
+        "estimatedPrice": { "type": "number" },
+        "isBought": { "type": "boolean" },
+        "updatedAtMillis": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name"]
+    },
+    "ProgressLog": {
+      "title": "Progress Log",
+      "description": "Body weight and body fat percentage progress record.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "dateMillis": { "type": "integer" },
+        "weightKg": { "type": "number" },
+        "bodyFatPercent": { "type": "number" },
+        "notes": { "type": "string" },
+        "updatedAtMillis": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "dateMillis", "weightKg"]
     }
   },
   "firestore": {
@@ -98,33 +269,53 @@
       "schema": "UserProfile",
       "description": "User profile document identified by UID."
     },
+    "/users/{userId}/calorieGoals/{goalId}": {
+      "schema": "CalorieGoal",
+      "description": "Consolidated macro and hydration goals."
+    },
+    "/users/{userId}/workoutLogs/{logId}": {
+      "schema": "WorkoutLog",
+      "description": "Historical gym workout records."
+    },
+    "/users/{userId}/cardioLogs/{logId}": {
+      "schema": "CardioLog",
+      "description": "Historical cardio records."
+    },
+    "/users/{userId}/gpsRouteLogs/{logId}": {
+      "schema": "GpsRouteLog",
+      "description": "GPS tracked running and cycling routes."
+    },
+    "/users/{userId}/foodRecords/{recordId}": {
+      "schema": "FoodRecord",
+      "description": "Daily logged food consumption records."
+    },
+    "/users/{userId}/dailyIntake/{dateKey}": {
+      "schema": "DailyIntake",
+      "description": "Daily nutrition and water intake summary."
+    },
+    "/users/{userId}/favoriteFoods/{foodId}": {
+      "schema": "FavoriteFood",
+      "description": "User favorite foods."
+    },
+    "/users/{userId}/mealPlans/{planId}": {
+      "schema": "MealPlan",
+      "description": "Planned diet protocol items."
+    },
+    "/users/{userId}/shoppingItems/{itemId}": {
+      "schema": "ShoppingItem",
+      "description": "Unified grocery shopping list items."
+    },
+    "/users/{userId}/progressLogs/{logId}": {
+      "schema": "ProgressLog",
+      "description": "Body weight and body fat progress logs."
+    },
     "/users/{userId}/workoutRoutines/{routineId}": {
       "schema": "WorkoutRoutine",
       "description": "User workout routine definition."
     },
-    "/users/{userId}/workoutRoutines/{routineId}/workoutExercises/{exerciseId}": {
+    "/users/{userId}/workoutRoutines/{routineId}/exercises/{exerciseId}": {
       "schema": "WorkoutExercise",
-      "description": "Nested workout exercises under a routine."
-    },
-    "/users/{userId}/workouts/{workoutId}/workoutExercises/{exerciseId}": {
-      "schema": "WorkoutExercise",
-      "description": "Nested workout exercises under a workout document."
-    },
-    "/users/{userId}/workouts/{workoutId}/exercises/{exerciseId}": {
-      "schema": "WorkoutExercise",
-      "description": "Compatible nested exercises subcollection under a workout document."
-    },
-    "/users/{userId}/workoutExercises/{exerciseId}": {
-      "schema": "WorkoutExercise",
-      "description": "Backward-compatible root-level user workout exercises collection."
-    },
-    "/users/{userId}/workout_logs/{logId}": {
-      "schema": "WorkoutLog",
-      "description": "Historical gym workout records for the user."
-    },
-    "/users/{userId}/cardio_logs/{logId}": {
-      "schema": "CardioLog",
-      "description": "Historical manual cardio records for the user."
+      "description": "Canonical nested workout exercises under a routine."
     }
   }
 }

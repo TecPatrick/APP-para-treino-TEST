@@ -1,7 +1,5 @@
 package com.example.util
 
-import android.util.Log
-
 object FirestoreLogger {
     private const val TAG = "VirtusFirestore"
 
@@ -11,17 +9,19 @@ object FirestoreLogger {
         path: String,
         data: Any?
     ) {
-        Log.d(TAG, "🔥 [FIRESTORE WRITE] Action: $action")
-        Log.d(TAG, "   ├─ Auth UID: ${userId ?: "UNAUTHENTICATED"}")
-        Log.d(TAG, "   ├─ Target Path: $path")
-        Log.d(TAG, "   └─ Data Payload: $data")
+        val maskedUid = if (userId.isNullOrBlank()) "UNAUTHENTICATED" else AppLog.maskUid(userId)
+        val maskedPath = userId?.takeIf { it.isNotBlank() }?.let { path.replace(it, maskedUid) } ?: path
+        AppLog.d(TAG, "🔥 [FIRESTORE WRITE] Action: $action")
+        AppLog.d(TAG, "   ├─ Auth UID: $maskedUid")
+        AppLog.d(TAG, "   ├─ Target Path: $maskedPath")
+        AppLog.d(TAG, "   └─ Data Payload: [redacted]")
     }
 
     fun logSuccess(action: String, path: String) {
-        Log.d(TAG, "✅ [FIRESTORE SUCCESS] Action: $action | Path: $path")
+        AppLog.d(TAG, "✅ [FIRESTORE SUCCESS] Action: $action | Path: $path")
     }
 
     fun logError(action: String, path: String, error: Throwable) {
-        Log.e(TAG, "❌ [FIRESTORE ERROR] Action: $action | Path: $path", error)
+        AppLog.e(TAG, "❌ [FIRESTORE ERROR] Action: $action | Path: $path", error)
     }
 }

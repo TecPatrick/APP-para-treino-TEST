@@ -25,3 +25,6 @@ dependencyResolutionManagement {
 rootProject.name = "Virtus - Dieta & Treino"
 
 include(":app")
+if (providers.gradleProperty("enableBaselineProfile").isPresent) {
+  include(":baselineprofile")
+}

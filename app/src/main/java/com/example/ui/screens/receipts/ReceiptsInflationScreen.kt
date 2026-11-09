@@ -256,7 +256,11 @@ fun ReceiptsInflationScreen(
                         )
                     }
 
-                    items(inflationStats) { item ->
+                    items(
+                        items = inflationStats,
+                        key = { it.foodName },
+                        contentType = { "inflation_stat" }
+                    ) { item ->
                         val isUp = item.inflationPercentage > 0
                         val isDown = item.inflationPercentage < 0
 
@@ -355,7 +359,11 @@ fun ReceiptsInflationScreen(
                         .padding(horizontal = 16.dp),
                     contentPadding = PaddingValues(top = 12.dp, bottom = 96.dp)
                 ) {
-                    items(receipts) { receipt ->
+                    items(
+                        items = receipts,
+                        key = { it.id },
+                        contentType = { "receipt_card" }
+                    ) { receipt ->
                         Card(
                             colors = CardDefaults.cardColors(containerColor = CarbonCard),
                             shape = RoundedCornerShape(12.dp),
@@ -500,7 +508,11 @@ fun AddReceiptDialog(
                     Spacer(modifier = Modifier.height(6.dp))
                 }
 
-                items(itemsList) { item ->
+                items(
+                    items = itemsList,
+                    key = { "${it.foodName}_${it.unitPricePaid}_${it.quantity}" },
+                    contentType = { "receipt_item" }
+                ) { item ->
                     Surface(
                         color = CarbonCardElevated,
                         shape = RoundedCornerShape(8.dp),

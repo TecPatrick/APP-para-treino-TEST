@@ -10,6 +10,7 @@ import com.example.data.local.AppDatabase
 import com.example.data.model.GpsRouteLog
 import com.example.data.repository.VirtusRepository
 import com.example.service.VoiceProviderFactory
+import com.example.util.AppLog
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -176,7 +177,7 @@ class WorkoutTrackerViewModel(application: Application) : AndroidViewModel(appli
                     val insertedId = repository.insertGpsRouteLog(log)
                     firestoreSync.syncGpsRouteLogToCloud(log.copy(id = insertedId))
                 } catch (e: Exception) {
-                    android.util.Log.e("WorkoutTrackerVM", "Erro ao salvar log de treino GPS: ${e.message}", e)
+                    AppLog.e("WorkoutTrackerVM", "Erro ao salvar log de treino GPS: ${e.message}", e)
                 }
             }
         }

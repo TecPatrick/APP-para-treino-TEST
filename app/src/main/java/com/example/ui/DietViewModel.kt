@@ -18,6 +18,7 @@ import com.example.data.model.Macro
 import com.example.data.model.MealPlanItem
 import com.example.data.model.MealType
 import com.example.data.model.WeeklyDietPlan
+import com.example.util.AppLog
 import com.example.util.MacroCalculator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -84,7 +85,7 @@ class DietViewModel(application: Application) : BaseVirtusDomainViewModel(applic
                     showToast("Falha ao gerar dieta com IA. Tente novamente.")
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLog.e("DietViewModel", "Erro na IA ao gerar dieta", e)
                 showToast("Erro na IA: ${e.message}")
             } finally {
                 _isAiDietLoading.value = false
@@ -177,7 +178,7 @@ class DietViewModel(application: Application) : BaseVirtusDomainViewModel(applic
                 repository.insertFoods(PrepopulatedData.defaultFoods)
                 showToast("Catálogo atualizado com ${PrepopulatedData.defaultFoods.size} alimentos!")
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLog.e("DietViewModel", "Erro ao restaurar base alimentar", e)
                 showToast("Erro ao restaurar base alimentar: ${e.message}")
             }
         }

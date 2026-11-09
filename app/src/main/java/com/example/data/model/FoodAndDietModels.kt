@@ -1,5 +1,6 @@
 package com.example.data.model
 
+import androidx.compose.runtime.Immutable
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -24,6 +25,7 @@ enum class MealType(val title: String, val defaultTime: String, val orderIndex: 
     SUPPER("Ceia", "22:30", 7)
 }
 
+@Immutable
 @Entity(tableName = "food_items")
 data class FoodItem(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -52,6 +54,7 @@ data class FoodItem(
     }
 }
 
+@Immutable
 data class MacroValues(
     val calories: Float,
     val protein: Float,
@@ -63,6 +66,7 @@ data class MacroValues(
 /**
  * Entidade para registros de consumo alimentar diário (Diário Alimentar offline)
  */
+@Immutable
 @Entity(
     tableName = "food_records",
     indices = [
@@ -89,6 +93,7 @@ data class FoodRecord(
     val notes: String = ""
 )
 
+@Immutable
 @Entity(
     tableName = "diet_plans",
     indices = [Index(value = ["isActive"])]
@@ -113,6 +118,7 @@ data class DietPlan(
 /**
  * Entidade para estruturação de Dietas Semanais (dia a dia da semana de 1 a 7)
  */
+@Immutable
 @Entity(
     tableName = "weekly_diet_plans",
     indices = [
@@ -134,6 +140,7 @@ data class WeeklyDietPlan(
     val notes: String = ""
 )
 
+@Immutable
 @Entity(
     tableName = "meal_plan_items",
     indices = [
@@ -160,6 +167,7 @@ data class MealPlanItem(
     val notes: String = ""
 )
 
+@Immutable
 @Entity(
     tableName = "daily_intake_history",
     indices = [

@@ -3,6 +3,7 @@ package com.example.ui.screens.gps
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.SystemClock
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,17 +21,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -48,12 +48,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.ui.theme.CarbonBorder
-import com.example.ui.theme.CarbonCard
 import com.example.ui.theme.CarbonDark
 import com.example.ui.theme.GrowthCyan
 import com.example.ui.theme.GrowthGreen
 import com.example.ui.theme.GrowthOrange
 import com.example.ui.theme.GrowthOrangeLight
+import kotlinx.coroutines.delay
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
@@ -74,6 +74,8 @@ import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.LineString
 import org.maplibre.geojson.Point
+import kotlin.math.abs
+import kotlin.math.hypot
 
 private const val OPEN_FREE_MAP_STREETS = "https://tiles.openfreemap.org/styles/liberty"
 
@@ -84,6 +86,95 @@ private const val START_SOURCE = "virtus-start-source"
 private const val START_LAYER = "virtus-start-point"
 private const val CURRENT_SOURCE = "virtus-current-source"
 private const val CURRENT_LAYER = "virtus-current-point"
+
+private const val MAP_UPDATE_INTERVAL_MS = 1000L
+internal const val MAX_RENDERED_POLYLINE_POINTS = 1000
+
+/**
+ * Simplifies a GPS polyline using the iterative Ramer-Douglas-Peucker algorithm
+ * when the point count exceeds [maxPoints].
+ */
+internal fun simplifyPolylineRdp(
+    points: List<Pair<Double, Double>>,
+    maxPoints: Int = MAX_RENDERED_POLYLINE_POINTS,
+    initialEpsilon: Double = 0.00003
+): List<Pair<Double, Double>> {
+    if (points.size <= maxPoints || points.size < 3) return points
+
+    var epsilon = initialEpsilon
+    var simplified = rdpPass(points, epsilon)
+    var attempts = 0
+    while (simplified.size > maxPoints && attempts < 6) {
+        epsilon *= 2.0
+        simplified = rdpPass(simplified, epsilon)
+        attempts++
+    }
+    return simplified
+}
+
+private fun rdpPass(
+    points: List<Pair<Double, Double>>,
+    epsilon: Double
+): List<Pair<Double, Double>> {
+    val n = points.size
+    if (n < 3) return points
+    val keep = BooleanArray(n)
+    keep[0] = true
+    keep[n - 1] = true
+
+    val stack = ArrayDeque<IntRange>()
+    stack.addLast(0..(n - 1))
+
+    while (stack.isNotEmpty()) {
+        val range = stack.removeLast()
+        val start = range.first
+        val end = range.last
+        if (end - start <= 1) continue
+
+        var maxDist = 0.0
+        var index = start
+        val startPt = points[start]
+        val endPt = points[end]
+
+        for (i in (start + 1) until end) {
+            val dist = perpendicularDistance(points[i], startPt, endPt)
+            if (dist > maxDist) {
+                index = i
+                maxDist = dist
+            }
+        }
+
+        if (maxDist > epsilon) {
+            keep[index] = true
+            stack.addLast(start..index)
+            stack.addLast(index..end)
+        }
+    }
+
+    val result = ArrayList<Pair<Double, Double>>(n)
+    for (i in 0 until n) {
+        if (keep[i]) result.add(points[i])
+    }
+    return result
+}
+
+private fun perpendicularDistance(
+    pt: Pair<Double, Double>,
+    lineStart: Pair<Double, Double>,
+    lineEnd: Pair<Double, Double>
+): Double {
+    val dx = lineEnd.second - lineStart.second
+    val dy = lineEnd.first - lineStart.first
+    if (dx == 0.0 && dy == 0.0) {
+        return hypot(pt.second - lineStart.second, pt.first - lineStart.first)
+    }
+    val numerator = abs(
+        dy * pt.second - dx * pt.first +
+            lineEnd.second * lineStart.first - lineEnd.first * lineStart.second
+    )
+    val denominator = hypot(dx, dy)
+    return numerator / denominator
+}
 
 /** Native, keyless map powered by MapLibre and OpenFreeMap/OpenStreetMap. */
 @Composable
@@ -97,7 +188,11 @@ fun NativeGpsMapView(
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
-    val targetPair = currentLocation ?: points.lastOrNull()
+    val simplifiedPoints = remember(points) {
+        simplifyPolylineRdp(points)
+    }
+    val targetPair = currentLocation ?: simplifiedPoints.lastOrNull()
+    var lastMapUpdateElapsedMs by remember { mutableLongStateOf(0L) }
 
     val mapView = remember(context) {
         MapLibre.getInstance(context.applicationContext)
@@ -134,13 +229,20 @@ fun NativeGpsMapView(
 
     LaunchedEffect(mapLibreMap) {
         mapLibreMap?.setStyle(OPEN_FREE_MAP_STREETS) { style ->
-            renderGpsRoute(style, points, targetPair)
+            renderGpsRoute(style, simplifiedPoints, targetPair)
         }
     }
 
-    LaunchedEffect(mapLibreMap, points, targetPair) {
+    LaunchedEffect(mapLibreMap, simplifiedPoints, targetPair) {
         val map = mapLibreMap ?: return@LaunchedEffect
-        map.getStyle { style -> renderGpsRoute(style, points, targetPair) }
+        val now = SystemClock.elapsedRealtime()
+        val elapsedSinceLast = now - lastMapUpdateElapsedMs
+        if (lastMapUpdateElapsedMs > 0L && elapsedSinceLast < MAP_UPDATE_INTERVAL_MS) {
+            delay(MAP_UPDATE_INTERVAL_MS - elapsedSinceLast)
+        }
+        lastMapUpdateElapsedMs = SystemClock.elapsedRealtime()
+
+        map.getStyle { style -> renderGpsRoute(style, simplifiedPoints, targetPair) }
         targetPair?.let { target ->
             map.animateCamera(
                 CameraUpdateFactory.newCameraPosition(
@@ -221,7 +323,6 @@ fun NativeGpsMapView(
                 modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp)
             )
         }
-
     }
 }
 

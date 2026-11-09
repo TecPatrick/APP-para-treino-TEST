@@ -1,5 +1,6 @@
 package com.example.data.model
 
+import androidx.compose.runtime.Immutable
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -14,6 +15,7 @@ enum class WorkoutSplitType(val title: String, val subtitle: String) {
 /**
  * Entidade para Planos de Treino (Training Plans / Workout Programs)
  */
+@Immutable
 @Entity(
     tableName = "workout_plans",
     indices = [Index(value = ["isActive"])]
@@ -31,6 +33,7 @@ data class WorkoutPlan(
     val notes: String = ""
 )
 
+@Immutable
 @Entity(tableName = "shopping_items")
 data class ShoppingItem(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -53,6 +56,7 @@ data class ShoppingItem(
         get() = if (isJointItem) quantity + partnerQuantity else quantity
 }
 
+@Immutable
 @Entity(tableName = "workout_routines")
 data class WorkoutRoutine(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -65,6 +69,7 @@ data class WorkoutRoutine(
     val orderIndex: Int = 0
 )
 
+@Immutable
 @Entity(
     tableName = "workout_exercises",
     indices = [Index(value = ["routineId"])]
@@ -86,6 +91,7 @@ data class WorkoutExercise(
     val isCompletedInCurrentSession: Boolean = false
 )
 
+@Immutable
 @Entity(
     tableName = "workout_logs",
     indices = [
@@ -105,6 +111,7 @@ data class WorkoutLog(
     val notes: String = ""
 )
 
+@Immutable
 @Entity(
     tableName = "progress_logs",
     indices = [Index(value = ["dateMillis"])]
@@ -130,6 +137,7 @@ enum class CardioType(val title: String, val iconName: String) {
     STATIONARY_BIKE("Bicicleta Ergométrica", "pedal_bike")
 }
 
+@Immutable
 @Entity(
     tableName = "cardio_logs",
     indices = [Index(value = ["dateMillis"])]

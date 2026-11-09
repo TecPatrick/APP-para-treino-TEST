@@ -1,6 +1,12 @@
 package com.example.util
 
 import android.content.Context
+import androidx.compose.runtime.Immutable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import java.io.BufferedReader
 import java.io.File
@@ -8,6 +14,7 @@ import java.io.FileInputStream
 import java.io.InputStream
 import java.io.InputStreamReader
 
+@Immutable
 data class ExerciseVisualGuide(
     val exerciseName: String,
     val muscleGroup: String,
@@ -48,19 +55,32 @@ object ExerciseMuscleClassifier {
 
 object ExerciseGifMapper {
 
+    private val loadLock = Any()
+    private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    @Volatile
     private var applicationContext: Context? = null
+    @Volatile
     private var cachedCatalogGuides: List<ExerciseVisualGuide>? = null
+    @Volatile
     private var cachedFullLibrary: List<ExerciseVisualGuide>? = null
+    @Volatile
     private var cachedLibraryByName: Map<String, ExerciseVisualGuide>? = null
+    @Volatile
     private var cachedDirectMap: Map<String, ExerciseVisualGuide>? = null
 
-    fun init(context: Context) {
+    fun init(context: Context, scope: CoroutineScope = ioScope) {
         if (applicationContext == null) {
             applicationContext = context.applicationContext
-            cachedCatalogGuides = null
-            cachedDirectMap = null
-            loadLibraryFromAssets()
+            scope.launch(Dispatchers.IO) {
+                ensureLoaded()
+            }
         }
+    }
+
+    suspend fun ensureLoaded() = withContext(Dispatchers.IO) {
+        loadLibraryFromAssets()
+        directMap
     }
 
     private fun openAssetOrFallback(fileName: String): InputStream? {
@@ -82,94 +102,102 @@ object ExerciseGifMapper {
     private val catalogGuides: List<ExerciseVisualGuide>
         get() {
             cachedCatalogGuides?.let { if (it.isNotEmpty()) return it }
-            val loaded = mutableListOf<ExerciseVisualGuide>()
-            try {
-                val stream = openAssetOrFallback("canonical_exercise_guides.json")
-                if (stream != null) {
-                    val jsonString = BufferedReader(InputStreamReader(stream)).use { it.readText() }
-                    val jsonArray = JSONArray(jsonString)
-                    for (i in 0 until jsonArray.length()) {
-                        val obj = jsonArray.getJSONObject(i)
-                        loaded.add(
-                            ExerciseVisualGuide(
-                                exerciseName = obj.optString("exerciseName", ""),
-                                muscleGroup = obj.optString("muscleGroup", ""),
-                                fitnessProgrammerUrl = obj.optString("fitnessProgrammerUrl", ""),
-                                gifUrl = obj.optString("gifUrl", ""),
-                                concentricPhase = obj.optString("concentricPhase", ""),
-                                eccentricPhase = obj.optString("eccentricPhase", ""),
-                                postureTip = obj.optString("postureTip", "")
+            synchronized(loadLock) {
+                cachedCatalogGuides?.let { if (it.isNotEmpty()) return it }
+                val loaded = mutableListOf<ExerciseVisualGuide>()
+                try {
+                    val stream = openAssetOrFallback("canonical_exercise_guides.json")
+                    if (stream != null) {
+                        val jsonString = BufferedReader(InputStreamReader(stream)).use { it.readText() }
+                        val jsonArray = JSONArray(jsonString)
+                        for (i in 0 until jsonArray.length()) {
+                            val obj = jsonArray.getJSONObject(i)
+                            loaded.add(
+                                ExerciseVisualGuide(
+                                    exerciseName = obj.optString("exerciseName", ""),
+                                    muscleGroup = obj.optString("muscleGroup", ""),
+                                    fitnessProgrammerUrl = obj.optString("fitnessProgrammerUrl", ""),
+                                    gifUrl = obj.optString("gifUrl", ""),
+                                    concentricPhase = obj.optString("concentricPhase", ""),
+                                    eccentricPhase = obj.optString("eccentricPhase", ""),
+                                    postureTip = obj.optString("postureTip", "")
+                                )
                             )
-                        )
+                        }
                     }
+                } catch (e: Exception) {
+                    AppLog.e("ExerciseGifMapper", "Erro ao carregar canonical_exercise_guides.json", e)
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
+                if (loaded.isNotEmpty()) {
+                    cachedCatalogGuides = loaded
+                }
+                return loaded
             }
-            if (loaded.isNotEmpty()) {
-                cachedCatalogGuides = loaded
-            }
-            return loaded
         }
 
     private fun loadLibraryFromAssets(): List<ExerciseVisualGuide> {
         cachedFullLibrary?.let { return it }
-        val baseCatalog = catalogGuides
+        synchronized(loadLock) {
+            cachedFullLibrary?.let { return it }
+            val baseCatalog = catalogGuides
 
-        try {
-            val inputStream = openAssetOrFallback("fitnessprogramer_exercises.json") ?: return baseCatalog
-            val reader = BufferedReader(InputStreamReader(inputStream))
-            val jsonString = reader.use { it.readText() }
-            val jsonArray = JSONArray(jsonString)
+            try {
+                val inputStream = openAssetOrFallback("fitnessprogramer_exercises.json") ?: return baseCatalog
+                val reader = BufferedReader(InputStreamReader(inputStream))
+                val jsonString = reader.use { it.readText() }
+                val jsonArray = JSONArray(jsonString)
 
-            val loadedList = mutableListOf<ExerciseVisualGuide>()
-            val loadedMap = mutableMapOf<String, ExerciseVisualGuide>()
+                val loadedList = mutableListOf<ExerciseVisualGuide>()
+                val loadedMap = mutableMapOf<String, ExerciseVisualGuide>()
 
-            for (guide in baseCatalog) {
-                loadedList.add(guide)
-                loadedMap[guide.exerciseName.lowercase().trim()] = guide
+                for (guide in baseCatalog) {
+                    loadedList.add(guide)
+                    loadedMap[guide.exerciseName.lowercase().trim()] = guide
+                }
+
+                for (i in 0 until jsonArray.length()) {
+                    val obj = jsonArray.getJSONObject(i)
+                    val enName = obj.optString("exerciseName", "").trim()
+                    if (enName.isEmpty()) continue
+
+                    val lowerEn = enName.lowercase()
+                    if (loadedMap.containsKey(lowerEn)) continue
+
+                    val muscleGroup = obj.optString("muscleGroup", "Geral")
+                    val pageUrl = obj.optString("fitnessProgrammerUrl", "")
+                    val gifUrl = obj.optString("gifUrl", "")
+
+                    val guide = ExerciseVisualGuide(
+                        exerciseName = enName,
+                        muscleGroup = muscleGroup,
+                        fitnessProgrammerUrl = pageUrl,
+                        gifUrl = gifUrl,
+                        concentricPhase = "Fase Concêntrica: Realize a contração vencendo a resistência de forma controlada.",
+                        eccentricPhase = "Fase Excêntrica: Controle a volta do movimento (descida da carga) em 2 a 3 segundos.",
+                        postureTip = "Mantenha a postura alinhada, core ativado e amplitudes seguras para as articulações."
+                    )
+
+                    loadedList.add(guide)
+                    loadedMap[lowerEn] = guide
+                }
+
+                cachedFullLibrary = loadedList
+                cachedLibraryByName = loadedMap
+                return loadedList
+            } catch (e: Exception) {
+                AppLog.e("ExerciseGifMapper", "Erro ao carregar fitnessprogramer_exercises.json", e)
+                return baseCatalog
             }
-
-            for (i in 0 until jsonArray.length()) {
-                val obj = jsonArray.getJSONObject(i)
-                val enName = obj.optString("exerciseName", "").trim()
-                if (enName.isEmpty()) continue
-
-                val lowerEn = enName.lowercase()
-                if (loadedMap.containsKey(lowerEn)) continue
-
-                val muscleGroup = obj.optString("muscleGroup", "Geral")
-                val pageUrl = obj.optString("fitnessProgrammerUrl", "")
-                val gifUrl = obj.optString("gifUrl", "")
-
-                val guide = ExerciseVisualGuide(
-                    exerciseName = enName,
-                    muscleGroup = muscleGroup,
-                    fitnessProgrammerUrl = pageUrl,
-                    gifUrl = gifUrl,
-                    concentricPhase = "Fase Concêntrica: Realize a contração vencendo a resistência de forma controlada.",
-                    eccentricPhase = "Fase Excêntrica: Controle a volta do movimento (descida da carga) em 2 a 3 segundos.",
-                    postureTip = "Mantenha a postura alinhada, core ativado e amplitudes seguras para as articulações."
-                )
-
-                loadedList.add(guide)
-                loadedMap[lowerEn] = guide
-            }
-
-            cachedFullLibrary = loadedList
-            cachedLibraryByName = loadedMap
-            return loadedList
-        } catch (e: Exception) {
-            e.printStackTrace()
-            return baseCatalog
         }
     }
 
     private val directMap: Map<String, ExerciseVisualGuide>
         get() {
             cachedDirectMap?.let { if (it.isNotEmpty()) return it }
-            val guides = catalogGuides
-            if (guides.isEmpty()) return emptyMap()
+            synchronized(loadLock) {
+                cachedDirectMap?.let { if (it.isNotEmpty()) return it }
+                val guides = catalogGuides
+                if (guides.isEmpty()) return emptyMap()
 
             val map = mutableMapOf<String, ExerciseVisualGuide>()
             guides.forEach { guide ->
@@ -285,6 +313,7 @@ object ExerciseGifMapper {
 
             cachedDirectMap = map
             return map
+            }
         }
 
     fun getAllAvailableExercises(): List<ExerciseVisualGuide> {

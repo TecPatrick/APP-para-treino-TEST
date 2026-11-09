@@ -9,6 +9,7 @@ import com.example.data.firestore.FirestoreSyncManager
 import com.example.data.repository.VirtusRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,12 +46,14 @@ class SyncController(
     private val syncManager: FirestoreSyncManager,
     private val showMessage: (String) -> Unit
 ) {
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val prefs by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
 
     private val busy = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = busy.asStateFlow()
 
-    private val _pendingItems = MutableStateFlow<List<PendingSyncItem>>(loadPersistedQueue())
+    private val _pendingItems = MutableStateFlow<List<PendingSyncItem>>(emptyList())
     val pendingItems: StateFlow<List<PendingSyncItem>> = _pendingItems.asStateFlow()
 
     private val _isOnline = MutableStateFlow(checkCurrentConnectivity())
@@ -64,6 +67,13 @@ class SyncController(
 
     init {
         registerNetworkCallback()
+        scope.launch(Dispatchers.IO) {
+            val persisted = loadPersistedQueue()
+            if (persisted.isNotEmpty()) {
+                val merged = (persisted + _pendingItems.value).distinctBy { it.id }.takeLast(50)
+                _pendingItems.value = merged
+            }
+        }
     }
 
     private fun checkCurrentConnectivity(): Boolean {
@@ -256,19 +266,21 @@ class SyncController(
     }
 
     private fun persistQueue(items: List<PendingSyncItem>) {
-        try {
-            val array = JSONArray()
-            items.forEach { item ->
-                val obj = JSONObject().apply {
-                    put("id", item.id)
-                    put("category", item.category)
-                    put("description", item.description)
-                    put("timestampMillis", item.timestampMillis)
+        scope.launch(Dispatchers.IO) {
+            try {
+                val array = JSONArray()
+                items.forEach { item ->
+                    val obj = JSONObject().apply {
+                        put("id", item.id)
+                        put("category", item.category)
+                        put("description", item.description)
+                        put("timestampMillis", item.timestampMillis)
+                    }
+                    array.put(obj)
                 }
-                array.put(obj)
+                prefs.edit().putString(KEY_QUEUE_JSON, array.toString()).apply()
+            } catch (_: Exception) {
             }
-            prefs.edit().putString(KEY_QUEUE_JSON, array.toString()).apply()
-        } catch (_: Exception) {
         }
     }
 

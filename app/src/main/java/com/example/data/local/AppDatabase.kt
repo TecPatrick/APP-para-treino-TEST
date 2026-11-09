@@ -7,6 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.data.model.*
+import com.example.util.AppLog
 
 @Database(entities = [
     DailyIntakeHistory::class,
@@ -101,15 +102,13 @@ abstract class AppDatabase : RoomDatabase() {
                     "app_database"
                 )
                     .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
-                    .fallbackToDestructiveMigration()
-                    .fallbackToDestructiveMigrationOnDowngrade()
                     .addCallback(object : RoomDatabase.Callback() {
                         override fun onOpen(db: SupportSQLiteDatabase) {
                             try {
                                 // Older versions stored the raw password in this legacy column.
                                 db.execSQL("UPDATE user_profile SET passwordHash = '' WHERE passwordHash != ''")
                             } catch (e: Exception) {
-                                e.printStackTrace()
+                                AppLog.e("AppDatabase", "Erro ao limpar passwordHash legado", e)
                             }
                         }
                     })

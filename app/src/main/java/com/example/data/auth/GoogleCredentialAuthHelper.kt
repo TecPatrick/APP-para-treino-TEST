@@ -2,13 +2,13 @@ package com.example.data.auth
 
 import android.app.Activity
 import android.content.Context
-import android.util.Log
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import com.example.R
+import com.example.util.AppLog
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -34,7 +34,7 @@ object GoogleCredentialAuthHelper {
         return try {
             context.getString(R.string.default_web_client_id).trim()
         } catch (e: Exception) {
-            Log.w("Auth", "default_web_client_id não encontrado: ${e.message}")
+            AppLog.w("Auth", "default_web_client_id não encontrado: ${e.message}")
             ""
         }
     }
@@ -85,7 +85,7 @@ object GoogleCredentialAuthHelper {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: GetCredentialCancellationException) {
-                Log.w("Auth", "Auto sign-in Google cancelado ou dispensado: ${e.message}", e)
+                AppLog.w("Auth", "Auto sign-in Google cancelado ou dispensado: ${e.message}", e)
                 onUnauthenticated()
             } catch (e: Exception) {
                 // Normal on clean devices without pre-authorized Google sessions
@@ -131,10 +131,10 @@ object GoogleCredentialAuthHelper {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: GetCredentialCancellationException) {
-                Log.w("Auth", "Google Sign-In flow cancelled or dismissed: ${e.message}", e)
+                AppLog.w("Auth", "Google Sign-In flow cancelled or dismissed: ${e.message}", e)
                 onCancelled()
             } catch (e: Exception) {
-                Log.e("Auth", "Google Sign-In failed", e)
+                AppLog.e("Auth", "Google Sign-In failed", e)
                 val friendlyMsg = FirebaseAuthService.translateAuthError(e)
                 onError(friendlyMsg)
             }
@@ -158,7 +158,7 @@ object GoogleCredentialAuthHelper {
                 val credentialManager = CredentialManager.create(context)
                 credentialManager.clearCredentialState(ClearCredentialStateRequest())
             } catch (e: Exception) {
-                Log.w("Auth", "Não foi possível limpar estado do CredentialManager: ${e.message}")
+                AppLog.w("Auth", "Não foi possível limpar estado do CredentialManager: ${e.message}")
             } finally {
                 onComplete()
             }

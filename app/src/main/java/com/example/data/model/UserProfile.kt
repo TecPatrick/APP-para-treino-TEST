@@ -1,5 +1,6 @@
 package com.example.data.model
 
+import androidx.compose.runtime.Immutable
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -61,6 +62,7 @@ enum class DietCycleType(val label: String) {
     TRAINING_VS_REST("Dias de Treino vs Descanso (Carbo alto em treino)")
 }
 
+@Immutable
 @Entity(tableName = "user_profile")
 data class UserProfile(
     @PrimaryKey val id: Int = 1,

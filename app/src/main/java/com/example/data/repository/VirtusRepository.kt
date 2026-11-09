@@ -26,6 +26,7 @@ import com.example.data.model.DietaryProfile
 import com.example.data.model.Macro
 import com.example.data.model.WorkoutSchedule
 import com.example.data.model.CardioLog
+import com.example.util.AppLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
@@ -395,7 +396,7 @@ open class VirtusRepository(
             }
             return true
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLog.e("VirtusRepository", "Erro ao importar lista de compras compartilhada", e)
             return false
         }
     }

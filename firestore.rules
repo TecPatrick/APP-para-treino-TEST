@@ -1,12 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default deny
+    // 1. Global Safety Net (Default Deny)
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // --- Helpers ---
+    // --- Core Primitives ---
     function isSignedIn() {
       return request.auth != null;
     }
@@ -15,168 +15,454 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    function hasValidOwnerField(data, userId) {
-      return !('userId' in data) || data.userId == userId;
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
-    // --- Validation Helpers ---
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Enforces strict owner identity on writes and bounds total top-level keys (< 50 KB document size guard)
+    function hasValidOwnerAndBoundedSize(data, userId) {
+      return ('userId' in data) &&
+             data.userId is string &&
+             data.userId == userId &&
+             data.size() <= 35;
+    }
+
+    function hasValidTimestamps(data) {
+      return (!('updatedAtMillis' in data) || (data.updatedAtMillis is int && data.updatedAtMillis >= 0)) &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp && data.updatedAt <= request.time)) &&
+             (!('createdAt' in data) || (data.createdAt is timestamp && data.createdAt <= request.time));
+    }
+
+    function preservesImmutableFields() {
+      return (!('userId' in existing()) || incoming().userId == existing().userId) &&
+             (!('createdAt' in existing()) || !('createdAt' in incoming()) || incoming().createdAt == existing().createdAt);
+    }
+
+    // --- Entity Validation Blueprints (S4: hasOnly, types, ranges, string/list bounds, < 50 KB) ---
+
     function isValidUserProfile(data, userId) {
-      return hasValidOwnerField(data, userId) &&
-             (!('email' in data) || (data.email is string && data.email.size() <= 320)) &&
+      return hasValidOwnerAndBoundedSize(data, userId) &&
+             hasValidTimestamps(data) &&
+             data.keys().hasOnly([
+               'userId', 'name', 'email', 'gender', 'age', 'weightKg', 'heightCm',
+               'biotype', 'trainingDaysPerWeek', 'activityLevel', 'goal', 'dietCycleType',
+               'isAthleteOrWarmClimate', 'targetCalories', 'targetProteinGrams',
+               'targetCarbsGrams', 'targetFatGrams', 'targetWaterMl',
+               'monthlyTargetWeightKg', 'monthlyTargetDurationWeeks', 'monthlyNotes',
+               'isDarkMode', 'isBiometricLockEnabled', 'hasCompletedOnboarding',
+               'createdAt', 'updatedAt', 'updatedAtMillis'
+             ]) &&
              (!('name' in data) || (data.name is string && data.name.size() <= 120)) &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 320)) &&
+             (!('gender' in data) || (data.gender is string && data.gender.size() <= 30)) &&
              (!('age' in data) || (data.age is int && data.age >= 10 && data.age <= 120)) &&
              (!('weightKg' in data) || (data.weightKg is number && data.weightKg >= 20 && data.weightKg <= 400)) &&
              (!('heightCm' in data) || (data.heightCm is number && data.heightCm >= 80 && data.heightCm <= 260)) &&
-             (!('hasCompletedOnboarding' in data) || data.hasCompletedOnboarding is bool) &&
+             (!('biotype' in data) || (data.biotype is string && data.biotype.size() <= 30)) &&
+             (!('trainingDaysPerWeek' in data) || (data.trainingDaysPerWeek is int && data.trainingDaysPerWeek >= 0 && data.trainingDaysPerWeek <= 7)) &&
+             (!('activityLevel' in data) || (data.activityLevel is string && data.activityLevel.size() <= 40)) &&
+             (!('goal' in data) || (data.goal is string && data.goal.size() <= 40)) &&
+             (!('dietCycleType' in data) || (data.dietCycleType is string && data.dietCycleType.size() <= 40)) &&
+             (!('isAthleteOrWarmClimate' in data) || data.isAthleteOrWarmClimate is bool) &&
+             (!('targetCalories' in data) || (data.targetCalories is int && data.targetCalories >= 500 && data.targetCalories <= 15000)) &&
+             (!('targetProteinGrams' in data) || (data.targetProteinGrams is int && data.targetProteinGrams >= 0 && data.targetProteinGrams <= 1000)) &&
+             (!('targetCarbsGrams' in data) || (data.targetCarbsGrams is int && data.targetCarbsGrams >= 0 && data.targetCarbsGrams <= 2000)) &&
+             (!('targetFatGrams' in data) || (data.targetFatGrams is int && data.targetFatGrams >= 0 && data.targetFatGrams <= 1000)) &&
+             (!('targetWaterMl' in data) || (data.targetWaterMl is int && data.targetWaterMl >= 0 && data.targetWaterMl <= 20000)) &&
+             (!('monthlyTargetWeightKg' in data) || (data.monthlyTargetWeightKg is number && data.monthlyTargetWeightKg >= 20 && data.monthlyTargetWeightKg <= 400)) &&
+             (!('monthlyTargetDurationWeeks' in data) || (data.monthlyTargetDurationWeeks is int && data.monthlyTargetDurationWeeks >= 1 && data.monthlyTargetDurationWeeks <= 104)) &&
+             (!('monthlyNotes' in data) || (data.monthlyNotes is string && data.monthlyNotes.size() <= 2000)) &&
+             (!('isDarkMode' in data) || data.isDarkMode is bool) &&
              (!('isBiometricLockEnabled' in data) || data.isBiometricLockEnabled is bool) &&
-             (!('isDarkMode' in data) || data.isDarkMode is bool);
+             (!('hasCompletedOnboarding' in data) || data.hasCompletedOnboarding is bool);
+    }
+
+    function isValidCalorieGoal(data, userId) {
+      return hasValidOwnerAndBoundedSize(data, userId) &&
+             hasValidTimestamps(data) &&
+             data.keys().hasOnly([
+               'userId', 'targetCalories', 'targetProteinGrams', 'targetCarbsGrams',
+               'targetFatGrams', 'targetWaterMl', 'updatedAtMillis', 'updatedAt', 'createdAt'
+             ]) &&
+             (!('targetCalories' in data) || (data.targetCalories is int && data.targetCalories >= 500 && data.targetCalories <= 15000)) &&
+             (!('targetProteinGrams' in data) || (data.targetProteinGrams is int && data.targetProteinGrams >= 0 && data.targetProteinGrams <= 1000)) &&
+             (!('targetCarbsGrams' in data) || (data.targetCarbsGrams is int && data.targetCarbsGrams >= 0 && data.targetCarbsGrams <= 2000)) &&
+             (!('targetFatGrams' in data) || (data.targetFatGrams is int && data.targetFatGrams >= 0 && data.targetFatGrams <= 1000)) &&
+             (!('targetWaterMl' in data) || (data.targetWaterMl is int && data.targetWaterMl >= 0 && data.targetWaterMl <= 20000));
     }
 
     function isValidWorkoutLog(data, userId) {
-      return hasValidOwnerField(data, userId) &&
-             data.dateMillis is int &&
-             (!('durationMinutes' in data) || data.durationMinutes is int);
+      return hasValidOwnerAndBoundedSize(data, userId) &&
+             hasValidTimestamps(data) &&
+             data.keys().hasOnly([
+               'userId', 'routineId', 'routineName', 'dateMillis', 'durationMinutes',
+               'totalVolumeKg', 'totalSetsCompleted', 'perceivedExertion', 'notes',
+               'updatedAtMillis', 'updatedAt', 'createdAt'
+             ]) &&
+             data.dateMillis is int && data.dateMillis >= 0 &&
+             (!('routineId' in data) || (data.routineId is int && data.routineId >= 0)) &&
+             (!('routineName' in data) || (data.routineName is string && data.routineName.size() <= 200)) &&
+             (!('durationMinutes' in data) || (data.durationMinutes is int && data.durationMinutes >= 0 && data.durationMinutes <= 1440)) &&
+             (!('totalVolumeKg' in data) || (data.totalVolumeKg is number && data.totalVolumeKg >= 0 && data.totalVolumeKg <= 500000)) &&
+             (!('totalSetsCompleted' in data) || (data.totalSetsCompleted is int && data.totalSetsCompleted >= 0 && data.totalSetsCompleted <= 500)) &&
+             (!('perceivedExertion' in data) || (data.perceivedExertion is int && data.perceivedExertion >= 0 && data.perceivedExertion <= 10)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000));
     }
 
     function isValidCardioLog(data, userId) {
-      return hasValidOwnerField(data, userId) &&
-             data.dateMillis is int &&
-             data.type is string;
+      return hasValidOwnerAndBoundedSize(data, userId) &&
+             hasValidTimestamps(data) &&
+             data.keys().hasOnly([
+               'userId', 'type', 'durationMinutes', 'caloriesBurned', 'distanceKm',
+               'dateMillis', 'notes', 'updatedAtMillis', 'updatedAt', 'createdAt'
+             ]) &&
+             data.type is string && data.type.size() >= 1 && data.type.size() <= 60 &&
+             data.dateMillis is int && data.dateMillis >= 0 &&
+             (!('durationMinutes' in data) || (data.durationMinutes is int && data.durationMinutes >= 0 && data.durationMinutes <= 1440)) &&
+             (!('caloriesBurned' in data) || (data.caloriesBurned is number && data.caloriesBurned >= 0 && data.caloriesBurned <= 20000)) &&
+             (!('distanceKm' in data) || (data.distanceKm is number && data.distanceKm >= 0 && data.distanceKm <= 1000)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000));
     }
 
-    function isValidSubcollectionDoc(data, userId) {
-      return hasValidOwnerField(data, userId);
+    function isValidGpsRouteLog(data, userId) {
+      return hasValidOwnerAndBoundedSize(data, userId) &&
+             hasValidTimestamps(data) &&
+             data.keys().hasOnly([
+               'userId', 'routeName', 'activityType', 'dateMillis', 'dateDisplay',
+               'durationSeconds', 'distanceMeters', 'stepsCount', 'caloriesBurned',
+               'averagePaceMinPerKm', 'routePointsJson', 'routePoints', 'notes',
+               'updatedAtMillis', 'updatedAt', 'createdAt'
+             ]) &&
+             data.dateMillis is int && data.dateMillis >= 0 &&
+             (!('routeName' in data) || (data.routeName is string && data.routeName.size() <= 200)) &&
+             (!('activityType' in data) || (data.activityType is string && data.activityType.size() <= 60)) &&
+             (!('dateDisplay' in data) || (data.dateDisplay is string && data.dateDisplay.size() <= 60)) &&
+             (!('durationSeconds' in data) || (data.durationSeconds is int && data.durationSeconds >= 0 && data.durationSeconds <= 172800)) &&
+             (!('distanceMeters' in data) || (data.distanceMeters is number && data.distanceMeters >= 0 && data.distanceMeters <= 500000)) &&
+             (!('stepsCount' in data) || (data.stepsCount is int && data.stepsCount >= 0 && data.stepsCount <= 500000)) &&
+             (!('caloriesBurned' in data) || (data.caloriesBurned is number && data.caloriesBurned >= 0 && data.caloriesBurned <= 30000)) &&
+             (!('averagePaceMinPerKm' in data) || (data.averagePaceMinPerKm is number && data.averagePaceMinPerKm >= 0 && data.averagePaceMinPerKm <= 120)) &&
+             (!('routePointsJson' in data) || (data.routePointsJson is string && data.routePointsJson.size() <= 45000)) &&
+             (!('routePoints' in data) || (data.routePoints is list && data.routePoints.size() <= 5000)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000));
     }
 
-    // --- Collections ---
+    function isValidFoodRecord(data, userId) {
+      return hasValidOwnerAndBoundedSize(data, userId) &&
+             hasValidTimestamps(data) &&
+             data.keys().hasOnly([
+               'userId', 'dateString', 'dateMillis', 'mealType', 'foodItemId',
+               'foodName', 'amount', 'unit', 'calories', 'protein', 'carbs',
+               'fat', 'fiber', 'notes', 'updatedAtMillis', 'updatedAt', 'createdAt'
+             ]) &&
+             data.dateString is string && data.dateString.size() >= 1 && data.dateString.size() <= 20 &&
+             data.dateMillis is int && data.dateMillis >= 0 &&
+             data.mealType is string && data.mealType.size() >= 1 && data.mealType.size() <= 40 &&
+             data.foodName is string && data.foodName.size() >= 1 && data.foodName.size() <= 200 &&
+             (!('foodItemId' in data) || (data.foodItemId is int && data.foodItemId >= 0)) &&
+             (!('amount' in data) || (data.amount is number && data.amount >= 0 && data.amount <= 100000)) &&
+             (!('unit' in data) || (data.unit is string && data.unit.size() <= 30)) &&
+             (!('calories' in data) || (data.calories is number && data.calories >= 0 && data.calories <= 50000)) &&
+             (!('protein' in data) || (data.protein is number && data.protein >= 0 && data.protein <= 5000)) &&
+             (!('carbs' in data) || (data.carbs is number && data.carbs >= 0 && data.carbs <= 5000)) &&
+             (!('fat' in data) || (data.fat is number && data.fat >= 0 && data.fat <= 5000)) &&
+             (!('fiber' in data) || (data.fiber is number && data.fiber >= 0 && data.fiber <= 5000)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000));
+    }
+
+    function isValidDailyIntake(data, userId) {
+      return hasValidOwnerAndBoundedSize(data, userId) &&
+             hasValidTimestamps(data) &&
+             data.keys().hasOnly([
+               'userId', 'dateString', 'dateMillis', 'totalCalories', 'totalProtein',
+               'totalCarbs', 'totalFat', 'targetCalories', 'isAdhered', 'waterDrankMl',
+               'updatedAtMillis', 'updatedAt', 'createdAt'
+             ]) &&
+             data.dateString is string && data.dateString.size() >= 1 && data.dateString.size() <= 20 &&
+             data.dateMillis is int && data.dateMillis >= 0 &&
+             (!('totalCalories' in data) || (data.totalCalories is number && data.totalCalories >= 0 && data.totalCalories <= 50000)) &&
+             (!('totalProtein' in data) || (data.totalProtein is number && data.totalProtein >= 0 && data.totalProtein <= 5000)) &&
+             (!('totalCarbs' in data) || (data.totalCarbs is number && data.totalCarbs >= 0 && data.totalCarbs <= 5000)) &&
+             (!('totalFat' in data) || (data.totalFat is number && data.totalFat >= 0 && data.totalFat <= 5000)) &&
+             (!('targetCalories' in data) || (data.targetCalories is int && data.targetCalories >= 0 && data.targetCalories <= 50000)) &&
+             (!('isAdhered' in data) || data.isAdhered is bool) &&
+             (!('waterDrankMl' in data) || (data.waterDrankMl is int && data.waterDrankMl >= 0 && data.waterDrankMl <= 30000));
+    }
+
+    function isValidFavoriteFood(data, userId) {
+      return hasValidOwnerAndBoundedSize(data, userId) &&
+             hasValidTimestamps(data) &&
+             data.keys().hasOnly([
+               'userId', 'foodId', 'foodName', 'category', 'isFavorite',
+               'updatedAtMillis', 'updatedAt', 'createdAt'
+             ]) &&
+             data.foodId is int && data.foodId >= 0 &&
+             data.foodName is string && data.foodName.size() >= 1 && data.foodName.size() <= 200 &&
+             (!('category' in data) || (data.category is string && data.category.size() <= 60)) &&
+             (!('isFavorite' in data) || data.isFavorite is bool);
+    }
+
+    function isValidMealPlan(data, userId) {
+      return hasValidOwnerAndBoundedSize(data, userId) &&
+             hasValidTimestamps(data) &&
+             data.keys().hasOnly([
+               'userId', 'mealType', 'foodItemId', 'name', 'foodName', 'foodCategory',
+               'portionGrams', 'amount', 'unit', 'calories', 'protein', 'carbs',
+               'fat', 'fiber', 'notes', 'isCompletedToday', 'isFixed',
+               'updatedAtMillis', 'updatedAt', 'createdAt'
+             ]) &&
+             data.mealType is string && data.mealType.size() >= 1 && data.mealType.size() <= 40 &&
+             (!('name' in data) || (data.name is string && data.name.size() <= 200)) &&
+             (!('foodName' in data) || (data.foodName is string && data.foodName.size() <= 200)) &&
+             (!('foodItemId' in data) || (data.foodItemId is int && data.foodItemId >= 0)) &&
+             (!('foodCategory' in data) || (data.foodCategory is string && data.foodCategory.size() <= 60)) &&
+             (!('portionGrams' in data) || (data.portionGrams is number && data.portionGrams >= 0 && data.portionGrams <= 100000)) &&
+             (!('amount' in data) || (data.amount is number && data.amount >= 0 && data.amount <= 100000)) &&
+             (!('unit' in data) || (data.unit is string && data.unit.size() <= 30)) &&
+             (!('calories' in data) || (data.calories is number && data.calories >= 0 && data.calories <= 50000)) &&
+             (!('protein' in data) || (data.protein is number && data.protein >= 0 && data.protein <= 5000)) &&
+             (!('carbs' in data) || (data.carbs is number && data.carbs >= 0 && data.carbs <= 5000)) &&
+             (!('fat' in data) || (data.fat is number && data.fat >= 0 && data.fat <= 5000)) &&
+             (!('fiber' in data) || (data.fiber is number && data.fiber >= 0 && data.fiber <= 5000)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
+             (!('isCompletedToday' in data) || data.isCompletedToday is bool) &&
+             (!('isFixed' in data) || data.isFixed is bool);
+    }
+
+    function isValidShoppingItem(data, userId) {
+      return hasValidOwnerAndBoundedSize(data, userId) &&
+             hasValidTimestamps(data) &&
+             data.keys().hasOnly([
+               'userId', 'id', 'name', 'category', 'totalQuantityGrams', 'quantity',
+               'unit', 'periodDays', 'estimatedPrice', 'myEstimatedPrice',
+               'isBought', 'isChecked', 'isAutoGenerated', 'notes',
+               'updatedAtMillis', 'updatedAt', 'createdAt'
+             ]) &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 200 &&
+             (!('id' in data) || data.id is int) &&
+             (!('category' in data) || (data.category is string && data.category.size() <= 60)) &&
+             (!('totalQuantityGrams' in data) || (data.totalQuantityGrams is number && data.totalQuantityGrams >= 0 && data.totalQuantityGrams <= 1000000)) &&
+             (!('quantity' in data) || (data.quantity is number && data.quantity >= 0 && data.quantity <= 1000000)) &&
+             (!('unit' in data) || (data.unit is string && data.unit.size() <= 30)) &&
+             (!('periodDays' in data) || (data.periodDays is int && data.periodDays >= 1 && data.periodDays <= 365)) &&
+             (!('estimatedPrice' in data) || (data.estimatedPrice is number && data.estimatedPrice >= 0 && data.estimatedPrice <= 1000000)) &&
+             (!('myEstimatedPrice' in data) || (data.myEstimatedPrice is number && data.myEstimatedPrice >= 0 && data.myEstimatedPrice <= 1000000)) &&
+             (!('isBought' in data) || data.isBought is bool) &&
+             (!('isChecked' in data) || data.isChecked is bool) &&
+             (!('isAutoGenerated' in data) || data.isAutoGenerated is bool) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000));
+    }
+
+    function isValidProgressLog(data, userId) {
+      return hasValidOwnerAndBoundedSize(data, userId) &&
+             hasValidTimestamps(data) &&
+             data.keys().hasOnly([
+               'userId', 'dateMillis', 'weightKg', 'bodyFatPercent', 'notes',
+               'updatedAtMillis', 'updatedAt', 'createdAt'
+             ]) &&
+             data.dateMillis is int && data.dateMillis >= 0 &&
+             data.weightKg is number && data.weightKg >= 20 && data.weightKg <= 400 &&
+             (!('bodyFatPercent' in data) || (data.bodyFatPercent is number && data.bodyFatPercent >= 0 && data.bodyFatPercent <= 80)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000));
+    }
+
+    function isValidWorkoutRoutine(data, userId) {
+      return hasValidOwnerAndBoundedSize(data, userId) &&
+             hasValidTimestamps(data) &&
+             data.keys().hasOnly([
+               'userId', 'splitType', 'letter', 'title', 'dayOfWeekLabel',
+               'targetMuscleGroups', 'estimatedDurationMinutes', 'orderIndex',
+               'updatedAtMillis', 'updatedAt', 'createdAt'
+             ]) &&
+             data.letter is string && data.letter.size() >= 1 && data.letter.size() <= 10 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 200 &&
+             (!('splitType' in data) || (data.splitType is string && data.splitType.size() <= 40)) &&
+             (!('dayOfWeekLabel' in data) || (data.dayOfWeekLabel is string && data.dayOfWeekLabel.size() <= 60)) &&
+             (!('targetMuscleGroups' in data) || (data.targetMuscleGroups is string && data.targetMuscleGroups.size() <= 300)) &&
+             (!('estimatedDurationMinutes' in data) || (data.estimatedDurationMinutes is int && data.estimatedDurationMinutes >= 0 && data.estimatedDurationMinutes <= 600)) &&
+             (!('orderIndex' in data) || (data.orderIndex is int && data.orderIndex >= 0 && data.orderIndex <= 500));
+    }
+
+    function isValidWorkoutExercise(data, userId) {
+      return hasValidOwnerAndBoundedSize(data, userId) &&
+             hasValidTimestamps(data) &&
+             data.keys().hasOnly([
+               'userId', 'id', 'workoutId', 'routineId', 'exerciseName', 'muscleGroup',
+               'sets', 'repsMin', 'repsMax', 'currentWeightKg', 'restSeconds',
+               'orderIndex', 'notes', 'biomechanicsGuide', 'gifDemonstrationUrl',
+               'updatedAtMillis', 'updatedAt', 'createdAt'
+             ]) &&
+             data.workoutId is string && data.workoutId.size() >= 1 && data.workoutId.size() <= 64 &&
+             data.exerciseName is string && data.exerciseName.size() >= 1 && data.exerciseName.size() <= 200 &&
+             (!('id' in data) || (data.id is string && data.id.size() <= 64) || data.id is int) &&
+             (!('routineId' in data) || (data.routineId is int && data.routineId >= 0)) &&
+             (!('muscleGroup' in data) || (data.muscleGroup is string && data.muscleGroup.size() <= 120)) &&
+             (!('sets' in data) || (data.sets is int && data.sets >= 0 && data.sets <= 100)) &&
+             (!('repsMin' in data) || (data.repsMin is int && data.repsMin >= 0 && data.repsMin <= 1000)) &&
+             (!('repsMax' in data) || (data.repsMax is int && data.repsMax >= 0 && data.repsMax <= 1000)) &&
+             (!('currentWeightKg' in data) || (data.currentWeightKg is number && data.currentWeightKg >= 0 && data.currentWeightKg <= 2000)) &&
+             (!('restSeconds' in data) || (data.restSeconds is int && data.restSeconds >= 0 && data.restSeconds <= 3600)) &&
+             (!('orderIndex' in data) || (data.orderIndex is int && data.orderIndex >= 0 && data.orderIndex <= 500)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000)) &&
+             (!('biomechanicsGuide' in data) || (data.biomechanicsGuide is string && data.biomechanicsGuide.size() <= 2000)) &&
+             (!('gifDemonstrationUrl' in data) || (data.gifDemonstrationUrl is string && data.gifDemonstrationUrl.size() <= 1000));
+    }
+
+    // --- User Document & Subcollections ---
     match /users/{userId} {
-      allow get: if isOwner(userId);
+      allow get: if isOwner(userId) && isValidId(userId);
       allow create: if isOwner(userId) &&
-                       isValidUserProfile(request.resource.data, userId) &&
-                       (!('createdAt' in request.resource.data) || request.resource.data.createdAt <= request.time);
+                       isValidId(userId) &&
+                       isValidUserProfile(incoming(), userId);
       allow update: if isOwner(userId) &&
-                       isValidUserProfile(request.resource.data, userId) &&
-                       (!('userId' in resource.data) || !('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId) &&
-                       (!('createdAt' in resource.data) || !('createdAt' in request.resource.data) || request.resource.data.createdAt == resource.data.createdAt);
-      allow delete: if isOwner(userId);
+                       isValidId(userId) &&
+                       isValidUserProfile(incoming(), userId) &&
+                       preservesImmutableFields();
+      allow delete: if isOwner(userId) && isValidId(userId);
 
-      match /workout_logs/{logId} {
-        allow list, get: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidWorkoutLog(request.resource.data, userId);
-        allow delete: if isOwner(userId);
+      // =====================================================================
+      // CANONICAL COLLECTIONS (camelCase, strict schema validation)
+      // =====================================================================
+
+      match /calorieGoals/{goalId} {
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(goalId);
+        allow create: if isOwner(userId) && isValidId(goalId) && isValidCalorieGoal(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(goalId) && isValidCalorieGoal(incoming(), userId) && preservesImmutableFields();
+        allow delete: if isOwner(userId) && isValidId(goalId);
       }
 
       match /workoutLogs/{logId} {
-        allow list, get: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidWorkoutLog(request.resource.data, userId);
-        allow delete: if isOwner(userId);
-      }
-
-      match /cardio_logs/{logId} {
-        allow list, get: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidCardioLog(request.resource.data, userId);
-        allow delete: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(logId);
+        allow create: if isOwner(userId) && isValidId(logId) && isValidWorkoutLog(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(logId) && isValidWorkoutLog(incoming(), userId) && preservesImmutableFields();
+        allow delete: if isOwner(userId) && isValidId(logId);
       }
 
       match /cardioLogs/{logId} {
-        allow list, get: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidCardioLog(request.resource.data, userId);
-        allow delete: if isOwner(userId);
-      }
-
-      match /calorieGoals/{goalId} {
-        allow list, get: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
-        allow delete: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(logId);
+        allow create: if isOwner(userId) && isValidId(logId) && isValidCardioLog(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(logId) && isValidCardioLog(incoming(), userId) && preservesImmutableFields();
+        allow delete: if isOwner(userId) && isValidId(logId);
       }
 
       match /gpsRouteLogs/{logId} {
-        allow list, get: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
-        allow delete: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(logId);
+        allow create: if isOwner(userId) && isValidId(logId) && isValidGpsRouteLog(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(logId) && isValidGpsRouteLog(incoming(), userId) && preservesImmutableFields();
+        allow delete: if isOwner(userId) && isValidId(logId);
       }
 
       match /foodRecords/{recordId} {
-        allow list, get: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
-        allow delete: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(recordId);
+        allow create: if isOwner(userId) && isValidId(recordId) && isValidFoodRecord(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(recordId) && isValidFoodRecord(incoming(), userId) && preservesImmutableFields();
+        allow delete: if isOwner(userId) && isValidId(recordId);
       }
 
       match /dailyIntake/{dateKey} {
-        allow list, get: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
-        allow delete: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(dateKey);
+        allow create: if isOwner(userId) && isValidId(dateKey) && isValidDailyIntake(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(dateKey) && isValidDailyIntake(incoming(), userId) && preservesImmutableFields();
+        allow delete: if isOwner(userId) && isValidId(dateKey);
       }
 
       match /favoriteFoods/{foodId} {
-        allow list, get: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
-        allow delete: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(foodId);
+        allow create: if isOwner(userId) && isValidId(foodId) && isValidFavoriteFood(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(foodId) && isValidFavoriteFood(incoming(), userId) && preservesImmutableFields();
+        allow delete: if isOwner(userId) && isValidId(foodId);
       }
 
       match /mealPlans/{planId} {
-        allow list, get: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
-        allow delete: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(planId);
+        allow create: if isOwner(userId) && isValidId(planId) && isValidMealPlan(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(planId) && isValidMealPlan(incoming(), userId) && preservesImmutableFields();
+        allow delete: if isOwner(userId) && isValidId(planId);
       }
 
       match /shoppingItems/{itemId} {
-        allow list, get: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
-        allow delete: if isOwner(userId);
-      }
-
-      match /shoppingList/{itemId} {
-        allow list, get: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
-        allow delete: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(itemId);
+        allow create: if isOwner(userId) && isValidId(itemId) && isValidShoppingItem(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(itemId) && isValidShoppingItem(incoming(), userId) && preservesImmutableFields();
+        allow delete: if isOwner(userId) && isValidId(itemId);
       }
 
       match /progressLogs/{logId} {
-        allow list, get: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
-        allow delete: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(logId);
+        allow create: if isOwner(userId) && isValidId(logId) && isValidProgressLog(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(logId) && isValidProgressLog(incoming(), userId) && preservesImmutableFields();
+        allow delete: if isOwner(userId) && isValidId(logId);
       }
 
       match /workoutRoutines/{routineId} {
-        allow list, get: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
-        allow delete: if isOwner(userId);
+        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) && isValidId(routineId);
+        allow create: if isOwner(userId) && isValidId(routineId) && isValidWorkoutRoutine(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(routineId) && isValidWorkoutRoutine(incoming(), userId) && preservesImmutableFields();
+        allow delete: if isOwner(userId) && isValidId(routineId);
 
-        match /workoutExercises/{exerciseId} {
-          allow list, get: if isOwner(userId);
-          allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
-          allow delete: if isOwner(userId);
-        }
-
+        // Canonical nested exercises collection: workoutRoutines/{routineId}/exercises/{exerciseId}
         match /exercises/{exerciseId} {
-          allow list, get: if isOwner(userId);
-          allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
-          allow delete: if isOwner(userId);
+          allow list: if isOwner(userId);
+          allow get: if isOwner(userId) && isValidId(exerciseId);
+          allow create: if isOwner(userId) && isValidId(exerciseId) && isValidWorkoutExercise(incoming(), userId);
+          allow update: if isOwner(userId) && isValidId(exerciseId) && isValidWorkoutExercise(incoming(), userId) && preservesImmutableFields();
+          allow delete: if isOwner(userId) && isValidId(exerciseId);
         }
+
+        // Legacy nested collection (read + delete only for migration cleanup)
+        match /workoutExercises/{exerciseId} {
+          allow read, delete: if isOwner(userId);
+        }
+      }
+
+      // =====================================================================
+      // LEGACY COLLECTIONS (S5: read & delete only for migration cleanup; no create/update)
+      // =====================================================================
+
+      match /workout_logs/{logId} {
+        allow read, delete: if isOwner(userId);
+      }
+
+      match /cardio_logs/{logId} {
+        allow read, delete: if isOwner(userId);
+      }
+
+      match /shoppingList/{itemId} {
+        allow read, delete: if isOwner(userId);
       }
 
       match /workoutExercises/{exerciseId} {
-        allow list, get: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
-        allow delete: if isOwner(userId);
+        allow read, delete: if isOwner(userId);
       }
 
       match /workouts/{workoutId} {
-        allow list, get: if isOwner(userId);
-        allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
-        allow delete: if isOwner(userId);
+        allow read, delete: if isOwner(userId);
 
         match /workoutExercises/{exerciseId} {
-          allow list, get: if isOwner(userId);
-          allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
-          allow delete: if isOwner(userId);
+          allow read, delete: if isOwner(userId);
         }
 
         match /exercises/{exerciseId} {
-          allow list, get: if isOwner(userId);
-          allow create, update: if isOwner(userId) && isValidSubcollectionDoc(request.resource.data, userId);
-          allow delete: if isOwner(userId);
+          allow read, delete: if isOwner(userId);
         }
       }
     }

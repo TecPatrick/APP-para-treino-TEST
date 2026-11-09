@@ -2,9 +2,7 @@ package com.example.ui
 
 import android.app.Application
 import android.content.Context
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
-import com.example.BuildConfig
 import com.example.VirtusApplication
 import com.example.data.auth.FirebaseAuthService
 import com.example.data.firestore.ConflictDecision
@@ -36,10 +34,12 @@ import com.example.service.RunningForegroundService
 import com.example.ui.auth.AuthController
 import com.example.ui.sync.PendingSyncItem
 import com.example.ui.sync.SyncController
+import com.example.util.AppLog
 import com.example.util.MacroCalculator
 import com.example.util.PdfExporter
 import com.example.util.WorkoutAudioHapticHelper
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -66,8 +66,8 @@ class VirtusSharedState(
     val scope: CoroutineScope,
     val repository: VirtusRepository
 ) {
-    val authService: FirebaseAuthService = FirebaseAuthService()
-    val firestoreSync: FirestoreSyncManager = FirestoreSyncManager(application)
+    val authService: FirebaseAuthService by lazy { FirebaseAuthService() }
+    val firestoreSync: FirestoreSyncManager by lazy { FirestoreSyncManager(application) }
 
     private val _toastMessage = MutableStateFlow<String?>(null)
     val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
@@ -175,6 +175,13 @@ class VirtusSharedState(
     private var cloudProfileObserverJob: Job? = null
     private var observedCloudUid: String? = null
 
+    fun stopCloudObservers() {
+        cloudProfileObserverJob?.cancel()
+        cloudProfileObserverJob = null
+        observedCloudUid = null
+        firestoreSync.removeAllListeners()
+    }
+
     private fun startCloudProfileObserverIfNeeded(uid: String) {
         if (uid.isBlank() || uid.startsWith("guest_") || observedCloudUid == uid) return
         observedCloudUid = uid
@@ -235,11 +242,13 @@ class VirtusSharedState(
                                 scope.launch { syncDataFromCloud() }
                                 fallback.value = syncedProfile
                             } else {
+                                stopCloudObservers()
                                 fallback.value = profile.copy(
                                     isLoggedIn = profile.isLoggedIn && profile.firebaseUid.startsWith("guest_")
                                 )
                             }
                         } else {
+                            stopCloudObservers()
                             fallback.value = UserProfile()
                         }
                     }
@@ -381,13 +390,15 @@ class VirtusSharedState(
     )
 
     init {
-        try {
-            WorkoutAudioHapticHelper.init(application)
-        } catch (e: Exception) {
-            e.printStackTrace()
+        scope.launch(Dispatchers.IO) {
+            try {
+                WorkoutAudioHapticHelper.init(application)
+            } catch (e: Exception) {
+                AppLog.e("VirtusSharedState", "Erro ao inicializar WorkoutAudioHapticHelper", e)
+            }
         }
 
-        scope.launch {
+        scope.launch(Dispatchers.IO) {
             try {
                 if (repository.getFoodsCount() < PrepopulatedData.defaultFoods.size) {
                     repository.insertFoods(PrepopulatedData.defaultFoods)
@@ -419,7 +430,7 @@ class VirtusSharedState(
                     }
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLog.e("VirtusSharedState", "Erro ao popular dados iniciais", e)
             }
         }
 
@@ -431,7 +442,7 @@ class VirtusSharedState(
             }
         }
 
-        scope.launch {
+        scope.launch(Dispatchers.IO) {
             val preferences = application.getSharedPreferences("daily_tracking", Context.MODE_PRIVATE)
             val today = currentDateKey()
             if (preferences.getString("meal_completion_date", null) != today) {
@@ -558,7 +569,7 @@ class VirtusSharedState(
                         _toastMessage.value = "${favoriteIds.size} favoritos sincronizados da nuvem!"
                     }
                 }.onFailure {
-                    if (BuildConfig.DEBUG) Log.e("VirtusSharedState", "Erro ao sincronizar favoritos: ${it.message}")
+                    AppLog.e("VirtusSharedState", "Erro ao sincronizar favoritos: ${it.message}", it)
                 }
             }
         }
@@ -570,7 +581,7 @@ class VirtusSharedState(
             if (uid.isNotBlank() && !uid.startsWith("guest_")) {
                 val localExercises = repository.allExercises.firstOrNull().orEmpty()
                 val migrationService = WorkoutMigrationService(application)
-                migrationService.migrateUserWorkoutsAndExercises(uid, preserveLegacyDocuments = true)
+                migrationService.migrateUserWorkoutsAndExercises(uid, preserveLegacyDocuments = false)
                 if (localExercises.isNotEmpty()) {
                     migrationService.migrateLocalExercisesToSubcollections(localExercises, uid)
                 }
@@ -608,7 +619,7 @@ class VirtusSharedState(
                     shoppingList.value
                 )
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLog.e("VirtusSharedState", "Erro ao exportar PDF", e)
                 _toastMessage.value = "Erro ao exportar PDF: ${e.localizedMessage}"
             }
         }
@@ -667,6 +678,8 @@ abstract class BaseVirtusDomainViewModel(application: Application) : AndroidView
     val lastSyncBannerNotification: StateFlow<String?> get() = syncController.lastSyncBannerNotification
     val lastSyncReport: StateFlow<SyncReport?> get() = firestoreSync.lastSyncReport
 
+    protected val viewModelListenerJobs = mutableListOf<Job>()
+
     fun clearToast() = shared.clearToast()
     fun showToast(message: String) = shared.showToast(message)
     fun selectAppDate(dateMillis: Long) = shared.selectAppDate(dateMillis)
@@ -674,4 +687,10 @@ abstract class BaseVirtusDomainViewModel(application: Application) : AndroidView
     fun setDarkMode(isDark: Boolean) = shared.setDarkMode(isDark)
     fun toggleDarkMode() = shared.toggleDarkMode()
     fun exportPdfProgressReport(context: Context) = shared.exportPdfProgressReport(context)
+
+    override fun onCleared() {
+        viewModelListenerJobs.forEach { it.cancel() }
+        viewModelListenerJobs.clear()
+        super.onCleared()
+    }
 }

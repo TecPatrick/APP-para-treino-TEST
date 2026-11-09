@@ -507,8 +507,14 @@ fun WorkoutScreen(
                     )
                 }
             } else {
-                items(allRoutines) { routine ->
-                    val exercisesForRoutine = allExercises.filter { it.routineId == routine.id }
+                items(
+                    items = allRoutines,
+                    key = { it.id },
+                    contentType = { "routine_card" }
+                ) { routine ->
+                    val exercisesForRoutine = remember(allExercises, routine.id) {
+                        allExercises.filter { it.routineId == routine.id }
+                    }
                     RoutineCardItem(
                         routine = routine,
                         exerciseCount = exercisesForRoutine.size,

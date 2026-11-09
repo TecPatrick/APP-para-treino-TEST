@@ -296,6 +296,7 @@ fun ExerciseProgressionContent(
     val totalGainPercent = if (baselinePeakWeight > 0f) (totalGainKg / baselinePeakWeight) * 100f else 0f
     val currentOneRepMax = weeklyProgressionList.lastOrNull()?.estimatedOneRepMaxKg ?: (currentPeakWeight * 1.25f)
     val totalTonnageSumKg = weeklyProgressionList.sumOf { it.totalVolumeKg.toDouble() }.toFloat()
+    val reversedProgressionList = remember(weeklyProgressionList) { weeklyProgressionList.asReversed() }
 
     var selectedPointIndex by remember { mutableStateOf<Int?>(null) }
 
@@ -404,7 +405,11 @@ fun ExerciseProgressionContent(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    items(availableCompoundExercises) { ex ->
+                    items(
+                        items = availableCompoundExercises,
+                        key = { "${it.id}_${it.exerciseName}" },
+                        contentType = { "compound_chip" }
+                    ) { ex ->
                         val isSelected = ex.exerciseName.equals(selectedExerciseName, ignoreCase = true)
                         Surface(
                             shape = RoundedCornerShape(12.dp),
@@ -594,7 +599,11 @@ fun ExerciseProgressionContent(
                 )
             }
 
-            items(weeklyProgressionList.asReversed()) { item ->
+            items(
+                items = reversedProgressionList,
+                key = { "${it.weekNumber}_${it.dateRangeDisplay}" },
+                contentType = { "weekly_progression" }
+            ) { item ->
                 val isPR = item.peakWeightKg >= allTimePR
                 Card(
                     colors = CardDefaults.cardColors(containerColor = CarbonCard),

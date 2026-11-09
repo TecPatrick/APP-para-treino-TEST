@@ -71,7 +71,7 @@ object PdfExporter {
             sharePdfFile(context, pdfFile)
             return pdfFile
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLog.e("PdfExporter", "Erro ao gerar PDF", e)
             Toast.makeText(context, "Erro ao gerar PDF: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
             pdfDocument.close()
             return null
@@ -410,7 +410,7 @@ object PdfExporter {
             chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(chooser)
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLog.e("PdfExporter", "Erro ao compartilhar arquivo PDF", e)
             Toast.makeText(context, "PDF gerado: ${file.name}", Toast.LENGTH_LONG).show()
         }
     }

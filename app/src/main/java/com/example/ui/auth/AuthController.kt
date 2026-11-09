@@ -4,6 +4,7 @@ import com.example.data.auth.FirebaseAuthService
 import com.example.data.firestore.FirestoreSyncManager
 import com.example.data.model.UserProfile
 import com.example.data.repository.VirtusRepository
+import com.example.util.AppLog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -75,7 +76,7 @@ class AuthController(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLog.e("AuthController", "Falha em operação de autenticação", e)
                 val message =
                     "Não foi possível concluir a operação. Tente novamente."
 
@@ -211,6 +212,7 @@ class AuthController(
         launchAuth {
             val current = localProfileForGuest()
 
+            firestoreSync.removeAllListeners()
             authService.signOut()
 
             val hasOnboarded =

@@ -1,10 +1,12 @@
 package com.example.ui
 
 import android.app.Application
+import androidx.compose.runtime.Immutable
 import com.example.data.model.MealType
 import com.example.data.model.WorkoutExercise
 import com.example.data.model.WorkoutRoutine
 
+@Immutable
 data class DailyEnergyExpenditure(
     val bmr: Int,
     val gymWorkoutCalories: Int,
@@ -18,6 +20,7 @@ data class DailyEnergyExpenditure(
     val cardioWorkoutsCount: Int
 )
 
+@Immutable
 data class ActiveWorkoutSession(
     val routine: WorkoutRoutine? = null,
     val exercises: List<WorkoutExercise> = emptyList(),
@@ -34,6 +37,7 @@ data class ActiveWorkoutSession(
     val loggedExerciseSets: Map<Long, List<Pair<Int, Float>>> = emptyMap()
 )
 
+@Immutable
 data class ActiveGpsSession(
     val isRunning: Boolean = false,
     val isPaused: Boolean = false,
@@ -49,6 +53,7 @@ data class ActiveGpsSession(
     val routePoints: List<Pair<Double, Double>> = emptyList()
 )
 
+@Immutable
 data class DietAiPreferences(
     val restrictions: String = "",
     val preferences: String = "",
@@ -56,6 +61,7 @@ data class DietAiPreferences(
     val includePreferredFoods: Boolean = true
 )
 
+@Immutable
 data class AiDietSuggestion(
     val mealType: MealType,
     val foodName: String,

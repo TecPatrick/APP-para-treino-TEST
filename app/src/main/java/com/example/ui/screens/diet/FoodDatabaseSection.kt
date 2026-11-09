@@ -2,7 +2,6 @@ package com.example.ui.screens.diet
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,18 +18,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.FitnessCenter
-import androidx.compose.material.icons.filled.LocalFireDepartment
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -40,13 +34,13 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,15 +50,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.FoodCategory
 import com.example.data.model.FoodItem
 import com.example.data.model.MealType
+import com.example.ui.screens.diet.components.QuickAddFoodToMealDialog
 import com.example.ui.theme.CarbonBorder
 import com.example.ui.theme.CarbonCard
-import com.example.ui.theme.CarbonCardElevated
 import com.example.ui.theme.CarbonDark
 import com.example.ui.theme.GrowthCyan
 import com.example.ui.theme.GrowthGreen
@@ -85,14 +78,25 @@ fun FoodDatabaseSection(
     var foodToAddToMeal by remember { mutableStateOf<FoodItem?>(null) }
     var showOnlyFavorites by remember { mutableStateOf(false) }
 
-    val filteredFoods = remember(foods, searchQuery, selectedCategory, showOnlyFavorites) {
-        foods.filter { food ->
-            val matchesQuery = searchQuery.isBlank() ||
-                food.name.contains(searchQuery, ignoreCase = true) ||
-                food.category.label.contains(searchQuery, ignoreCase = true)
-            val matchesCategory = selectedCategory == null || food.category == selectedCategory
-            val matchesFavorite = !showOnlyFavorites || food.isFavorite
-            matchesQuery && matchesCategory && matchesFavorite
+    val filteredFoods by remember(foods, searchQuery, selectedCategory, showOnlyFavorites) {
+        derivedStateOf {
+            foods.filter { food ->
+                val matchesQuery = searchQuery.isBlank() ||
+                    food.name.contains(searchQuery, ignoreCase = true) ||
+                    food.category.label.contains(searchQuery, ignoreCase = true)
+                val matchesCategory = selectedCategory == null || food.category == selectedCategory
+                val matchesFavorite = !showOnlyFavorites || food.isFavorite
+                matchesQuery && matchesCategory && matchesFavorite
+            }
+        }
+    }
+
+    val favCount by remember(foods) {
+        derivedStateOf { foods.count { it.isFavorite } }
+    }
+    val nonEmptyCategories by remember(foods) {
+        derivedStateOf {
+            FoodCategory.entries.filter { cat -> foods.any { it.category == cat } }
         }
     }
 
@@ -103,7 +107,6 @@ fun FoodDatabaseSection(
     ) {
         Spacer(modifier = Modifier.height(12.dp))
 
-        // 🔍 Modern Real-time Search Bar
         Surface(
             color = CarbonCard,
             shape = RoundedCornerShape(14.dp),
@@ -113,12 +116,12 @@ fun FoodDatabaseSection(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { 
+                placeholder = {
                     Text(
-                        "Buscar por nome ou categoria (ex: frango, suplemento...)", 
+                        "Buscar por nome ou categoria (ex: frango, suplemento...)",
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    ) 
+                    )
                 },
                 leadingIcon = {
                     Icon(
@@ -157,7 +160,6 @@ fun FoodDatabaseSection(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // 🏷️ Dynamic Category Filter Chips
         Text(
             text = "FILTRAR POR CATEGORIA",
             fontSize = 10.sp,
@@ -166,13 +168,13 @@ fun FoodDatabaseSection(
             modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
             letterSpacing = 1.sp
         )
-        
+
         LazyRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(bottom = 4.dp)
         ) {
-            item {
+            item(key = "filter_all_foods") {
                 FilterChip(
                     selected = selectedCategory == null,
                     onClick = { selectedCategory = null },
@@ -188,12 +190,11 @@ fun FoodDatabaseSection(
                     modifier = Modifier.testTag("filter_all_foods")
                 )
             }
-            item {
-                val favCount = foods.count { it.isFavorite }
+            item(key = "filter_favorites") {
                 FilterChip(
                     selected = showOnlyFavorites,
                     onClick = { showOnlyFavorites = !showOnlyFavorites },
-                    label = { 
+                    label = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = if (showOnlyFavorites) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
@@ -216,30 +217,35 @@ fun FoodDatabaseSection(
                     modifier = Modifier.testTag("filter_favorites")
                 )
             }
-            items(FoodCategory.values()) { cat ->
-                val count = foods.count { it.category == cat }
-                if (count > 0) {
-                    FilterChip(
-                        selected = selectedCategory == cat,
-                        onClick = { selectedCategory = cat },
-                        label = { Text(cat.label, fontSize = 11.sp, fontWeight = FontWeight.Medium) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = if (cat == FoodCategory.GROWTH_SUPPLEMENT) GrowthOrange else GrowthCyan,
-                            selectedLabelColor = Color.Black,
-                            containerColor = CarbonCard,
-                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        border = BorderStroke(1.dp, if (selectedCategory == cat) (if (cat == FoodCategory.GROWTH_SUPPLEMENT) GrowthOrange else GrowthCyan) else CarbonBorder),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.testTag("filter_category_${cat.name}")
-                    )
-                }
+            items(
+                items = nonEmptyCategories,
+                key = { it.name },
+                contentType = { "food_category_chip" }
+            ) { cat ->
+                FilterChip(
+                    selected = selectedCategory == cat,
+                    onClick = { selectedCategory = cat },
+                    label = { Text(cat.label, fontSize = 11.sp, fontWeight = FontWeight.Medium) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = if (cat == FoodCategory.GROWTH_SUPPLEMENT) GrowthOrange else GrowthCyan,
+                        selectedLabelColor = Color.Black,
+                        containerColor = CarbonCard,
+                        labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    border = BorderStroke(
+                        1.dp,
+                        if (selectedCategory == cat) {
+                            if (cat == FoodCategory.GROWTH_SUPPLEMENT) GrowthOrange else GrowthCyan
+                        } else CarbonBorder
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.testTag("filter_category_${cat.name}")
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 📊 Results Summary & Action Toolbar
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -263,10 +269,9 @@ fun FoodDatabaseSection(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Quick Action: Clear Filters
                 if (searchQuery.isNotEmpty() || selectedCategory != null) {
                     TextButton(
-                        onClick = { 
+                        onClick = {
                             searchQuery = ""
                             selectedCategory = null
                             showOnlyFavorites = false
@@ -294,7 +299,6 @@ fun FoodDatabaseSection(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // List of food items
         if (filteredFoods.isEmpty()) {
             Box(
                 modifier = Modifier
@@ -337,7 +341,11 @@ fun FoodDatabaseSection(
                 contentPadding = PaddingValues(bottom = 96.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(filteredFoods, key = { it.id }) { food ->
+                items(
+                    items = filteredFoods,
+                    key = { it.id },
+                    contentType = { "food_database_item" }
+                ) { food ->
                     FoodDatabaseItemCard(
                         food = food,
                         onAddToMealClick = { foodToAddToMeal = food },
@@ -348,7 +356,6 @@ fun FoodDatabaseSection(
         }
     }
 
-    // Modal to add selected food to a meal
     foodToAddToMeal?.let { food ->
         QuickAddFoodToMealDialog(
             food = food,
@@ -477,7 +484,6 @@ fun FoodDatabaseItemCard(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Macro details grid
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -486,253 +492,46 @@ fun FoodDatabaseItemCard(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Calorias
                 Column(
                     modifier = Modifier.weight(1f),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = "CAL",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "${food.calories.toInt()}",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
+                    Text("CAL", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("${food.calories.toInt()}", fontSize = 11.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.onBackground)
                 }
 
-                // Proteína
                 Column(
                     modifier = Modifier.weight(1f),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = "PROT",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GrowthCyan
-                    )
-                    Text(
-                        text = "${food.protein}g",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        color = GrowthCyan
-                    )
+                    Text("PROT", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = GrowthCyan)
+                    Text("${food.protein}g", fontSize = 11.sp, fontWeight = FontWeight.Black, color = GrowthCyan)
                 }
 
-                // Carbos
                 Column(
                     modifier = Modifier.weight(1f),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = "CARB",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GrowthYellow
-                    )
-                    Text(
-                        text = "${food.carbs}g",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        color = GrowthYellow
-                    )
+                    Text("CARB", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = GrowthYellow)
+                    Text("${food.carbs}g", fontSize = 11.sp, fontWeight = FontWeight.Black, color = GrowthYellow)
                 }
 
-                // Gorduras
                 Column(
                     modifier = Modifier.weight(1f),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = "GORD",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GrowthOrange
-                    )
-                    Text(
-                        text = "${food.fat}g",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        color = GrowthOrange
-                    )
+                    Text("GORD", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = GrowthOrange)
+                    Text("${food.fat}g", fontSize = 11.sp, fontWeight = FontWeight.Black, color = GrowthOrange)
                 }
 
-                // Fibras
                 Column(
                     modifier = Modifier.weight(1f),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = "FIBRA",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = GrowthGreen
-                    )
-                    Text(
-                        text = "${food.fiber}g",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        color = GrowthGreen
-                    )
+                    Text("FIBRA", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = GrowthGreen)
+                    Text("${food.fiber}g", fontSize = 11.sp, fontWeight = FontWeight.Black, color = GrowthGreen)
                 }
             }
         }
     }
-}
-
-@Composable
-fun QuickAddFoodToMealDialog(
-    food: FoodItem,
-    onDismiss: () -> Unit,
-    onConfirm: (MealType, Float, String) -> Unit
-) {
-    var selectedMealType by remember { mutableStateOf(MealType.LUNCH) }
-    var amountText by remember { mutableStateOf(food.baseServingAmount.toInt().toString()) }
-    var notesText by remember { mutableStateOf("") }
-
-    val amount = amountText.toFloatOrNull() ?: food.baseServingAmount
-    val ratio = if (food.baseServingAmount > 0f) amount / food.baseServingAmount else 1f
-
-    val calculatedCalories = food.calories * ratio
-    val calculatedProtein = food.protein * ratio
-    val calculatedCarbs = food.carbs * ratio
-    val calculatedFat = food.fat * ratio
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = CarbonCard,
-        title = {
-            Column {
-                Text(
-                    text = "Adicionar à Refeição",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Text(
-                    text = food.name,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = GrowthOrange
-                )
-            }
-        },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "Selecione a refeição do dia:",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // Meal selector chips
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    items(MealType.values()) { meal ->
-                        FilterChip(
-                            selected = selectedMealType == meal,
-                            onClick = { selectedMealType = meal },
-                            label = { Text(meal.title, fontSize = 11.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = GrowthOrange,
-                                selectedLabelColor = Color.White
-                            )
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = amountText,
-                    onValueChange = { amountText = it.filter { char -> char.isDigit() || char == '.' } },
-                    label = { Text("Quantidade (${food.servingUnit})") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("dialog_food_amount_input"),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GrowthOrange,
-                        unfocusedBorderColor = CarbonBorder
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Live macro calculation preview
-                Surface(
-                    color = CarbonDark,
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, CarbonBorder),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(8.dp),
-                        horizontalArrangement = Arrangement.SpaceAround
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("CAL", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("${calculatedCalories.toInt()} kcal", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("PROT", fontSize = 9.sp, color = GrowthCyan)
-                            Text("${String.format("%.1f", calculatedProtein)}g", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GrowthCyan)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("CARB", fontSize = 9.sp, color = GrowthYellow)
-                            Text("${String.format("%.1f", calculatedCarbs)}g", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GrowthYellow)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("GORD", fontSize = 9.sp, color = GrowthOrange)
-                            Text("${String.format("%.1f", calculatedFat)}g", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GrowthOrange)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                OutlinedTextField(
-                    value = notesText,
-                    onValueChange = { notesText = it },
-                    label = { Text("Observação (opcional)") },
-                    placeholder = { Text("Ex: pós-treino, grelhado sem óleo...", fontSize = 11.sp) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GrowthOrange,
-                        unfocusedBorderColor = CarbonBorder
-                    )
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val finalAmount = amountText.toFloatOrNull() ?: food.baseServingAmount
-                    if (finalAmount > 0f) {
-                        onConfirm(selectedMealType, finalAmount, notesText.trim())
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = GrowthOrange),
-                modifier = Modifier.testTag("confirm_quick_add_food_btn")
-            ) {
-                Text("Adicionar ao Cardápio", color = Color.White, fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancelar", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    )
 }

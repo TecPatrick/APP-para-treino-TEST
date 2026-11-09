@@ -1,9 +1,8 @@
 package com.example.data.firestore
 
+import com.example.util.AppLog
 import com.example.util.FirestoreLogger
 import android.content.Context
-import android.util.Log
-import com.example.BuildConfig
 import com.example.R
 import com.example.data.model.ActivityLevel
 import com.example.data.model.BodyType
@@ -22,9 +21,11 @@ import com.example.data.model.WorkoutRoutine
 import com.example.data.model.WorkoutExercise
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.MetadataChanges
 import com.google.firebase.firestore.PersistentCacheSettings
 import com.google.firebase.firestore.Query
@@ -40,6 +41,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import java.util.concurrent.CopyOnWriteArraySet
 
 /**
  * Representa os dados consolidados da meta calórica sincronizados no Firestore.
@@ -69,12 +71,42 @@ data class RemoteProfileSnapshot(
  */
 open class FirestoreSyncManager(private val context: Context) {
 
+    companion object {
+        const val MAX_BATCH_OPERATIONS = 450
+        const val DEFAULT_LOG_WINDOW_DAYS = 90L
+        const val DEFAULT_LOG_PAGE_LIMIT = 100L
+        private const val MILLIS_PER_DAY = 24L * 60L * 60L * 1000L
+    }
+
     val deltaLedger: DeltaSyncLedger = DeltaSyncLedger(context)
 
     private val _lastSyncReport = MutableStateFlow<SyncReport?>(null)
     val lastSyncReport: StateFlow<SyncReport?> = _lastSyncReport.asStateFlow()
 
     private val migratedUsersInSession = mutableSetOf<String>()
+    private val activeListeners = CopyOnWriteArraySet<ListenerRegistration>()
+
+    private fun trackListener(registration: ListenerRegistration): ListenerRegistration {
+        activeListeners.add(registration)
+        return registration
+    }
+
+    private fun untrackAndRemoveListener(registration: ListenerRegistration) {
+        activeListeners.remove(registration)
+        runCatching { registration.remove() }
+    }
+
+    /**
+     * Removes all active Firestore snapshot listeners immediately (called on logout and onCleared).
+     */
+    open fun removeAllListeners() {
+        val listeners = activeListeners ?: return
+        val snapshot = listeners.toList()
+        listeners.clear()
+        snapshot.forEach { reg ->
+            runCatching { reg.remove() }
+        }
+    }
 
     private val firestore: FirebaseFirestore by lazy {
         val databaseId = context.applicationContext.getString(R.string.firestore_database_id)
@@ -86,11 +118,11 @@ open class FirestoreSyncManager(private val context: Context) {
                 .setLocalCacheSettings(PersistentCacheSettings.newBuilder().build())
                 .build()
             fs.firestoreSettings = settings
-            if (BuildConfig.DEBUG) Log.d("FirestoreSync", "Firestore inicializado com persistência offline ativa.")
+            AppLog.d("FirestoreSync", "Firestore inicializado com persistência offline ativa.")
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.w("FirestoreSync", "Configuração do Firestore já aplicada ou aviso: ${e.message}")
+            AppLog.w("FirestoreSync", "Configuração do Firestore já aplicada ou aviso: ${e.message}")
         }
         fs
     }
@@ -162,7 +194,7 @@ open class FirestoreSyncManager(private val context: Context) {
             val delta = FirestoreDeltaEngine.computeFieldDiff(previousMap, canonicalMap)
 
             if (!delta.isChanged) {
-                if (BuildConfig.DEBUG) Log.d("FirestoreSync", "Delta Sync: Perfil do usuário $uid sem alterações (ignorado).")
+                AppLog.d("FirestoreSync", "Delta Sync: Perfil do usuário ${AppLog.maskUid(uid)} sem alterações (ignorado).")
                 _lastSyncReport.value = SyncReport(
                     successful = 0,
                     skipped = 1,
@@ -186,14 +218,12 @@ open class FirestoreSyncManager(private val context: Context) {
                 skipped = 0,
                 updatedFieldsCount = delta.changedFieldNames.size
             )
-            if (BuildConfig.DEBUG) {
-                Log.d("FirestoreSync", "Delta Sync: Perfil $uid enviou ${delta.changedFieldNames.size} campo(s): ${delta.changedFieldNames}")
-            }
+            AppLog.d("FirestoreSync", "Delta Sync: Perfil ${AppLog.maskUid(uid)} enviou ${delta.changedFieldNames.size} campo(s): ${delta.changedFieldNames}")
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao salvar perfil no Firestore: ${e.message}", e)
+            AppLog.e("FirestoreSync", "Erro ao salvar perfil no Firestore: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -217,7 +247,7 @@ open class FirestoreSyncManager(private val context: Context) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao buscar perfil da nuvem: ${e.message}", e)
+            AppLog.e("FirestoreSync", "Erro ao buscar perfil da nuvem: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -240,23 +270,25 @@ open class FirestoreSyncManager(private val context: Context) {
             return@callbackFlow
         }
 
-        val registration = firestore.collection("users").document(uid)
-            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
-                if (error != null) {
-                    if (BuildConfig.DEBUG) Log.w("FirestoreSync", "Erro no listener do perfil: ${error.message}")
-                    return@addSnapshotListener
+        val registration = trackListener(
+            firestore.collection("users").document(uid)
+                .addSnapshotListener(MetadataChanges.EXCLUDE) { snapshot, error ->
+                    if (error != null) {
+                        AppLog.w("FirestoreSync", "Erro no listener do perfil: ${error.message}")
+                        return@addSnapshotListener
+                    }
+                    if (snapshot != null && snapshot.exists()) {
+                        val data = snapshot.data ?: emptyMap()
+                        val profile = parseUserProfile(data, uid)
+                        val remoteTs = extractTimestampMillis(data)
+                        trySend(RemoteProfileSnapshot(profile = profile, updatedAtMillis = remoteTs))
+                    } else {
+                        trySend(null)
+                    }
                 }
-                if (snapshot != null && snapshot.exists()) {
-                    val data = snapshot.data ?: emptyMap()
-                    val profile = parseUserProfile(data, uid)
-                    val remoteTs = extractTimestampMillis(data)
-                    trySend(RemoteProfileSnapshot(profile = profile, updatedAtMillis = remoteTs))
-                } else {
-                    trySend(null)
-                }
-            }
+        )
 
-        awaitClose { registration.remove() }
+        awaitClose { untrackAndRemoveListener(registration) }
     }
 
     /**
@@ -271,21 +303,23 @@ open class FirestoreSyncManager(private val context: Context) {
             return@callbackFlow
         }
 
-        val registration = firestore.collection("users").document(uid)
-            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
-                if (error != null) {
-                    if (BuildConfig.DEBUG) Log.w("FirestoreSync", "Erro no listener do perfil: ${error.message}")
-                    return@addSnapshotListener
+        val registration = trackListener(
+            firestore.collection("users").document(uid)
+                .addSnapshotListener(MetadataChanges.EXCLUDE) { snapshot, error ->
+                    if (error != null) {
+                        AppLog.w("FirestoreSync", "Erro no listener do perfil: ${error.message}")
+                        return@addSnapshotListener
+                    }
+                    if (snapshot != null && snapshot.exists()) {
+                        val profile = parseUserProfile(snapshot.data ?: emptyMap(), uid)
+                        trySend(profile)
+                    } else {
+                        trySend(null)
+                    }
                 }
-                if (snapshot != null && snapshot.exists()) {
-                    val profile = parseUserProfile(snapshot.data ?: emptyMap(), uid)
-                    trySend(profile)
-                } else {
-                    trySend(null)
-                }
-            }
+        )
 
-        awaitClose { registration.remove() }
+        awaitClose { untrackAndRemoveListener(registration) }
     }
 
     private fun extractTimestampMillis(data: Map<String, Any>): Long {
@@ -358,7 +392,7 @@ open class FirestoreSyncManager(private val context: Context) {
             val delta = FirestoreDeltaEngine.computeFieldDiff(previousGoals, canonicalGoals)
 
             if (!delta.isChanged) {
-                if (BuildConfig.DEBUG) Log.d("FirestoreSync", "Delta Sync: Metas calóricas sem alterações (ignorado).")
+                AppLog.d("FirestoreSync", "Delta Sync: Metas calóricas sem alterações (ignorado).")
                 return Result.success(Unit)
             }
 
@@ -380,12 +414,12 @@ open class FirestoreSyncManager(private val context: Context) {
             )
             deltaLedger.markCaloricGoalsSynced(uid, canonicalGoals, nowMillis)
 
-            if (BuildConfig.DEBUG) Log.d("FirestoreSync", "Delta Sync: Metas calóricas sincronizadas (${delta.changedFieldNames.size} campos).")
+            AppLog.d("FirestoreSync", "Delta Sync: Metas calóricas sincronizadas (${delta.changedFieldNames.size} campos).")
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao salvar metas calóricas: ${e.message}", e)
+            AppLog.e("FirestoreSync", "Erro ao salvar metas calóricas: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -417,7 +451,7 @@ open class FirestoreSyncManager(private val context: Context) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao buscar meta calórica: ${e.message}", e)
+            AppLog.e("FirestoreSync", "Erro ao buscar meta calórica: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -433,30 +467,32 @@ open class FirestoreSyncManager(private val context: Context) {
             return@callbackFlow
         }
 
-        val reg = firestore.collection("users").document(uid)
-            .collection("calorieGoals").document("current")
-            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
-                if (error != null) {
-                    if (BuildConfig.DEBUG) Log.w("FirestoreSync", "Erro ao observar metas calóricas: ${error.message}")
-                    return@addSnapshotListener
+        val reg = trackListener(
+            firestore.collection("users").document(uid)
+                .collection("calorieGoals").document("current")
+                .addSnapshotListener(MetadataChanges.EXCLUDE) { snapshot, error ->
+                    if (error != null) {
+                        AppLog.w("FirestoreSync", "Erro ao observar metas calóricas: ${error.message}")
+                        return@addSnapshotListener
+                    }
+                    if (snapshot != null && snapshot.exists()) {
+                        val d = snapshot.data ?: emptyMap()
+                        val goal = CaloricGoalData(
+                            targetCalories = (d["targetCalories"] as? Number)?.toInt() ?: 2000,
+                            targetProteinGrams = (d["targetProteinGrams"] as? Number)?.toInt() ?: 150,
+                            targetCarbsGrams = (d["targetCarbsGrams"] as? Number)?.toInt() ?: 200,
+                            targetFatGrams = (d["targetFatGrams"] as? Number)?.toInt() ?: 50,
+                            targetWaterMl = (d["targetWaterMl"] as? Number)?.toInt() ?: 3000,
+                            updatedAtMillis = extractTimestampMillis(d)
+                        )
+                        trySend(goal)
+                    } else {
+                        trySend(null)
+                    }
                 }
-                if (snapshot != null && snapshot.exists()) {
-                    val d = snapshot.data ?: emptyMap()
-                    val goal = CaloricGoalData(
-                        targetCalories = (d["targetCalories"] as? Number)?.toInt() ?: 2000,
-                        targetProteinGrams = (d["targetProteinGrams"] as? Number)?.toInt() ?: 150,
-                        targetCarbsGrams = (d["targetCarbsGrams"] as? Number)?.toInt() ?: 200,
-                        targetFatGrams = (d["targetFatGrams"] as? Number)?.toInt() ?: 50,
-                        targetWaterMl = (d["targetWaterMl"] as? Number)?.toInt() ?: 3000,
-                        updatedAtMillis = extractTimestampMillis(d)
-                    )
-                    trySend(goal)
-                } else {
-                    trySend(null)
-                }
-            }
+        )
 
-        awaitClose { reg.remove() }
+        awaitClose { untrackAndRemoveListener(reg) }
     }
 
     // =========================================================================
@@ -496,12 +532,12 @@ open class FirestoreSyncManager(private val context: Context) {
             )
             awaitCloudWrite(docRef.set(data, SetOptions.merge()))
             deltaLedger.markEntitySynced(uid, "workoutLogs", docId, hash, nowMillis)
-            if (BuildConfig.DEBUG) Log.d("FirestoreSync", "Delta Sync: WorkoutLog $docId enviado.")
+            AppLog.d("FirestoreSync", "Delta Sync: WorkoutLog $docId enviado.")
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao salvar WorkoutLog no Firestore: ${e.message}", e)
+            AppLog.e("FirestoreSync", "Erro ao salvar WorkoutLog no Firestore: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -519,20 +555,49 @@ open class FirestoreSyncManager(private val context: Context) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao excluir WorkoutLog do Firestore: ${e.message}", e)
+            AppLog.e("FirestoreSync", "Erro ao excluir WorkoutLog do Firestore: ${e.message}", e)
             Result.failure(e)
         }
     }
 
-    suspend fun fetchWorkoutLogsFromCloud(customUid: String? = null): Result<List<WorkoutLog>> {
+    private fun buildScopedDateQuery(
+        userId: String,
+        collectionName: String,
+        daysBack: Long = DEFAULT_LOG_WINDOW_DAYS,
+        limitCount: Long = DEFAULT_LOG_PAGE_LIMIT,
+        beforeDateMillis: Long? = null
+    ): Query {
+        val base = firestore.collection("users").document(userId).collection(collectionName)
+        val filtered = if (beforeDateMillis != null && beforeDateMillis > 0L) {
+            base.whereLessThan("dateMillis", beforeDateMillis)
+        } else if (daysBack > 0L) {
+            val cutoffMillis = System.currentTimeMillis() - (daysBack * MILLIS_PER_DAY)
+            base.whereGreaterThanOrEqualTo("dateMillis", cutoffMillis)
+        } else {
+            base
+        }
+        return filtered
+            .orderBy("dateMillis", Query.Direction.DESCENDING)
+            .limit(limitCount.coerceIn(1L, 500L))
+    }
+
+    suspend fun fetchWorkoutLogsFromCloud(
+        customUid: String? = null,
+        daysBack: Long = DEFAULT_LOG_WINDOW_DAYS,
+        limitCount: Long = DEFAULT_LOG_PAGE_LIMIT,
+        beforeDateMillis: Long? = null
+    ): Result<List<WorkoutLog>> {
         val uid = resolveUserId(customUid)
             ?: return Result.failure(Exception("Usuário não autenticado"))
 
         return try {
-            val querySnapshot = firestore.collection("users").document(uid)
-                .collection("workoutLogs")
-                .orderBy("dateMillis", Query.Direction.DESCENDING)
-                .get(Source.DEFAULT).await()
+            val querySnapshot = buildScopedDateQuery(
+                userId = uid,
+                collectionName = "workoutLogs",
+                daysBack = daysBack,
+                limitCount = limitCount,
+                beforeDateMillis = beforeDateMillis
+            ).get(Source.DEFAULT).await()
 
             val logs = querySnapshot.documents.mapNotNull { doc ->
                 val d = doc.data ?: return@mapNotNull null
@@ -553,12 +618,16 @@ open class FirestoreSyncManager(private val context: Context) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao buscar logs de treino: ${e.message}", e)
+            AppLog.e("FirestoreSync", "Erro ao buscar logs de treino: ${e.message}", e)
             Result.failure(e)
         }
     }
 
-    fun observeWorkoutLogsFromCloud(customUid: String? = null): Flow<List<WorkoutLog>> = callbackFlow {
+    fun observeWorkoutLogsFromCloud(
+        customUid: String? = null,
+        daysBack: Long = DEFAULT_LOG_WINDOW_DAYS,
+        limitCount: Long = DEFAULT_LOG_PAGE_LIMIT
+    ): Flow<List<WorkoutLog>> = callbackFlow {
         val uid = resolveUserId(customUid)
         if (uid == null) {
             trySend(emptyList())
@@ -566,12 +635,15 @@ open class FirestoreSyncManager(private val context: Context) {
             return@callbackFlow
         }
 
-        val reg = firestore.collection("users").document(uid)
-            .collection("workoutLogs")
-            .orderBy("dateMillis", Query.Direction.DESCENDING)
-            .addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+        val reg = trackListener(
+            buildScopedDateQuery(
+                userId = uid,
+                collectionName = "workoutLogs",
+                daysBack = daysBack,
+                limitCount = limitCount
+            ).addSnapshotListener(MetadataChanges.EXCLUDE) { snapshot, error ->
                 if (error != null) {
-                    if (BuildConfig.DEBUG) Log.w("FirestoreSync", "Erro ao escutar workoutLogs: ${error.message}")
+                    AppLog.w("FirestoreSync", "Erro ao escutar workoutLogs: ${error.message}")
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
@@ -593,8 +665,9 @@ open class FirestoreSyncManager(private val context: Context) {
                     trySend(logs)
                 }
             }
+        )
 
-        awaitClose { reg.remove() }
+        awaitClose { untrackAndRemoveListener(reg) }
     }
 
     private fun gpsRouteLogPayload(uid: String, log: GpsRouteLog): Map<String, Any> = mapOf(
@@ -633,12 +706,107 @@ open class FirestoreSyncManager(private val context: Context) {
             )
             awaitCloudWrite(docRef.set(data, SetOptions.merge()))
             deltaLedger.markEntitySynced(uid, "gpsRouteLogs", docId, hash, nowMillis)
-            if (BuildConfig.DEBUG) Log.d("FirestoreSync", "Delta Sync: GpsRouteLog $docId enviado.")
+            AppLog.d("FirestoreSync", "Delta Sync: GpsRouteLog $docId enviado.")
             Result.success(Unit)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao salvar GpsRouteLog no Firestore: ${e.message}", e)
+            AppLog.e("FirestoreSync", "Erro ao salvar GpsRouteLog no Firestore: ${e.message}", e)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun fetchGpsRouteLogsFromCloud(
+        customUid: String? = null,
+        daysBack: Long = DEFAULT_LOG_WINDOW_DAYS,
+        limitCount: Long = DEFAULT_LOG_PAGE_LIMIT,
+        beforeDateMillis: Long? = null
+    ): Result<List<GpsRouteLog>> {
+        val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado"))
+        return try {
+            val snap = buildScopedDateQuery(uid, "gpsRouteLogs", daysBack, limitCount, beforeDateMillis)
+                .get(Source.DEFAULT).await()
+            val logs = snap.documents.mapNotNull { doc ->
+                val d = doc.data ?: return@mapNotNull null
+                GpsRouteLog(
+                    id = doc.id.substringAfter("_", doc.id).toLongOrNull() ?: 0L,
+                    routeName = d["routeName"] as? String ?: "Corrida GPS",
+                    activityType = d["activityType"] as? String ?: "RUNNING",
+                    dateMillis = (d["dateMillis"] as? Number)?.toLong() ?: 0L,
+                    dateDisplay = d["dateDisplay"] as? String ?: "",
+                    durationSeconds = (d["durationSeconds"] as? Number)?.toInt() ?: 0,
+                    distanceMeters = (d["distanceMeters"] as? Number)?.toFloat() ?: 0f,
+                    stepsCount = (d["stepsCount"] as? Number)?.toInt() ?: 0,
+                    caloriesBurned = (d["caloriesBurned"] as? Number)?.toFloat() ?: 0f,
+                    averagePaceMinPerKm = (d["averagePaceMinPerKm"] as? Number)?.toFloat() ?: 0f,
+                    routePointsJson = d["routePointsJson"] as? String ?: "[]",
+                    notes = d["notes"] as? String ?: ""
+                )
+            }
+            Result.success(logs)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun fetchCardioLogsFromCloud(
+        customUid: String? = null,
+        daysBack: Long = DEFAULT_LOG_WINDOW_DAYS,
+        limitCount: Long = DEFAULT_LOG_PAGE_LIMIT,
+        beforeDateMillis: Long? = null
+    ): Result<List<CardioLog>> {
+        val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado"))
+        return try {
+            val snap = buildScopedDateQuery(uid, "cardioLogs", daysBack, limitCount, beforeDateMillis)
+                .get(Source.DEFAULT).await()
+            val logs = snap.documents.mapNotNull { doc ->
+                val d = doc.data ?: return@mapNotNull null
+                CardioLog(
+                    id = doc.id.substringAfter("_", doc.id).toLongOrNull() ?: 0L,
+                    type = runCatching { com.example.data.model.CardioType.valueOf(d["type"] as? String ?: "TREADMILL") }
+                        .getOrDefault(com.example.data.model.CardioType.TREADMILL),
+                    durationMinutes = (d["durationMinutes"] as? Number)?.toInt() ?: 0,
+                    caloriesBurned = (d["caloriesBurned"] as? Number)?.toInt() ?: 0,
+                    distanceKm = (d["distanceKm"] as? Number)?.toFloat(),
+                    dateMillis = (d["dateMillis"] as? Number)?.toLong() ?: 0L,
+                    notes = d["notes"] as? String ?: ""
+                )
+            }
+            Result.success(logs)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun fetchProgressLogsFromCloud(
+        customUid: String? = null,
+        daysBack: Long = DEFAULT_LOG_WINDOW_DAYS,
+        limitCount: Long = DEFAULT_LOG_PAGE_LIMIT,
+        beforeDateMillis: Long? = null
+    ): Result<List<ProgressLog>> {
+        val uid = resolveUserId(customUid) ?: return Result.failure(Exception("Usuário não autenticado"))
+        return try {
+            val snap = buildScopedDateQuery(uid, "progressLogs", daysBack, limitCount, beforeDateMillis)
+                .get(Source.DEFAULT).await()
+            val logs = snap.documents.mapNotNull { doc ->
+                val d = doc.data ?: return@mapNotNull null
+                ProgressLog(
+                    id = doc.id.toLongOrNull() ?: 0L,
+                    dateMillis = (d["dateMillis"] as? Number)?.toLong() ?: 0L,
+                    dateDisplay = d["dateDisplay"] as? String ?: "",
+                    weightKg = (d["weightKg"] as? Number)?.toFloat() ?: 0f,
+                    bodyFatPercentage = (d["bodyFatPercent"] as? Number)?.toFloat() ?: 0f,
+                    notes = d["notes"] as? String ?: ""
+                )
+            }
+            Result.success(logs)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }
@@ -919,7 +1087,7 @@ open class FirestoreSyncManager(private val context: Context) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao sincronizar item de compra: ${e.message}", e)
+            AppLog.e("FirestoreSync", "Erro ao sincronizar item de compra: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -955,7 +1123,7 @@ open class FirestoreSyncManager(private val context: Context) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.e("FirestoreSync", "Erro ao sincronizar progresso: ${e.message}", e)
+            AppLog.e("FirestoreSync", "Erro ao sincronizar progresso: ${e.message}", e)
             Result.failure(e)
         }
     }
@@ -1012,7 +1180,7 @@ open class FirestoreSyncManager(private val context: Context) {
         val wid = workoutId ?: if (exercise.routineId > 0) exercise.routineId.toString() else "free"
         val exerciseIdStr = exercise.id.toString()
         val docId = "${wid}_$exerciseIdStr"
-        val path = "users/$uid/workoutRoutines/$wid/workoutExercises/$exerciseIdStr"
+        val path = "users/$uid/workoutRoutines/$wid/exercises/$exerciseIdStr"
         FirestoreLogger.logWriteAttempt("syncWorkoutExerciseToCloud", uid, path, exercise)
         return try {
             val baseData = workoutExercisePayload(uid, wid, exercise)
@@ -1028,36 +1196,10 @@ open class FirestoreSyncManager(private val context: Context) {
                 "updatedAt" to FieldValue.serverTimestamp()
             )
 
-            val batch = firestore.batch()
-            // 1. Subcoleção aninhada em workoutRoutines/{wid}/workoutExercises/{exerciseId}
-            batch.set(
-                userDocRef.collection("workoutRoutines").document(wid)
-                    .collection("workoutExercises").document(exerciseIdStr),
-                data,
-                SetOptions.merge()
-            )
-            // 2. Subcoleção aninhada em workouts/{wid}/workoutExercises/{exerciseId}
-            batch.set(
-                userDocRef.collection("workouts").document(wid)
-                    .collection("workoutExercises").document(exerciseIdStr),
-                data,
-                SetOptions.merge()
-            )
-            // 3. Subcoleção aninhada em workouts/{wid}/exercises/{exerciseId}
-            batch.set(
-                userDocRef.collection("workouts").document(wid)
-                    .collection("exercises").document(exerciseIdStr),
-                data,
-                SetOptions.merge()
-            )
-            // 4. Estrutura atual preservada em workoutExercises/{docId} para retrocompatibilidade
-            batch.set(
-                userDocRef.collection("workoutExercises").document(docId),
-                data,
-                SetOptions.merge()
-            )
+            val docRef = userDocRef.collection("workoutRoutines").document(wid)
+                .collection("exercises").document(exerciseIdStr)
 
-            awaitCloudWrite(batch.commit())
+            awaitCloudWrite(docRef.set(data, SetOptions.merge()))
             deltaLedger.markEntitySynced(uid, "workoutExercises", docId, hash, nowMillis)
             FirestoreLogger.logSuccess("syncWorkoutExerciseToCloud", path)
             Result.success(Unit)
@@ -1090,7 +1232,11 @@ open class FirestoreSyncManager(private val context: Context) {
         "dailyIntake",
         "favoriteFoods",
         "workoutRoutines",
-        "workoutExercises"
+        "workout_logs",
+        "cardio_logs",
+        "shoppingList",
+        "workoutExercises",
+        "workouts"
     )
 
     private suspend fun deleteCollectionFromServer(
@@ -1161,20 +1307,59 @@ open class FirestoreSyncManager(private val context: Context) {
         val uid = resolveUserId(profile?.firebaseUid)
             ?: return Result.failure(IllegalStateException("Entre na sua conta para sincronizar. Os dados locais continuam no aparelho."))
 
-        // Executa automaticamente a migração não-destrutiva de exercícios para workoutRoutines/{id}/workoutExercises e workouts/{id}/exercises
+        // Executa automaticamente a migração de coleções legadas para o formato canônico camelCase e apaga o legado
         if (migratedUsersInSession.add(uid)) {
             runCatching {
                 val migrationService = WorkoutMigrationService(context, firestore, auth)
-                migrationService.migrateUserWorkoutsAndExercises(uid, preserveLegacyDocuments = true)
+                migrationService.migrateUserWorkoutsAndExercises(uid, preserveLegacyDocuments = false)
                 if (workoutExercises.isNotEmpty()) {
                     migrationService.migrateLocalExercisesToSubcollections(workoutExercises, uid)
                 }
             }
         }
 
+        data class QueuedBatchEntityWrite(
+            val docRef: DocumentReference,
+            val payload: Map<String, Any>,
+            val collectionKey: String,
+            val docId: String,
+            val hash: String,
+            val timestampMillis: Long
+        )
+
         val operations = mutableListOf<suspend () -> Result<Unit>>()
+        val queuedEntityWrites = mutableListOf<QueuedBatchEntityWrite>()
         var skippedCount = 0
         var updatedFieldsCount = 0
+        val userDocRef = firestore.collection("users").document(uid)
+        val batchTimestampMillis = System.currentTimeMillis()
+
+        fun enqueueEntityWriteIfChanged(
+            collectionKey: String,
+            docRef: DocumentReference,
+            docId: String,
+            basePayload: Map<String, Any>
+        ) {
+            val hash = FirestoreDeltaEngine.computeRecordHash(collectionKey, basePayload)
+            if (deltaLedger.hasEntityChanged(uid, collectionKey, docId, hash)) {
+                val payloadWithMeta = basePayload + mapOf(
+                    "updatedAtMillis" to batchTimestampMillis,
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+                queuedEntityWrites.add(
+                    QueuedBatchEntityWrite(
+                        docRef = docRef,
+                        payload = payloadWithMeta,
+                        collectionKey = collectionKey,
+                        docId = docId,
+                        hash = hash,
+                        timestampMillis = batchTimestampMillis
+                    )
+                )
+            } else {
+                skippedCount++
+            }
+        }
 
         if (profile != null) {
             val canonicalProfile = FirestoreDeltaEngine.profileToCanonicalMap(profile, uid)
@@ -1214,119 +1399,147 @@ open class FirestoreSyncManager(private val context: Context) {
         workoutRoutines.forEach { routine ->
             if (routine.id > 0L) {
                 val docId = routine.id.toString()
-                val hash = FirestoreDeltaEngine.computeRecordHash("workoutRoutines", workoutRoutinePayload(uid, routine))
-                if (deltaLedger.hasEntityChanged(uid, "workoutRoutines", docId, hash)) {
-                    operations.add { syncWorkoutRoutineToCloud(routine, uid) }
-                } else {
-                    skippedCount++
-                }
+                enqueueEntityWriteIfChanged(
+                    collectionKey = "workoutRoutines",
+                    docRef = userDocRef.collection("workoutRoutines").document(docId),
+                    docId = docId,
+                    basePayload = workoutRoutinePayload(uid, routine)
+                )
             }
         }
 
         workoutExercises.forEach { exercise ->
             if (exercise.id > 0L) {
                 val wid = if (exercise.routineId > 0L) exercise.routineId.toString() else "free"
-                val docId = "${wid}_${exercise.id}"
-                val hash = FirestoreDeltaEngine.computeRecordHash("workoutExercises", workoutExercisePayload(uid, wid, exercise))
-                if (deltaLedger.hasEntityChanged(uid, "workoutExercises", docId, hash)) {
-                    operations.add { syncWorkoutExerciseToCloud(exercise, wid, uid) }
-                } else {
-                    skippedCount++
-                }
+                val exerciseIdStr = exercise.id.toString()
+                val docId = "${wid}_$exerciseIdStr"
+                enqueueEntityWriteIfChanged(
+                    collectionKey = "workoutExercises",
+                    docRef = userDocRef.collection("workoutRoutines").document(wid).collection("exercises").document(exerciseIdStr),
+                    docId = docId,
+                    basePayload = workoutExercisePayload(uid, wid, exercise)
+                )
             }
         }
 
         mealPlanItems.forEach { item ->
             if (item.id > 0L) {
                 val docId = item.id.toString()
-                val hash = FirestoreDeltaEngine.computeRecordHash("mealPlans", mealPlanPayload(uid, item))
-                if (deltaLedger.hasEntityChanged(uid, "mealPlans", docId, hash)) {
-                    operations.add { syncMealPlanToCloud(item, uid) }
-                } else {
-                    skippedCount++
-                }
+                enqueueEntityWriteIfChanged(
+                    collectionKey = "mealPlans",
+                    docRef = userDocRef.collection("mealPlans").document(docId),
+                    docId = docId,
+                    basePayload = mealPlanPayload(uid, item)
+                )
             }
         }
 
         shoppingItems.forEach { item ->
             if (item.id > 0L) {
                 val docId = item.id.toString()
-                val hash = FirestoreDeltaEngine.computeRecordHash("shoppingItems", shoppingItemPayload(uid, item))
-                if (deltaLedger.hasEntityChanged(uid, "shoppingItems", docId, hash)) {
-                    operations.add { syncShoppingItemToCloud(item, uid) }
-                } else {
-                    skippedCount++
-                }
+                enqueueEntityWriteIfChanged(
+                    collectionKey = "shoppingItems",
+                    docRef = userDocRef.collection("shoppingItems").document(docId),
+                    docId = docId,
+                    basePayload = shoppingItemPayload(uid, item)
+                )
             }
         }
 
         workoutLogs.forEach { log ->
             val docId = if (log.id > 0) log.id.toString() else "workout_${log.dateMillis}"
-            val hash = FirestoreDeltaEngine.computeRecordHash("workoutLogs", workoutLogPayload(uid, log))
-            if (deltaLedger.hasEntityChanged(uid, "workoutLogs", docId, hash)) {
-                operations.add { syncWorkoutLogToCloud(log, uid) }
-            } else {
-                skippedCount++
-            }
+            enqueueEntityWriteIfChanged(
+                collectionKey = "workoutLogs",
+                docRef = userDocRef.collection("workoutLogs").document(docId),
+                docId = docId,
+                basePayload = workoutLogPayload(uid, log)
+            )
         }
 
         progressLogs.forEach { log ->
             val docId = log.id.toString()
-            val hash = FirestoreDeltaEngine.computeRecordHash("progressLogs", progressLogPayload(uid, log))
-            if (deltaLedger.hasEntityChanged(uid, "progressLogs", docId, hash)) {
-                operations.add { syncProgressLogToCloud(log) }
-            } else {
-                skippedCount++
-            }
+            enqueueEntityWriteIfChanged(
+                collectionKey = "progressLogs",
+                docRef = userDocRef.collection("progressLogs").document(docId),
+                docId = docId,
+                basePayload = progressLogPayload(uid, log)
+            )
         }
 
         gpsLogs.forEach { log ->
             val docId = if (log.id > 0) log.id.toString() else "gps_${log.dateMillis}"
-            val hash = FirestoreDeltaEngine.computeRecordHash("gpsRouteLogs", gpsRouteLogPayload(uid, log))
-            if (deltaLedger.hasEntityChanged(uid, "gpsRouteLogs", docId, hash)) {
-                operations.add { syncGpsRouteLogToCloud(log, uid) }
-            } else {
-                skippedCount++
-            }
+            enqueueEntityWriteIfChanged(
+                collectionKey = "gpsRouteLogs",
+                docRef = userDocRef.collection("gpsRouteLogs").document(docId),
+                docId = docId,
+                basePayload = gpsRouteLogPayload(uid, log)
+            )
         }
 
         foodRecords.forEach { record ->
             val docId = if (record.id > 0) record.id.toString() else "food_${record.dateMillis}"
-            val hash = FirestoreDeltaEngine.computeRecordHash("foodRecords", foodRecordPayload(uid, record))
-            if (deltaLedger.hasEntityChanged(uid, "foodRecords", docId, hash)) {
-                operations.add { syncFoodRecordToCloud(record, uid) }
-            } else {
-                skippedCount++
-            }
+            enqueueEntityWriteIfChanged(
+                collectionKey = "foodRecords",
+                docRef = userDocRef.collection("foodRecords").document(docId),
+                docId = docId,
+                basePayload = foodRecordPayload(uid, record)
+            )
         }
 
         cardioLogs.forEach { log ->
             val docId = if (log.id > 0) log.id.toString() else "cardio_${log.dateMillis}"
-            val hash = FirestoreDeltaEngine.computeRecordHash("cardioLogs", cardioLogPayload(uid, log))
-            if (deltaLedger.hasEntityChanged(uid, "cardioLogs", docId, hash)) {
-                operations.add { syncCardioLogToCloud(log, uid) }
-            } else {
-                skippedCount++
-            }
+            enqueueEntityWriteIfChanged(
+                collectionKey = "cardioLogs",
+                docRef = userDocRef.collection("cardioLogs").document(docId),
+                docId = docId,
+                basePayload = cardioLogPayload(uid, log)
+            )
         }
 
         dailyIntakes.forEach { intake ->
             val docId = intake.dateString
-            val hash = FirestoreDeltaEngine.computeRecordHash("dailyIntake", dailyIntakePayload(uid, intake))
-            if (deltaLedger.hasEntityChanged(uid, "dailyIntake", docId, hash)) {
-                operations.add { syncDailyIntakeToCloud(intake, uid) }
-            } else {
-                skippedCount++
-            }
+            enqueueEntityWriteIfChanged(
+                collectionKey = "dailyIntake",
+                docRef = userDocRef.collection("dailyIntake").document(docId),
+                docId = docId,
+                basePayload = dailyIntakePayload(uid, intake)
+            )
         }
 
         favoriteFoods.forEach { food ->
             val docId = food.id.toString()
-            val hash = FirestoreDeltaEngine.computeRecordHash("favoriteFoods", favoriteFoodPayload(uid, food))
-            if (deltaLedger.hasEntityChanged(uid, "favoriteFoods", docId, hash)) {
-                operations.add { syncFavoriteFoodToCloud(food, uid) }
-            } else {
-                skippedCount++
+            enqueueEntityWriteIfChanged(
+                collectionKey = "favoriteFoods",
+                docRef = userDocRef.collection("favoriteFoods").document(docId),
+                docId = docId,
+                basePayload = favoriteFoodPayload(uid, food)
+            )
+        }
+
+        // Commit entity writes in WriteBatch chunks of up to MAX_BATCH_OPERATIONS (450 < 500 Firestore limit)
+        queuedEntityWrites.chunked(MAX_BATCH_OPERATIONS).forEach { chunk ->
+            operations.add {
+                try {
+                    val batch = firestore.batch()
+                    chunk.forEach { item ->
+                        batch.set(item.docRef, item.payload, SetOptions.merge())
+                    }
+                    awaitCloudWrite(batch.commit())
+                    chunk.forEach { item ->
+                        deltaLedger.markEntitySynced(
+                            uid,
+                            item.collectionKey,
+                            item.docId,
+                            item.hash,
+                            item.timestampMillis
+                        )
+                    }
+                    Result.success(Unit)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Result.failure(e)
+                }
             }
         }
 

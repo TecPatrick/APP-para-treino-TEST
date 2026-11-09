@@ -302,7 +302,7 @@ fun WorkoutHistoryModal(
                         modifier = Modifier.height(300.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(workoutLogs) { log ->
+                        items(items = workoutLogs, key = { it.id }, contentType = { "workout_log" }) { log ->
                             Surface(
                                 color = CarbonCardElevated,
                                 shape = RoundedCornerShape(10.dp),

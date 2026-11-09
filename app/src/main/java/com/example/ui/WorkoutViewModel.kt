@@ -3,7 +3,6 @@ package com.example.ui
 import android.app.Application
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import androidx.lifecycle.viewModelScope
 import com.example.data.ai.GeminiRepository
 import com.example.data.local.PrepopulatedData
@@ -14,6 +13,7 @@ import com.example.data.model.WorkoutPlan
 import com.example.data.model.WorkoutRoutine
 import com.example.data.model.WorkoutSchedule
 import com.example.data.model.WorkoutSplitType
+import com.example.util.AppLog
 import com.example.util.ExerciseGifMapper
 import com.example.util.ExerciseVisualGuide
 import com.example.util.WorkoutAudioHapticHelper
@@ -58,7 +58,7 @@ class WorkoutViewModel(application: Application) : BaseVirtusDomainViewModel(app
                 }
                 showToast("Fichas padrão (Treinos A, B, C e E) restauradas com sucesso!")
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLog.e("WorkoutViewModel", "Erro ao restaurar fichas", e)
                 showToast("Erro ao restaurar fichas: ${e.message}")
             }
         }
@@ -80,7 +80,7 @@ class WorkoutViewModel(application: Application) : BaseVirtusDomainViewModel(app
                 repository.addWorkoutRoutine(newRoutine)
                 showToast("Ficha $letter criada! Agora é só incluir os exercícios 💪")
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLog.e("WorkoutViewModel", "Erro ao criar ficha", e)
                 showToast("Erro ao criar ficha: ${e.message}")
             }
         }
@@ -234,10 +234,10 @@ class WorkoutViewModel(application: Application) : BaseVirtusDomainViewModel(app
                     shared.setCloudWorkoutLogs(list)
                     showToast("${list.size} treinos históricos carregados do Firestore (App Check verificado).")
                 }.onFailure { err ->
-                    Log.w("WorkoutViewModel", "Erro ao carregar treinos do Firestore: ${err.message}")
+                    AppLog.w("WorkoutViewModel", "Erro ao carregar treinos do Firestore: ${err.message}")
                 }
             } catch (e: Exception) {
-                Log.e("WorkoutViewModel", "Exceção ao buscar treinos do Firestore", e)
+                AppLog.e("WorkoutViewModel", "Exceção ao buscar treinos do Firestore", e)
             } finally {
                 shared.setFirestoreSyncing(false)
             }
@@ -270,7 +270,7 @@ class WorkoutViewModel(application: Application) : BaseVirtusDomainViewModel(app
             shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(shareIntent)
         } catch (e: Exception) {
-            Log.e("WorkoutViewModel", "Error sharing progression", e)
+            AppLog.e("WorkoutViewModel", "Error sharing progression", e)
         }
     }
 
@@ -450,7 +450,7 @@ class WorkoutViewModel(application: Application) : BaseVirtusDomainViewModel(app
                 repository.deleteExercisesForRoutine(existingRoutineId)
 
                 firestoreSync.syncWorkoutRoutineToCloud(updatedRoutine).onFailure { e ->
-                    Log.e("WorkoutViewModel", "Falha ao sincronizar rotina: ${e.message}")
+                    AppLog.e("WorkoutViewModel", "Falha ao sincronizar rotina: ${e.message}", e)
                     showToast("Erro ao sincronizar rotina na nuvem.")
                 }
 
@@ -467,7 +467,7 @@ class WorkoutViewModel(application: Application) : BaseVirtusDomainViewModel(app
                 val id = repository.addWorkoutRoutine(newRoutine)
 
                 firestoreSync.syncWorkoutRoutineToCloud(newRoutine.copy(id = id)).onFailure { e ->
-                    Log.e("WorkoutViewModel", "Falha ao sincronizar nova rotina: ${e.message}")
+                    AppLog.e("WorkoutViewModel", "Falha ao sincronizar nova rotina: ${e.message}", e)
                     showToast("Erro ao sincronizar nova rotina na nuvem.")
                 }
 
@@ -487,7 +487,7 @@ class WorkoutViewModel(application: Application) : BaseVirtusDomainViewModel(app
                 val workoutId = routineId.toString()
 
                 firestoreSync.syncWorkoutExerciseToCloud(exWithId.copy(id = id), workoutId = workoutId).onFailure { e ->
-                    Log.e("WorkoutViewModel", "Falha ao sincronizar exercício $id no caminho aninhado: ${e.message}")
+                    AppLog.e("WorkoutViewModel", "Falha ao sincronizar exercício $id no caminho aninhado: ${e.message}", e)
                     showToast("Erro ao sincronizar exercício na nuvem.")
                 }
             }

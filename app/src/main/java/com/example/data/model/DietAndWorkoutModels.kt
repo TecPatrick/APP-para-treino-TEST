@@ -1,8 +1,10 @@
 package com.example.data.model
 
+import androidx.compose.runtime.Immutable
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
+@Immutable
 @Entity(tableName = "dietary_profiles")
 data class DietaryProfile(
     @PrimaryKey val id: Int = 0,
@@ -13,6 +15,7 @@ data class DietaryProfile(
     val fatGoal: Int
 )
 
+@Immutable
 @Entity(tableName = "macros")
 data class Macro(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
@@ -23,6 +26,7 @@ data class Macro(
     val fat: Int
 )
 
+@Immutable
 @Entity(tableName = "workout_schedules")
 data class WorkoutSchedule(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,

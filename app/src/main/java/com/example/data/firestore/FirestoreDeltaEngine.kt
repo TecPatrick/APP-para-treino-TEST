@@ -233,12 +233,14 @@ object FirestoreDeltaEngine {
  * Armazena localmente (em SharedPreferences + cache em memória) os hashes e snapshots
  * já sincronizados por usuário para evitar reenvios desnecessários ao Firestore.
  */
-class DeltaSyncLedger(context: Context? = null) {
+class DeltaSyncLedger(private val context: Context? = null) {
 
-    private val prefs: SharedPreferences? = try {
-        context?.applicationContext?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    } catch (_: Exception) {
-        null
+    private val prefs: SharedPreferences? by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        try {
+            context?.applicationContext?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private val memoryStore = mutableMapOf<String, String>()

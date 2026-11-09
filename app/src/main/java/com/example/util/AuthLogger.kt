@@ -1,6 +1,5 @@
 package com.example.util
 
-import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
@@ -83,38 +82,37 @@ object AuthLogger {
         if (!isListenerAttached) {
             auth.addAuthStateListener(listener)
             isListenerAttached = true
-            Log.i(TAG, "📡 [AUTH_LISTENER] Firebase AuthStateListener attached successfully.")
+            AppLog.i(TAG, "📡 [AUTH_LISTENER] Firebase AuthStateListener attached successfully.")
         }
         return listener
     }
 
     /**
-     * Logs auth state transition (signed in vs signed out).
+     * Logs auth state transition (signed in vs signed out) without exposing full UID or email.
      */
     fun logAuthStateChanged(user: FirebaseUser?) {
-        val timestamp = System.currentTimeMillis()
         if (user != null) {
+            val maskedUid = AppLog.maskUid(user.uid)
             val sanitizedEmail = sanitizeIdentifier(user.email)
             val providerIds = user.providerData.joinToString { it.providerId }
             val logMessage = buildString {
                 appendLine("======================================================================")
                 appendLine("👤 [AUTH STATE] User is SIGNED IN")
-                appendLine("├─ UID: ${user.uid}")
+                appendLine("├─ UID: $maskedUid")
                 appendLine("├─ Email: $sanitizedEmail (Verified: ${user.isEmailVerified})")
-                appendLine("├─ Name: ${user.displayName ?: "<not set>"}")
                 appendLine("├─ Providers: [$providerIds]")
                 appendLine("└─ Is Anonymous: ${user.isAnonymous}")
                 appendLine("======================================================================")
             }
-            Log.i(TAG, logMessage)
-            recordEvent("AUTH_STATE_SIGNED_IN", "UID=${user.uid}, email=$sanitizedEmail, providers=$providerIds")
+            AppLog.i(TAG, logMessage)
+            recordEvent("AUTH_STATE_SIGNED_IN", "UID=$maskedUid, email=$sanitizedEmail, providers=$providerIds")
         } else {
             val logMessage = buildString {
                 appendLine("======================================================================")
                 appendLine("🚪 [AUTH STATE] User is SIGNED OUT (No active session)")
                 appendLine("======================================================================")
             }
-            Log.i(TAG, logMessage)
+            AppLog.i(TAG, logMessage)
             recordEvent("AUTH_STATE_SIGNED_OUT", "No authenticated user")
         }
     }
@@ -124,7 +122,7 @@ object AuthLogger {
      */
     fun logLoginAttempt(method: String, identifier: String?) {
         val sanitized = sanitizeIdentifier(identifier)
-        Log.d(TAG, "🚀 [AUTH ATTEMPT] Method: $method | Target: $sanitized")
+        AppLog.d(TAG, "🚀 [AUTH ATTEMPT] Method: $method | Target: $sanitized")
         recordEvent("LOGIN_ATTEMPT", "Method=$method, Target=$sanitized")
     }
 
@@ -132,9 +130,10 @@ object AuthLogger {
      * Logs a successful authentication attempt.
      */
     fun logLoginSuccess(method: String, user: FirebaseUser) {
+        val maskedUid = AppLog.maskUid(user.uid)
         val sanitized = sanitizeIdentifier(user.email)
-        Log.i(TAG, "✅ [AUTH SUCCESS] Method: $method | UID: ${user.uid} | Email: $sanitized")
-        recordEvent("LOGIN_SUCCESS", "Method=$method, UID=${user.uid}, Target=$sanitized")
+        AppLog.i(TAG, "✅ [AUTH SUCCESS] Method: $method | UID: $maskedUid | Email: $sanitized")
+        recordEvent("LOGIN_SUCCESS", "Method=$method, UID=$maskedUid, Target=$sanitized")
         lastDiagnosis = null
     }
 
@@ -168,11 +167,11 @@ object AuthLogger {
         }
 
         if (diagnosis.isAppCheckOrRecaptcha || diagnosis.category == FailureCategory.NETWORK_FAILURE) {
-            Log.e(TAG, logOutput, throwable)
+            AppLog.e(TAG, logOutput, throwable)
         } else if (diagnosis.isWrongPassword) {
-            Log.w(TAG, logOutput)
+            AppLog.w(TAG, logOutput)
         } else {
-            Log.e(TAG, logOutput, throwable)
+            AppLog.e(TAG, logOutput, throwable)
         }
 
         recordEvent(
@@ -189,14 +188,15 @@ object AuthLogger {
      */
     fun logRegistrationAttempt(email: String) {
         val sanitized = sanitizeIdentifier(email)
-        Log.d(TAG, "📝 [REGISTER ATTEMPT] Email: $sanitized")
+        AppLog.d(TAG, "📝 [REGISTER ATTEMPT] Email: $sanitized")
         recordEvent("REGISTER_ATTEMPT", "Email=$sanitized")
     }
 
     fun logRegistrationSuccess(user: FirebaseUser) {
+        val maskedUid = AppLog.maskUid(user.uid)
         val sanitized = sanitizeIdentifier(user.email)
-        Log.i(TAG, "✅ [REGISTER SUCCESS] UID: ${user.uid} | Email: $sanitized")
-        recordEvent("REGISTER_SUCCESS", "UID=${user.uid}, Email=$sanitized")
+        AppLog.i(TAG, "✅ [REGISTER SUCCESS] UID: $maskedUid | Email: $sanitized")
+        recordEvent("REGISTER_SUCCESS", "UID=$maskedUid, Email=$sanitized")
         lastDiagnosis = null
     }
 
@@ -205,7 +205,7 @@ object AuthLogger {
         lastDiagnosis = diagnosis
         val sanitized = sanitizeIdentifier(email)
 
-        Log.e(
+        AppLog.e(
             TAG,
             "❌ [REGISTER FAILURE] Email: $sanitized | Category: ${diagnosis.category} | " +
                 "Code: ${diagnosis.errorCode} | ${diagnosis.summary}",
@@ -219,9 +219,9 @@ object AuthLogger {
      * Logs explicit sign-out.
      */
     fun logSignOut(user: FirebaseUser?) {
-        val uid = user?.uid ?: "unknown"
-        Log.i(TAG, "🚪 [SIGN OUT] Active session ended for UID: $uid")
-        recordEvent("SIGN_OUT", "UID=$uid")
+        val maskedUid = AppLog.maskUid(user?.uid)
+        AppLog.i(TAG, "🚪 [SIGN OUT] Active session ended for UID: $maskedUid")
+        recordEvent("SIGN_OUT", "UID=$maskedUid")
     }
 
     /**

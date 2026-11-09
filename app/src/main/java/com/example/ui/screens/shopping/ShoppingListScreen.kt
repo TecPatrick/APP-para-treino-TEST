@@ -50,7 +50,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.MacronutrientAisle
-import com.example.ui.ShoppingListViewModel
 import com.example.ui.ShoppingViewModel
 import com.example.ui.components.GrowthHeader
 import com.example.ui.theme.CarbonBorder
@@ -65,20 +64,19 @@ import com.example.ui.theme.GrowthYellow
 @Composable
 fun ShoppingListScreen(
     viewModel: ShoppingViewModel,
-    shoppingListViewModel: ShoppingListViewModel = androidx.lifecycle.viewmodel.compose.viewModel(),
     onNavigateToReceipts: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val profile by viewModel.userProfile.collectAsStateWithLifecycle()
-    val shoppingList by shoppingListViewModel.shoppingList.collectAsStateWithLifecycle()
-    val aisleGroupedItems by shoppingListViewModel.aisleGroupedItems.collectAsStateWithLifecycle()
-    val selectedPeriodDays by shoppingListViewModel.selectedPeriodDays.collectAsStateWithLifecycle()
-    val uiMessage by shoppingListViewModel.uiMessage.collectAsStateWithLifecycle()
+    val shoppingList by viewModel.shoppingList.collectAsStateWithLifecycle()
+    val aisleGroupedItems by viewModel.aisleGroupedItems.collectAsStateWithLifecycle()
+    val selectedPeriodDays by viewModel.selectedPeriodDays.collectAsStateWithLifecycle()
+    val uiMessage by viewModel.uiMessage.collectAsStateWithLifecycle()
 
     LaunchedEffect(uiMessage) {
         uiMessage?.let {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-            shoppingListViewModel.clearUiMessage()
+            viewModel.clearUiMessage()
         }
     }
 
@@ -87,14 +85,14 @@ fun ShoppingListScreen(
     var generatedExportCode by remember { mutableStateOf("") }
     var showImportCodeDialog by remember { mutableStateOf(false) }
 
-    val totalItems = shoppingList.size
-    val completedItems = shoppingList.count { it.isChecked }
-    val isJointShoppingActive = shoppingList.any { it.isJointItem }
-    val partnerName = shoppingList.firstOrNull { it.isJointItem }?.partnerName.orEmpty().ifBlank { "Irmão" }
+    val totalItems = remember(shoppingList) { shoppingList.size }
+    val completedItems = remember(shoppingList) { shoppingList.count { it.isChecked } }
+    val isJointShoppingActive = remember(shoppingList) { shoppingList.any { it.isJointItem } }
+    val partnerName = remember(shoppingList) { shoppingList.firstOrNull { it.isJointItem }?.partnerName.orEmpty().ifBlank { "Irmão" } }
 
-    val totalEstimatedCost = shoppingList.sumOf { it.estimatedPrice.toDouble() }.toFloat()
-    val myTotalCost = shoppingList.sumOf { it.myEstimatedPrice.toDouble() }.toFloat()
-    val partnerTotalCost = shoppingList.sumOf { it.partnerEstimatedPrice.toDouble() }.toFloat()
+    val totalEstimatedCost = remember(shoppingList) { shoppingList.sumOf { it.estimatedPrice.toDouble() }.toFloat() }
+    val myTotalCost = remember(shoppingList) { shoppingList.sumOf { it.myEstimatedPrice.toDouble() }.toFloat() }
+    val partnerTotalCost = remember(shoppingList) { shoppingList.sumOf { it.partnerEstimatedPrice.toDouble() }.toFloat() }
 
     Box(
         modifier = Modifier
@@ -122,7 +120,7 @@ fun ShoppingListScreen(
 
                         IconButton(
                             onClick = {
-                                shoppingListViewModel.exportShoppingCode(profile.name) { code ->
+                                viewModel.exportShoppingCode(profile.name) { code ->
                                     generatedExportCode = code
                                     showExportCodeDialog = true
                                 }
@@ -141,7 +139,7 @@ fun ShoppingListScreen(
 
                         if (completedItems > 0) {
                             IconButton(
-                                onClick = { shoppingListViewModel.clearCheckedShoppingItems() },
+                                onClick = { viewModel.clearCheckedShoppingItems() },
                                 modifier = Modifier.testTag("clear_checked_shopping_btn")
                             ) {
                                 Icon(Icons.Default.DeleteSweep, contentDescription = "Limpar Adquiridos", tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -158,14 +156,14 @@ fun ShoppingListScreen(
                 contentPadding = PaddingValues(top = 4.dp, bottom = 96.dp)
             ) {
                 if (isJointShoppingActive) {
-                    item {
+                    item(key = "joint_split_banner", contentType = "banner") {
                         JointShoppingSplitBannerCard(
                             profileName = profile.name,
                             partnerName = partnerName,
                             myTotalCost = myTotalCost,
                             partnerTotalCost = partnerTotalCost,
                             totalEstimatedCost = totalEstimatedCost,
-                            onUnlink = { shoppingListViewModel.unlinkPartnerShopping() }
+                            onUnlink = { viewModel.unlinkPartnerShopping() }
                         )
                     }
                 }
@@ -279,11 +277,11 @@ fun ShoppingListScreen(
                     }
                 }
 
-                item {
+                item(key = "period_auto_sync", contentType = "period_selector") {
                     ShoppingPeriodAutoSyncCard(
                         selectedPeriodDays = selectedPeriodDays,
-                        onSelectPeriodDays = { shoppingListViewModel.setPeriodDays(it) },
-                        onRecalculateClick = { shoppingListViewModel.parseDietPlanAndGenerateShoppingList(selectedPeriodDays) }
+                        onSelectPeriodDays = { viewModel.setPeriodDays(it) },
+                        onRecalculateClick = { viewModel.parseDietPlanAndGenerateShoppingList(selectedPeriodDays) }
                     )
                 }
 
@@ -399,7 +397,7 @@ fun ShoppingListScreen(
                             MacronutrientAisle.FAT -> GrowthYellow
                         }
 
-                        item(key = "aisle_header_${aisle.name}") {
+                        item(key = "aisle_header_${aisle.name}", contentType = "aisle_header") {
                             ShoppingAisleHeaderCard(
                                 aisle = aisle,
                                 aisleTotal = aisleTotal,
@@ -412,19 +410,20 @@ fun ShoppingListScreen(
 
                         items(
                             items = aisleItems,
-                            key = { item -> item.id }
+                            key = { item -> item.id },
+                            contentType = { "shopping_item" }
                         ) { item ->
                             ShoppingAisleItemCard(
                                 item = item,
                                 partnerName = partnerName,
                                 aisleAccentColor = aisleAccentColor,
-                                onToggleItem = { shoppingListViewModel.toggleShoppingItem(item) }
+                                onToggleItem = { viewModel.toggleShoppingItem(item) }
                             )
                         }
                     }
                 }
 
-                item {
+                item(key = "add_extra_btn", contentType = "footer_action") {
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedButton(
                         onClick = { showAddItemDialog = true },
@@ -447,7 +446,7 @@ fun ShoppingListScreen(
         AddManualShoppingItemDialog(
             onDismiss = { showAddItemDialog = false },
             onConfirm = { name, cat, qty, unit, price ->
-                shoppingListViewModel.addExtraProduct(name, cat, qty, unit, price)
+                viewModel.addExtraProduct(name, cat, qty, unit, price)
                 showAddItemDialog = false
             }
         )
@@ -464,7 +463,7 @@ fun ShoppingListScreen(
         ImportPartnerShoppingDialog(
             onDismiss = { showImportCodeDialog = false },
             onImport = { code, name ->
-                shoppingListViewModel.importAndMergePartnerShopping(code, name)
+                viewModel.importAndMergePartnerShopping(code, name)
                 showImportCodeDialog = false
             }
         )

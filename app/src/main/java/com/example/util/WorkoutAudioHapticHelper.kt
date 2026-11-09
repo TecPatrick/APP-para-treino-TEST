@@ -78,7 +78,7 @@ object WorkoutAudioHapticHelper {
                 try {
                     toneGenerator?.startTone(ToneGenerator.TONE_PROP_ACK, 200)
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    AppLog.e("WorkoutAudioHaptic", "Erro ao tocar som de início de descanso", e)
                 }
             }
         }
@@ -108,7 +108,7 @@ object WorkoutAudioHapticHelper {
                 try {
                     toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP, 80)
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    AppLog.e("WorkoutAudioHaptic", "Erro ao tocar som de contagem regressiva", e)
                 }
             }
         }
@@ -138,7 +138,7 @@ object WorkoutAudioHapticHelper {
                 try {
                     toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP2, 350)
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    AppLog.e("WorkoutAudioHaptic", "Erro ao tocar som de fim de descanso", e)
                 }
             }
         }
@@ -177,7 +177,7 @@ object WorkoutAudioHapticHelper {
                 }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLog.e("WorkoutAudioHaptic", "Erro ao acionar vibração", e)
         }
     }
 }

@@ -1,50 +1,41 @@
-# Add project specific ProGuard rules here.
-
-# Preserve useful crash line numbers while removing original source file names.
+# Preserve crash line numbers while obfuscating original source file names.
 -keepattributes SourceFile,LineNumberTable
 -renamesourcefileattribute SourceFile
 
-# Preserve annotations and inner classes
+# Preserve annotations and inner classes required by serialization.
 -keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
 
-# Keep Application, MainActivity & ViewModels
--keep class com.example.MainApplication { *; }
--keep class com.example.VirtusApplication { *; }
--keep class com.example.MainActivity { *; }
--keep class com.example.ui.** { *; }
--keep class com.example.service.** { *; }
--keep class com.example.util.** { *; }
-
-# Keep data models used by Room, Firebase & Serializers
--keep class com.example.data.model.** { *; }
--keep class com.example.data.local.** { *; }
--keep class com.example.data.repository.** { *; }
-
-# Room Database Rules (CRITICAL for R8 release builds)
--keep class * extends androidx.room.RoomDatabase
--keep class * extends androidx.room.RoomDatabase { *; }
--keep class * implements androidx.room.EntityDeletionOrUpdateAdapter { *; }
--keep class * implements androidx.room.EntityInsertionAdapter { *; }
--dontwarn androidx.room.paging.**
-
-# Kotlinx Serialization & Navigation Compose
--keepclassmembers class * {
-    @kotlinx.serialization.Serializable *;
+# Models serialized by Firestore (toObject / set with classes).
+-keep class com.example.data.model.** {
+    <init>();
+    <fields>;
 }
--keepclassmembers class * {
-    ** Companion;
+-keepclassmembers enum com.example.data.model.** {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
 }
--keep class kotlinx.serialization.** { *; }
 
-# Firebase & Google Play Services
--keep class com.google.firebase.** { *; }
--keep class com.google.android.gms.** { *; }
+# Official kotlinx.serialization R8 rules.
+-dontnote kotlinx.serialization.AnnotationsKt
+-keepclassmembers class kotlinx.serialization.json.** {
+    *** Companion;
+}
+-keepclasseswithmembers class kotlinx.serialization.json.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-keep,includedescriptorclasses class com.example.**$$serializer { *; }
+-keepclassmembers class com.example.** {
+    *** Companion;
+}
+-keepclasseswithmembers class com.example.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
 
-# Coil Image Loader
--keep class coil.** { *; }
-
-# Never emit verbose Android logging calls in release builds.
+# Strip all Android Log calls in release builds.
 -assumenosideeffects class android.util.Log {
     public static int v(...);
     public static int d(...);
+    public static int i(...);
+    public static int w(...);
+    public static int e(...);
 }
