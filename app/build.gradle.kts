@@ -164,7 +164,7 @@ dependencies {
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
   testImplementation(libs.junit)
-  testImplementation("org.mockito:mockito-core:5.14.2")
+  testImplementation("org.mockito:mockito-core:5.24.0")
   testImplementation(libs.kotlinx.coroutines.test)
   testImplementation(libs.robolectric)
   androidTestImplementation(platform(libs.androidx.compose.bom))
